@@ -1,0 +1,16 @@
+spring:
+  # 테스트는 임베디드 H2(create-drop) — TCP 서버 불필요, 실 DB 오염 없음.
+  datasource:
+    url: jdbc:h2:mem:jhg-wms-test;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+  h2:
+    console:
+      enabled: false

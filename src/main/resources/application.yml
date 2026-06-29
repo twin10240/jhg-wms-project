@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: jhg-wms
+  # WMS 자체 DB(OMS와 물리 분리). OMS는 ~/hgpage, WMS는 ~/jhg-wms 로 별도 파일.
+  datasource:
+    url: jdbc:h2:tcp://localhost/~/jhg-wms
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update   # 기본: 데이터 보존. local 프로파일은 create(아래)
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+
+# OMS가 8080이므로 WMS는 8081로 동시 기동 가능
+server:
+  port: 8081
+
+---
+# 스키마 리셋용: --spring.profiles.active=local
+spring:
+  config:
+    activate:
+      on-profile: local
+  jpa:
+    hibernate:
+      ddl-auto: create
