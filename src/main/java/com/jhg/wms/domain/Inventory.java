@@ -38,5 +38,22 @@ public class Inventory {
     public int getAvailableQty() {
         return onHandQty - reservedQty;
     }
-    // ponytail: reserve/ship/release는 S2에서 추가
+
+    /** 가용하면 예약하고 true, 부족하면 false(변경 없음). */
+    public boolean reserve(int qty) {
+        if (getAvailableQty() < qty) return false;
+        reservedQty += qty;
+        return true;
+    }
+
+    /** 예약분 출고: 실물·예약 동시 차감. */
+    public void ship(int qty) {
+        onHandQty -= qty;
+        reservedQty -= qty;
+    }
+
+    /** 예약 해제: 예약분 복구. */
+    public void release(int qty) {
+        reservedQty -= qty;
+    }
 }
