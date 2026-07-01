@@ -2,10 +2,10 @@ package com.jhg.wms.web;
 
 import com.jhg.wms.service.PurchaseOrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -25,12 +25,12 @@ public class PurchaseOrderController {
     public ResponseEntity<PurchaseOrderResponse> create(@RequestBody PurchaseOrderRequest req) {
         try {
             Long poId = purchaseOrderService.create(req.toServiceLines(), req.memo());
-            List<PurchaseOrderResponse.ItemResponse> items = req.lines().stream()
-                    .map(l -> new PurchaseOrderResponse.ItemResponse(null, l.productId(), l.quantity()))
-                    .toList();
-            PurchaseOrderResponse response = new PurchaseOrderResponse(
-                    poId, "ORDERED", req.memo(), LocalDateTime.now(), null, items);
-            return ResponseEntity.ok(response);
+            PurchaseOrderResponse response = purchaseOrderService.findAllWithItems().stream()
+                    .filter(po -> po.getId().equals(poId))
+                    .findFirst()
+                    .map(PurchaseOrderResponse::from)
+                    .orElseThrow();
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

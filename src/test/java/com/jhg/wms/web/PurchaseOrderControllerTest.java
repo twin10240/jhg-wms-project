@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -40,14 +41,18 @@ class PurchaseOrderControllerTest {
     @Test
     void 발주를_생성하고_응답을_반환한다() throws Exception {
         when(purchaseOrderService.create(anyList(), anyString())).thenReturn(7L);
-        PurchaseOrder po = PurchaseOrder.create("긴급", PurchaseOrderItem.create(1L, 10));
+        PurchaseOrderItem item = PurchaseOrderItem.create(1L, 10);
+        ReflectionTestUtils.setField(item, "id", 1L);
+        PurchaseOrder po = PurchaseOrder.create("긴급", item);
+        ReflectionTestUtils.setField(po, "id", 7L);
         when(purchaseOrderService.findAllWithItems()).thenReturn(List.of(po));
 
         mockMvc.perform(post("/api/purchase-orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"lines\":[{\"productId\":1,\"quantity\":10}],\"memo\":\"긴급\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(7));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.items[0].id").value(1));
 
         verify(purchaseOrderService).create(anyList(), eq("긴급"));
     }
