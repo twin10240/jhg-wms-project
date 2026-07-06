@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>WMS 발주 관리</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+    th { background: #f5f5f5; }
+    .flash-ok { color: green; padding: 8px; border: 1px solid green; margin-bottom: 12px; }
+    .flash-err { color: red; padding: 8px; border: 1px solid red; margin-bottom: 12px; }
+    .form-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 16px; }
+    input, select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: 7px 16px; background: #f4a261; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button.sm { padding: 4px 10px; font-size: 13px; }
+    nav { margin-bottom: 16px; }
+    nav a { margin-right: 12px; }
+  </style>
+</head>
+<body>
+  <nav><a th:href="@{/admin/inventory}">재고 관리</a></nav>
+  <h2>WMS 발주 관리</h2>
+
+  <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>
+  <div class="flash-err" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+  <h3>발주 생성</h3>
+  <form th:action="@{/admin/purchase-orders}" method="post" class="form-row">
+    <div>
+      <label>상품 ID</label><br/>
+      <select name="items[0].productId">
+        <option th:each="p : ${products}" th:value="${p.productId}" th:text="${p.productId}">1</option>
+      </select>
+    </div>
+    <div>
+      <label>수량</label><br/>
+      <input type="number" name="items[0].quantity" min="1" value="10" style="width:80px" />
+    </div>
+    <div>
+      <label>메모</label><br/>
+      <input type="text" name="memo" placeholder="긴급 발주 등" />
+    </div>
+    <button type="submit">발주 생성</button>
+  </form>
+
+  <h3>발주 현황</h3>
+  <table>
+    <thead>
+      <tr><th>발주번호</th><th>상태</th><th>품목</th><th>메모</th><th>발주일시</th><th>입고</th></tr>
+    </thead>
+    <tbody>
+      <tr th:each="po : ${purchaseOrders}">
+        <td th:text="${po.id}">1</td>
+        <td th:text="${po.status.name() == 'RECEIVED'} ? '입고완료' : '입고대기'">입고대기</td>
+        <td>
+          <span th:each="item, stat : ${po.items}">
+            <span th:text="|상품#${item.productId} x${item.quantity}|">상품#1 x10</span><span th:if="${!stat.last}">, </span>
+          </span>
+        </td>
+        <td th:text="${po.memo}">긴급</td>
+        <td th:text="${#temporals.format(po.createdAt,'yyyy-MM-dd HH:mm')}">2026-07-01 10:00</td>
+        <td>
+          <form th:if="${po.status.name() != 'RECEIVED'}" th:action="@{/admin/purchase-orders/receive}" method="post" style="margin:0">
+            <input type="hidden" name="poId" th:value="${po.id}" />
+            <button class="sm" type="submit">입고</button>
+          </form>
+          <span th:if="${po.status.name() == 'RECEIVED'}">—</span>
+        </td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(purchaseOrders)}">
+        <td colspan="6">발주 내역이 없습니다.</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>
