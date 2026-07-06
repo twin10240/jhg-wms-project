@@ -61,6 +61,23 @@ release  → reservedQty -qty
 adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 ```
 
+### 발주 (Purchase Order)
+
+| Method | URL | Body | 설명 |
+|--------|-----|------|------|
+| GET | `/api/purchase-orders` | | 발주 목록 (품목 포함) |
+| POST | `/api/purchase-orders` | `{"lines":[{"productId":1,"quantity":10}],"memo":"..."}` | 발주 생성 → 201 |
+| POST | `/api/purchase-orders/receive?poId=1` | | 입고 처리 → 재고 자동 증가 |
+
+발주 상태: `ORDERED → RECEIVED` (중복 입고 시 409)
+
+### 관리자 UI (Thymeleaf)
+
+| URL | 설명 |
+|-----|------|
+| `/admin/inventory` | 재고 조회·수동 조정 |
+| `/admin/purchase-orders` | 발주 생성·입고 처리 |
+
 ### 예약 멱등성
 
 `Reservation` 엔티티가 `orderId`에 `UNIQUE` 제약을 가집니다.  
@@ -77,7 +94,6 @@ OMS `InitDb`의 상품 데이터와 수량이 일치합니다.
 ./gradlew test
 ```
 
-- `InventoryTest` — 도메인 단위 테스트
-- `ReservationTest` — Reservation 상태 전이
-- `InventoryServiceTest` — 서비스 레이어 통합 테스트
-- `InventoryControllerTest` — MockMvc 슬라이스 테스트
+- `InventoryTest` / `ReservationTest` / `PurchaseOrderTest` — 도메인 단위 테스트
+- `InventoryServiceTest` / `PurchaseOrderServiceTest` — 서비스 레이어 통합 테스트
+- `InventoryControllerTest` / `PurchaseOrderControllerTest` — MockMvc 슬라이스 테스트
