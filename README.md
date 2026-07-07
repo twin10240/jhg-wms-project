@@ -71,6 +71,15 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 
 발주 상태: `ORDERED → RECEIVED` (중복 입고 시 409)
 
+### OMS 재고보충 통지 (S3, 채널3)
+
+재고가 늘어나면(발주 입고, +조정) 트랜잭션 커밋 후 OMS `POST /api/replenishments` 에 `{"productIds":[...]}` 를 보냅니다 — OMS가 백오더를 FIFO 승격.
+
+- 발화점은 `InventoryService.adjust` 한 곳 — 모든 재고 증가 경로(입고·REST·UI 조정)가 통과
+- best-effort: OMS가 다운이어도 입고/조정은 성공, warn 로그만 남김 (누락 승격은 S4 보상 스윕이 커버)
+- 통지는 자연 멱등(사실 전달뿐) — 중복 수신 시 OMS 쪽 no-op
+- 콜백 대상: `oms.base-url` (기본 `http://localhost:8080`)
+
 ### 관리자 UI (Thymeleaf)
 
 | URL | 설명 |
