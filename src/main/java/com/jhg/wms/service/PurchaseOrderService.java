@@ -39,7 +39,6 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
         po.receive(); // 중복 입고 시 IllegalStateException
         po.getItems().forEach(item -> inventoryService.adjust(item.getProductId(), item.getQuantity()));
-        // ponytail: S3에서 OMS 콜백(StockReplenishedHandler) 추가. 현재는 OMS가 자체 트리거 유지.
         return po.getId();
     }
 

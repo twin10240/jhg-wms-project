@@ -1,5 +1,6 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.domain.PurchaseOrderItem;
 import com.jhg.wms.domain.PurchaseOrderStatus;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @DataJpaTest
 class PurchaseOrderServiceTest {
@@ -24,10 +26,12 @@ class PurchaseOrderServiceTest {
     @Autowired PurchaseOrderRepository poRepo;
     InventoryService inventoryService;
     PurchaseOrderService service;
+    OmsReplenishmentNotifier notifier;
 
     @BeforeEach
     void setUp() {
-        inventoryService = new InventoryService(inventoryRepo, reservationRepo);
+        notifier = mock(OmsReplenishmentNotifier.class);
+        inventoryService = new InventoryService(inventoryRepo, reservationRepo, notifier);
         service = new PurchaseOrderService(poRepo, inventoryService);
     }
 
@@ -82,5 +86,15 @@ class PurchaseOrderServiceTest {
         service.receive(poId);
         assertThatThrownBy(() -> service.receive(poId))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void receive_입고하면_품목별로_OMS_통지를_예약한다() {
+        inventoryRepo.save(com.jhg.wms.domain.Inventory.create(1L, 5));
+        Long poId = service.create(List.of(new PurchaseOrderLine(1L, 10)), "발주");
+
+        service.receive(poId);
+
+        verify(notifier).notifyAfterCommit(1L);
     }
 }

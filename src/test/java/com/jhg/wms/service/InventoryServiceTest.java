@@ -1,5 +1,6 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
@@ -13,6 +14,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @DataJpaTest
 class InventoryServiceTest {
@@ -20,9 +23,13 @@ class InventoryServiceTest {
     @Autowired InventoryRepository repo;
     @Autowired ReservationRepository reservationRepo;
     InventoryService service;
+    OmsReplenishmentNotifier notifier;
 
     @BeforeEach
-    void setUp() { service = new InventoryService(repo, reservationRepo); }
+    void setUp() {
+        notifier = mock(OmsReplenishmentNotifier.class);
+        service = new InventoryService(repo, reservationRepo, notifier);
+    }
 
     private void seed(long pid, int qty) {
         repo.save(Inventory.create(pid, qty));
@@ -91,6 +98,20 @@ class InventoryServiceTest {
         assertThat(rows).hasSize(2);
         assertThat(rows.get(0).productId()).isEqualTo(1L);
         assertThat(rows.get(1).productId()).isEqualTo(2L);
+    }
+
+    @Test
+    void adjust_증가면_커밋_후_OMS_통지를_예약한다() {
+        seed(1L, 10);
+        service.adjust(1L, 5);
+        verify(notifier).notifyAfterCommit(1L);
+    }
+
+    @Test
+    void adjust_감소면_OMS_통지를_예약하지_않는다() {
+        seed(1L, 10);
+        service.adjust(1L, -3);
+        verify(notifier, never()).notifyAfterCommit(any());
     }
 
     // ── 멱등성 ──────────────────────────────────────────────────
