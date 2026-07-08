@@ -1,0 +1,14 @@
+# 빌드 컨텍스트에서 제외 — 이미지 빌드 속도/재현성 향상
+.git
+.gradle
+build
+.idea
+*.iml
+*.iws
+*.ipr
+out
+bin
+spy.log
+HELP.md
+docs
+*.zip
