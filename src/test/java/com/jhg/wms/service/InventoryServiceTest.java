@@ -141,4 +141,20 @@ class InventoryServiceTest {
         service.releaseAll(99L, Map.of(1L, 6)); // 예약 없이 해제 → no-op, 예외 없음
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
     }
+
+    @Test
+    void shipAll_해제된_예약이면_예외를_던지고_재고는_불변이다() {
+        // 취소 release가 처리됐는데 응답만 타임아웃난 반쪽 상태에서 출고가 들어온 시나리오 —
+        // 가드 없으면 reservedQty가 음수로 내려가 가용수량이 부풀려진다(침묵 오염).
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.releaseAll(99L, Map.of(1L, 6));
+
+        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
+                .isInstanceOf(IllegalStateException.class);
+
+        Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after.getOnHandQty()).isEqualTo(10);
+        assertThat(after.getReservedQty()).isEqualTo(0);
+    }
 }

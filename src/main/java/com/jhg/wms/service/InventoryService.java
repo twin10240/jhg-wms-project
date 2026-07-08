@@ -70,12 +70,14 @@ public class InventoryService {
         return true;
     }
 
-    /** 예약분 출고. 이미 출고됐으면 no-op. */
+    /** 예약분 출고. 이미 출고됐으면 no-op. 해제된 예약은 출고 거부(반쪽 상태 오염 방지). */
     @Transactional
     public void shipAll(Long orderId, Map<Long, Integer> qtyByProductId) {
         Reservation reservation = reservationRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new IllegalStateException("예약이 없어 출고할 수 없습니다. orderId=" + orderId));
         if (reservation.getStatus() == ReservationStatus.SHIPPED) return;
+        if (reservation.getStatus() == ReservationStatus.RELEASED)
+            throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. orderId=" + orderId);
         inventoryRepository.findByProductIdIn(qtyByProductId.keySet())
                 .forEach(inv -> inv.ship(qtyByProductId.get(inv.getProductId())));
         reservation.ship();
