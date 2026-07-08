@@ -18,6 +18,12 @@ spring:
   h2:
     console:
       enabled: true
+  # S4: RestClient 공통 타임아웃 — OMS 콜백(OmsReplenishmentNotifier) hang 방지.
+  # 자동구성 RestClient.Builder 전체에 적용(Spring Boot 3.4+).
+  http:
+    client:
+      connect-timeout: 1s
+      read-timeout: 2s
 
 # OMS가 8080이므로 WMS는 8081로 동시 기동 가능
 server:
