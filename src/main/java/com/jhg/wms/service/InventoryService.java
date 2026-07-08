@@ -83,11 +83,13 @@ public class InventoryService {
         reservation.ship();
     }
 
-    /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. */
+    /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. 출고된 예약은 해제 거부(반쪽 상태 오염 방지). */
     @Transactional
     public void releaseAll(Long orderId, Map<Long, Integer> qtyByProductId) {
         reservationRepository.findByOrderId(orderId).ifPresent(r -> {
             if (r.getStatus() == ReservationStatus.RELEASED) return;
+            if (r.getStatus() == ReservationStatus.SHIPPED)
+                throw new IllegalStateException("출고된 예약은 해제할 수 없습니다. orderId=" + orderId);
             inventoryRepository.findByProductIdIn(qtyByProductId.keySet())
                     .forEach(inv -> inv.release(qtyByProductId.get(inv.getProductId())));
             r.release();
