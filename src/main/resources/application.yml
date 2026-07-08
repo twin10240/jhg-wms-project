@@ -25,13 +25,13 @@ spring:
       connect-timeout: 1s
       read-timeout: 2s
 
-# OMS가 8080이므로 WMS는 8081로 동시 기동 가능
+# OMS가 8080이므로 WMS는 8081로 동시 기동 가능. Railway는 PORT 주입(Variables로 8081 고정 권장).
 server:
-  port: 8081
+  port: ${PORT:8081}
 
-# 재고 보충 콜백(채널3) 대상 — OMS
+# 재고 보충 콜백(채널3) 대상 — OMS. 운영은 OMS_BASE_URL 주입(Railway private networking).
 oms:
-  base-url: http://localhost:8080
+  base-url: ${OMS_BASE_URL:http://localhost:8080}
 
 ---
 # 스키마 리셋용: --spring.profiles.active=local
@@ -42,3 +42,25 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create
+---
+# 운영 프로파일(Railway): PostgreSQL. SPRING_PROFILES_ACTIVE=prod + Postgres 플러그인 변수(PG*) 주입.
+# 스키마는 ddl-auto update(신생 앱 — Flyway 미도입 결정), 빈 DB면 InitDb가 재고 1~20 시드.
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
+    username: ${PGUSER}
+    password: ${PGPASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: false
+        default_batch_fetch_size: 100
+  h2:
+    console:
+      enabled: false
