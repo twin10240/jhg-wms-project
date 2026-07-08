@@ -80,7 +80,7 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 - 통지는 자연 멱등(사실 전달뿐) — 중복 수신 시 OMS 쪽 no-op
 - 콜백 대상: `oms.base-url` (기본 `http://localhost:8080`)
 - 통지·전 REST 응답에 타임아웃(connect 1s / read 2s, `spring.http.client.*`) — OMS hang이어도 최대 수 초 내 복귀 (S4)
-- `shipAll`은 RELEASED 예약 출고를 거부(S4) — 취소 타임아웃 반쪽 상태에서의 재고 오염 방지
+- `shipAll`은 RELEASED 예약 출고를, `releaseAll`은 SHIPPED 예약 해제를 거부(S4) — 타임아웃 반쪽 상태에서의 재고 오염(reservedQty 음수) 방지
 
 ### 관리자 UI (Thymeleaf)
 
