@@ -101,6 +101,16 @@ class InventoryServiceTest {
     }
 
     @Test
+    void findAllRows_예약수량과_가용수량을_포함한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 3));
+        var rows = service.findAllRows();
+        assertThat(rows.get(0).onHandQty()).isEqualTo(10);
+        assertThat(rows.get(0).reservedQty()).isEqualTo(3);
+        assertThat(rows.get(0).availableQty()).isEqualTo(7);
+    }
+
+    @Test
     void adjust_증가면_커밋_후_OMS_통지를_예약한다() {
         seed(1L, 10);
         service.adjust(1L, 5);

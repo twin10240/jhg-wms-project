@@ -47,7 +47,8 @@ public class InventoryService {
     /** 관리자 재고 화면용 전체 목록. */
     public List<InventoryRowResponse> findAllRows() {
         return inventoryRepository.findAll().stream()
-                .map(inv -> new InventoryRowResponse(inv.getProductId(), inv.getOnHandQty()))
+                .map(inv -> new InventoryRowResponse(
+                        inv.getProductId(), inv.getOnHandQty(), inv.getReservedQty(), inv.getAvailableQty()))
                 .sorted(Comparator.comparing(InventoryRowResponse::productId))
                 .toList();
     }
