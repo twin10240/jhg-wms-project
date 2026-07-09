@@ -30,6 +30,14 @@ java -cp h2*.jar org.h2.tools.Server -tcp -tcpAllowOthers -ifNotExists
 H2 콘솔: `http://localhost:8081/h2-console`  
 JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 
+## 운영 배포 (Railway)
+
+- Dockerfile(멀티스테이지 JDK21) 존재 시 Railway가 자동 사용. `.dockerignore`로 build/·.git/ 제외.
+- `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`, H2 콘솔 off. 빈 DB면 `InitDb`가 재고 1~20 시드.
+- Variables: `SPRING_PROFILES_ACTIVE=prod`, `PORT=8081`(private networking 주소 고정용), `OMS_BASE_URL=http://<oms>.railway.internal:8080`.
+- 공개 도메인 없음 — OMS가 private networking으로만 호출. 관리 작업은 OMS 관리자 화면이 프록시.
+- 주의: `org.gradle.java.home`은 레포 `gradle.properties`에 커밋 금지(Windows 경로가 컨테이너 빌드를 죽임) — 머신 로컬 `~/.gradle/gradle.properties`에서 지정한다.
+
 ## API
 
 ### 재고 조회
