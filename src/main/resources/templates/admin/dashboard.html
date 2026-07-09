@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 대시보드')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('dashboard')}"></nav>
+<main>
+  <h2>대시보드</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>재고</h3>
+      <p class="big" th:text="${skuCount}">20</p>
+      <p class="label">SKU</p>
+      <p>보유 <b th:text="${totalOnHand}">0</b> · 예약 <b th:text="${totalReserved}">0</b> · 가용 <b th:text="${totalAvailable}">0</b></p>
+      <p><a th:href="@{/admin/inventory}">재고 관리 →</a></p>
+    </div>
+    <div class="card">
+      <h3>발주</h3>
+      <p class="big" th:text="${orderedPoCount}">0</p>
+      <p class="label">입고대기</p>
+      <p><a th:href="@{/admin/purchase-orders(status='ORDERED')}">입고대기 발주 →</a></p>
+    </div>
+    <div class="card">
+      <h3>예약</h3>
+      <p>
+        <span class="badge badge-reserved">RESERVED</span> <b th:text="${reservedCount}">0</b><br/>
+        <span class="badge badge-shipped">SHIPPED</span> <b th:text="${shippedCount}">0</b><br/>
+        <span class="badge badge-released">RELEASED</span> <b th:text="${releasedCount}">0</b>
+      </p>
+      <p><a th:href="@{/admin/reservations}">예약 현황 →</a></p>
+    </div>
+  </div>
+</main>
+</body>
+</html>

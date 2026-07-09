@@ -2,6 +2,7 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -182,5 +183,14 @@ class InventoryServiceTest {
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4);
         assertThat(after.getReservedQty()).isEqualTo(0);
+    }
+
+    @Test
+    void findAllReservations_ID_역순으로_반환한다() {
+        reservationRepo.save(Reservation.reserve(1L));
+        reservationRepo.save(Reservation.reserve(2L));
+        var list = service.findAllReservations();
+        assertThat(list).hasSize(2);
+        assertThat(list.get(0).getOrderId()).isEqualTo(2L);
     }
 }

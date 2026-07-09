@@ -1,5 +1,6 @@
 package com.jhg.wms.web;
 
+import com.jhg.wms.domain.*;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
@@ -10,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 @RequiredArgsConstructor
@@ -17,6 +20,23 @@ public class WmsAdminController {
 
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
+
+    @GetMapping("/")
+    public String dashboard(Model model) {
+        List<InventoryRowResponse> rows = inventoryService.findAllRows();
+        model.addAttribute("skuCount", rows.size());
+        model.addAttribute("totalOnHand", rows.stream().mapToInt(InventoryRowResponse::onHandQty).sum());
+        model.addAttribute("totalReserved", rows.stream().mapToInt(InventoryRowResponse::reservedQty).sum());
+        model.addAttribute("totalAvailable", rows.stream().mapToInt(InventoryRowResponse::availableQty).sum());
+        model.addAttribute("orderedPoCount", purchaseOrderService.findAllWithItems().stream()
+                .filter(po -> po.getStatus() == PurchaseOrderStatus.ORDERED).count());
+        Map<ReservationStatus, Long> resCounts = inventoryService.findAllReservations().stream()
+                .collect(Collectors.groupingBy(Reservation::getStatus, Collectors.counting()));
+        model.addAttribute("reservedCount", resCounts.getOrDefault(ReservationStatus.RESERVED, 0L));
+        model.addAttribute("shippedCount", resCounts.getOrDefault(ReservationStatus.SHIPPED, 0L));
+        model.addAttribute("releasedCount", resCounts.getOrDefault(ReservationStatus.RELEASED, 0L));
+        return "admin/dashboard";
+    }
 
     @GetMapping("/admin/inventory")
     public String inventory(Model model) {
