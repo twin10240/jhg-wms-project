@@ -54,9 +54,24 @@ public class InventoryService {
                 .toList();
     }
 
+    /** 재고 쓰기(reserve/ship/release) 공통 입구 검증. 모든 경로가 통과하는 유일 지점. */
+    private static void validateWriteRequest(Long orderId, Map<Long, Integer> qtyByProductId) {
+        if (orderId == null)
+            throw new IllegalArgumentException("orderId는 필수입니다.");
+        if (qtyByProductId == null || qtyByProductId.isEmpty())
+            throw new IllegalArgumentException("품목이 없습니다.");
+        qtyByProductId.forEach((pid, qty) -> {
+            if (pid == null)
+                throw new IllegalArgumentException("productId는 null일 수 없습니다.");
+            if (qty == null || qty <= 0)
+                throw new IllegalArgumentException("수량은 1 이상이어야 합니다. (productId=" + pid + ", qty=" + qty + ")");
+        });
+    }
+
     /** 전부-아니면-실패 예약. orderId 멱등: 같은 주문 재요청은 현재 상태 그대로 반환. */
     @Transactional
     public boolean reserveAll(Long orderId, Map<Long, Integer> qtyByProductId) {
+        validateWriteRequest(orderId, qtyByProductId);
         Reservation existing = reservationRepository.findByOrderId(orderId).orElse(null);
         if (existing != null) return existing.getStatus() != ReservationStatus.RELEASED;
 
@@ -75,6 +90,7 @@ public class InventoryService {
     /** 예약분 출고. 이미 출고됐으면 no-op. 해제된 예약은 출고 거부(반쪽 상태 오염 방지). */
     @Transactional
     public void shipAll(Long orderId, Map<Long, Integer> qtyByProductId) {
+        validateWriteRequest(orderId, qtyByProductId);
         Reservation reservation = reservationRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new IllegalStateException("예약이 없어 출고할 수 없습니다. orderId=" + orderId));
         if (reservation.getStatus() == ReservationStatus.SHIPPED) return;
@@ -88,6 +104,7 @@ public class InventoryService {
     /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. 출고된 예약은 해제 거부(반쪽 상태 오염 방지). */
     @Transactional
     public void releaseAll(Long orderId, Map<Long, Integer> qtyByProductId) {
+        validateWriteRequest(orderId, qtyByProductId);
         reservationRepository.findByOrderId(orderId).ifPresent(r -> {
             if (r.getStatus() == ReservationStatus.RELEASED) return;
             if (r.getStatus() == ReservationStatus.SHIPPED)

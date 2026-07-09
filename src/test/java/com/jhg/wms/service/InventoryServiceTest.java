@@ -74,6 +74,40 @@ class InventoryServiceTest {
         assertThat(after.getOnHandQty()).isEqualTo(10);
     }
 
+    // ── 쓰기 입구 검증(음수/0 수량) ────────────────────────────
+
+    @Test
+    void reserveAll_음수_수량은_거부하고_예약을_변경하지_않는다() {
+        seed(1L, 10);
+        assertThatThrownBy(() -> service.reserveAll(99L, Map.of(1L, -5)))
+                .isInstanceOf(IllegalArgumentException.class);
+        Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after.getReservedQty()).isEqualTo(0); // 음수 예약이 reservedQty를 깎아 가용을 부풀리면 안 됨
+    }
+
+    @Test
+    void reserveAll_0_수량은_거부한다() {
+        seed(1L, 10);
+        assertThatThrownBy(() -> service.reserveAll(99L, Map.of(1L, 0)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shipAll_음수_수량은_거부한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, -3)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void releaseAll_음수_수량은_거부한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        assertThatThrownBy(() -> service.releaseAll(99L, Map.of(1L, -3)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     // ── adjust / rows ──────────────────────────────────────────
 
     @Test

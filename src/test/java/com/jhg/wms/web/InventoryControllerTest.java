@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -113,5 +114,38 @@ class InventoryControllerTest {
                 .andExpect(status().isOk());
 
         verify(inventoryService).releaseAll(eq(1L), any());
+    }
+
+    @Test
+    void ship_상태충돌은_409를_반환한다() throws Exception {
+        doThrow(new IllegalStateException("예약이 없어 출고할 수 없습니다."))
+                .when(inventoryService).shipAll(eq(1L), any());
+
+        mockMvc.perform(post("/api/inventory/ship")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void release_상태충돌은_409를_반환한다() throws Exception {
+        doThrow(new IllegalStateException("출고된 예약은 해제할 수 없습니다."))
+                .when(inventoryService).releaseAll(eq(1L), any());
+
+        mockMvc.perform(post("/api/inventory/release")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void reserve_잘못된_수량은_400을_반환한다() throws Exception {
+        when(inventoryService.reserveAll(eq(1L), any()))
+                .thenThrow(new IllegalArgumentException("수량은 1 이상이어야 합니다."));
+
+        mockMvc.perform(post("/api/inventory/reserve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":1,\"items\":{\"1\":-3}}"))
+                .andExpect(status().isBadRequest());
     }
 }
