@@ -8,6 +8,7 @@ import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,8 @@ public class InventoryService {
     /** 관리자 재고 화면용 전체 목록. */
     public List<InventoryRowResponse> findAllRows() {
         return inventoryRepository.findAll().stream()
-                .map(inv -> new InventoryRowResponse(inv.getProductId(), inv.getOnHandQty()))
+                .map(inv -> new InventoryRowResponse(
+                        inv.getProductId(), inv.getOnHandQty(), inv.getReservedQty(), inv.getAvailableQty()))
                 .sorted(Comparator.comparing(InventoryRowResponse::productId))
                 .toList();
     }
@@ -94,5 +96,10 @@ public class InventoryService {
                     .forEach(inv -> inv.release(qtyByProductId.get(inv.getProductId())));
             r.release();
         });
+    }
+
+    /** 관리자 예약 화면·대시보드용 전체 예약 목록 (최신 먼저). */
+    public List<Reservation> findAllReservations() {
+        return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
     }
 }

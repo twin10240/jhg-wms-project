@@ -30,6 +30,14 @@ java -cp h2*.jar org.h2.tools.Server -tcp -tcpAllowOthers -ifNotExists
 H2 콘솔: `http://localhost:8081/h2-console`  
 JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 
+## 운영 배포 (Railway)
+
+- Dockerfile(멀티스테이지 JDK21) 존재 시 Railway가 자동 사용. `.dockerignore`로 build/·.git/ 제외.
+- `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`, H2 콘솔 off. 빈 DB면 `InitDb`가 재고 1~20 시드.
+- Variables: `SPRING_PROFILES_ACTIVE=prod`, `PORT=8081`(private networking 주소 고정용), `OMS_BASE_URL=http://<oms>.railway.internal:8080`.
+- 공개 도메인 없음 — OMS가 private networking으로만 호출. 관리 작업은 OMS 관리자 화면이 프록시.
+- 주의: `org.gradle.java.home`은 레포 `gradle.properties`에 커밋 금지(Windows 경로가 컨테이너 빌드를 죽임) — 머신 로컬 `~/.gradle/gradle.properties`에서 지정한다.
+
 ## API
 
 ### 재고 조회
@@ -86,8 +94,12 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 
 | URL | 설명 |
 |-----|------|
-| `/admin/inventory` | 재고 조회·수동 조정 |
-| `/admin/purchase-orders` | 발주 생성·입고 처리 |
+| `/` | 대시보드 — 재고·발주·예약 요약 |
+| `/admin/inventory` | 재고 조회(보유·예약·가용)·수동 조정 |
+| `/admin/reservations` | 예약 현황 조회 (상태 필터, 조회 전용) |
+| `/admin/purchase-orders` | 발주 생성(다품목)·입고 처리 (상태 필터) |
+
+> ⚠️ 관리자 UI는 **인증이 없습니다**. 루트 `/`가 관리자 콘솔이고 상태 변경 POST(재고 조정·발주·입고)에 CSRF 방어도 없으므로, **공개 인그레스 없음**(내부망/Railway private networking 전용)이 하드 불변식입니다. 공개 도메인을 붙이려면 반드시 Spring Security를 먼저 도입할 것.
 
 ### 예약 멱등성
 

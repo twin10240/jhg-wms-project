@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+  <meta charset="UTF-8" />
+  <title th:text="${title}">JHG-WMS</title>
+  <link rel="stylesheet" th:href="@{/css/admin.css}" />
+</head>
+<body>
+  <nav class="topnav" th:fragment="nav(active)">
+    <span class="brand">JHG-WMS</span>
+    <a th:href="@{/}" th:classappend="${active == 'dashboard'} ? 'active'">대시보드</a>
+    <a th:href="@{/admin/inventory}" th:classappend="${active == 'inventory'} ? 'active'">재고</a>
+    <a th:href="@{/admin/reservations}" th:classappend="${active == 'reservations'} ? 'active'">예약</a>
+    <a th:href="@{/admin/purchase-orders}" th:classappend="${active == 'purchase-orders'} ? 'active'">발주</a>
+  </nav>
+  <div th:fragment="flash" th:remove="tag">
+    <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>
+    <div class="flash-err" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+  </div>
+</body>
+</html>

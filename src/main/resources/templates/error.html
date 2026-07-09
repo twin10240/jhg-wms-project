@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('오류 — JHG-WMS')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('')}"></nav>
+<main>
+  <h2>문제가 발생했습니다</h2>
+  <p>
+    <b th:text="${status} ?: '오류'">404</b>
+    <span th:text="${error} ?: ''">Not Found</span>
+  </p>
+  <p><a th:href="@{/}">← 대시보드로 돌아가기</a></p>
+</main>
+</body>
+</html>

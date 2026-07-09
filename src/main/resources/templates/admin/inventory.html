@@ -1,28 +1,11 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8" />
-  <title>WMS 재고 관리</title>
-  <style>
-    body { font-family: sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
-    th { background: #f5f5f5; }
-    .flash-ok { color: green; padding: 8px; border: 1px solid green; margin-bottom: 12px; }
-    .flash-err { color: red; padding: 8px; border: 1px solid red; margin-bottom: 12px; }
-    .form-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 16px; }
-    input, select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
-    button { padding: 7px 16px; background: #f4a261; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    nav { margin-bottom: 16px; }
-    nav a { margin-right: 12px; }
-  </style>
-</head>
+<head th:replace="~{fragments/layout :: head('WMS 재고 관리')}"></head>
 <body>
-  <nav><a th:href="@{/admin/purchase-orders}">발주 관리</a></nav>
-  <h2>WMS 재고 관리</h2>
-
-  <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>
-  <div class="flash-err" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+<nav th:replace="~{fragments/layout :: nav('inventory')}"></nav>
+<main>
+  <h2>재고 관리</h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
 
   <h3>수동 재고 조정</h3>
   <form th:action="@{/admin/inventory/adjust}" method="post" class="form-row">
@@ -45,16 +28,19 @@
 
   <h3>전체 재고</h3>
   <table>
-    <thead><tr><th>상품 ID</th><th>보유 수량</th></tr></thead>
+    <thead><tr><th>상품 ID</th><th>보유</th><th>예약</th><th>가용</th></tr></thead>
     <tbody>
-      <tr th:each="p : ${products}">
+      <tr th:each="p : ${products}" th:classappend="${p.availableQty == 0} ? 'soldout'">
         <td th:text="${p.productId}">1</td>
         <td th:text="${p.onHandQty}">15</td>
+        <td th:text="${p.reservedQty}">0</td>
+        <td th:text="${p.availableQty}">15</td>
       </tr>
       <tr th:if="${#lists.isEmpty(products)}">
-        <td colspan="2">재고 없음</td>
+        <td colspan="4">재고 없음</td>
       </tr>
     </tbody>
   </table>
+</main>
 </body>
 </html>

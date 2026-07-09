@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 예약 현황')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('reservations')}"></nav>
+<main>
+  <h2>예약 현황</h2>
+  <p class="label">조회 전용 — 예약·출고·해제는 OMS가 API로 처리합니다.</p>
+
+  <div class="tabs">
+    <a th:href="@{/admin/reservations}" th:classappend="${activeStatus == null} ? 'active'">전체</a>
+    <a th:href="@{/admin/reservations(status='RESERVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RESERVED'} ? 'active'">RESERVED</a>
+    <a th:href="@{/admin/reservations(status='SHIPPED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'SHIPPED'} ? 'active'">SHIPPED</a>
+    <a th:href="@{/admin/reservations(status='RELEASED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RELEASED'} ? 'active'">RELEASED</a>
+  </div>
+
+  <table>
+    <thead><tr><th>예약 ID</th><th>주문 ID</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr th:each="r : ${reservations}">
+        <td th:text="${r.id}">1</td>
+        <td th:text="${r.orderId}">1</td>
+        <td><span class="badge" th:classappend="'badge-' + ${#strings.toLowerCase(r.status.name())}" th:text="${r.status.name()}">RESERVED</span></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(reservations)}">
+        <td colspan="3">예약 내역이 없습니다.</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>
