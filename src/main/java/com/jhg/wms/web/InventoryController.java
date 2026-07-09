@@ -4,6 +4,7 @@ import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.service.InventoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,5 +65,17 @@ public class InventoryController {
     @PostMapping("/release")
     public void release(@RequestBody InventoryWriteRequest req) {
         inventoryService.releaseAll(req.orderId(), req.items());
+    }
+
+    /** 잘못된 요청(음수/0 수량 등) → 400. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleBadRequest(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
+
+    /** 예약 상태 충돌(예약 없음·해제 후 출고·출고 후 해제) → 409. */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> handleConflict(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 }
