@@ -57,4 +57,26 @@ class WmsAdminControllerTest {
                 .andExpect(model().attribute("shippedCount", 1L))
                 .andExpect(model().attribute("releasedCount", 0L));
     }
+
+    @Test
+    void 예약화면_전체_목록을_렌더링한다() throws Exception {
+        when(inventoryService.findAllReservations()).thenReturn(List.of(Reservation.reserve(10L)));
+
+        mockMvc.perform(get("/admin/reservations"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/reservations"))
+                .andExpect(content().string(containsString("10")))
+                .andExpect(content().string(containsString("RESERVED")));
+    }
+
+    @Test
+    void 예약화면_상태_필터가_동작한다() throws Exception {
+        Reservation shipped = Reservation.reserve(20L);
+        shipped.ship();
+        when(inventoryService.findAllReservations()).thenReturn(List.of(Reservation.reserve(10L), shipped));
+
+        mockMvc.perform(get("/admin/reservations").param("status", "SHIPPED"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("reservations", List.of(shipped)));
+    }
 }

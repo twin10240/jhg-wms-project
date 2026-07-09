@@ -38,6 +38,16 @@ public class WmsAdminController {
         return "admin/dashboard";
     }
 
+    @GetMapping("/admin/reservations")
+    public String reservations(@RequestParam(required = false) ReservationStatus status, Model model) {
+        List<Reservation> reservations = inventoryService.findAllReservations();
+        if (status != null)
+            reservations = reservations.stream().filter(r -> r.getStatus() == status).toList();
+        model.addAttribute("reservations", reservations);
+        model.addAttribute("activeStatus", status);
+        return "admin/reservations";
+    }
+
     @GetMapping("/admin/inventory")
     public String inventory(Model model) {
         model.addAttribute("products", inventoryService.findAllRows());
