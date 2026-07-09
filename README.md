@@ -99,6 +99,8 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 | `/admin/reservations` | 예약 현황 조회 (상태 필터, 조회 전용) |
 | `/admin/purchase-orders` | 발주 생성(다품목)·입고 처리 (상태 필터) |
 
+> ⚠️ 관리자 UI는 **인증이 없습니다**. 루트 `/`가 관리자 콘솔이고 상태 변경 POST(재고 조정·발주·입고)에 CSRF 방어도 없으므로, **공개 인그레스 없음**(내부망/Railway private networking 전용)이 하드 불변식입니다. 공개 도메인을 붙이려면 반드시 Spring Security를 먼저 도입할 것.
+
 ### 예약 멱등성
 
 `Reservation` 엔티티가 `orderId`에 `UNIQUE` 제약을 가집니다.  
