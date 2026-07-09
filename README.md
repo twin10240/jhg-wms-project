@@ -94,8 +94,10 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 
 | URL | 설명 |
 |-----|------|
-| `/admin/inventory` | 재고 조회·수동 조정 |
-| `/admin/purchase-orders` | 발주 생성·입고 처리 |
+| `/` | 대시보드 — 재고·발주·예약 요약 |
+| `/admin/inventory` | 재고 조회(보유·예약·가용)·수동 조정 |
+| `/admin/reservations` | 예약 현황 조회 (상태 필터, 조회 전용) |
+| `/admin/purchase-orders` | 발주 생성(다품목)·입고 처리 (상태 필터) |
 
 ### 예약 멱등성
 
