@@ -1,0 +1,36 @@
+body { font-family: sans-serif; margin: 0; background: #fafafa; }
+main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+
+nav.topnav { display: flex; align-items: center; gap: 12px; background: #2b2d42; padding: 12px 24px; }
+nav.topnav .brand { color: #f4a261; font-weight: bold; margin-right: 12px; }
+nav.topnav a { color: #ddd; text-decoration: none; padding: 4px 10px; border-radius: 4px; }
+nav.topnav a.active { background: #f4a261; color: #fff; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+th { background: #f5f5f5; }
+tr.soldout td { background: #fdecea; }
+
+.flash-ok { color: green; padding: 8px; border: 1px solid green; margin-bottom: 12px; background: #fff; }
+.flash-err { color: red; padding: 8px; border: 1px solid red; margin-bottom: 12px; background: #fff; }
+
+.form-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 16px; }
+input, select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+button { padding: 7px 16px; background: #f4a261; color: white; border: none; border-radius: 4px; cursor: pointer; }
+button.sm { padding: 4px 10px; font-size: 13px; }
+button.ghost { background: #fff; color: #555; border: 1px solid #ccc; }
+
+.cards { display: flex; gap: 16px; flex-wrap: wrap; }
+.card { flex: 1 1 260px; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px 20px; }
+.card h3 { margin-top: 0; }
+.card .big { font-size: 32px; font-weight: bold; margin: 4px 0 0; }
+.card .label { color: #888; margin: 0 0 8px; }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; color: #fff; }
+.badge-reserved { background: #3a86ff; }
+.badge-shipped { background: #2a9d8f; }
+.badge-released { background: #999; }
+
+.tabs { margin-bottom: 12px; }
+.tabs a { margin-right: 8px; padding: 4px 10px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; color: #555; background: #fff; }
+.tabs a.active { background: #f4a261; border-color: #f4a261; color: #fff; }
