@@ -1,53 +1,50 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8" />
-  <title>WMS 발주 관리</title>
-  <style>
-    body { font-family: sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
-    th { background: #f5f5f5; }
-    .flash-ok { color: green; padding: 8px; border: 1px solid green; margin-bottom: 12px; }
-    .flash-err { color: red; padding: 8px; border: 1px solid red; margin-bottom: 12px; }
-    .form-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 16px; }
-    input, select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
-    button { padding: 7px 16px; background: #f4a261; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    button.sm { padding: 4px 10px; font-size: 13px; }
-    nav { margin-bottom: 16px; }
-    nav a { margin-right: 12px; }
-  </style>
-</head>
+<head th:replace="~{fragments/layout :: head('WMS 발주 관리')}"></head>
 <body>
-  <nav><a th:href="@{/admin/inventory}">재고 관리</a></nav>
-  <h2>WMS 발주 관리</h2>
-
-  <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>
-  <div class="flash-err" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+<nav th:replace="~{fragments/layout :: nav('purchase-orders')}"></nav>
+<main>
+  <h2>발주 관리</h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
 
   <h3>발주 생성</h3>
-  <form th:action="@{/admin/purchase-orders}" method="post" class="form-row">
-    <div>
-      <label>상품 ID</label><br/>
-      <select name="items[0].productId">
-        <option th:each="p : ${products}" th:value="${p.productId}" th:text="${p.productId}">1</option>
-      </select>
+  <form th:action="@{/admin/purchase-orders}" method="post">
+    <div id="po-lines">
+      <div class="form-row po-line">
+        <div>
+          <label>상품 ID</label><br/>
+          <select name="items[0].productId">
+            <option th:each="p : ${products}" th:value="${p.productId}" th:text="${p.productId}">1</option>
+          </select>
+        </div>
+        <div>
+          <label>수량</label><br/>
+          <input type="number" name="items[0].quantity" min="1" value="10" style="width:80px" />
+        </div>
+      </div>
     </div>
-    <div>
-      <label>수량</label><br/>
-      <input type="number" name="items[0].quantity" min="1" value="10" style="width:80px" />
+    <div class="form-row">
+      <button type="button" class="ghost sm" onclick="addLine()">+ 품목 추가</button>
+      <button type="button" class="ghost sm" onclick="removeLine()">− 품목 삭제</button>
     </div>
-    <div>
-      <label>메모</label><br/>
-      <input type="text" name="memo" placeholder="긴급 발주 등" />
+    <div class="form-row">
+      <div>
+        <label>메모</label><br/>
+        <input type="text" name="memo" placeholder="긴급 발주 등" />
+      </div>
+      <button type="submit">발주 생성</button>
     </div>
-    <button type="submit">발주 생성</button>
   </form>
 
   <h3>발주 현황</h3>
+  <div class="tabs">
+    <a th:href="@{/admin/purchase-orders}" th:classappend="${activeStatus == null} ? 'active'">전체</a>
+    <a th:href="@{/admin/purchase-orders(status='ORDERED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'ORDERED'} ? 'active'">입고대기</a>
+    <a th:href="@{/admin/purchase-orders(status='RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RECEIVED'} ? 'active'">입고완료</a>
+  </div>
   <table>
     <thead>
-      <tr><th>발주번호</th><th>상태</th><th>품목</th><th>메모</th><th>발주일시</th><th>입고</th></tr>
+      <tr><th>발주번호</th><th>상태</th><th>품목</th><th>메모</th><th>발주일시</th><th>입고일시</th><th>입고</th></tr>
     </thead>
     <tbody>
       <tr th:each="po : ${purchaseOrders}">
@@ -60,6 +57,7 @@
         </td>
         <td th:text="${po.memo}">긴급</td>
         <td th:text="${#temporals.format(po.createdAt,'yyyy-MM-dd HH:mm')}">2026-07-01 10:00</td>
+        <td th:text="${po.receivedAt != null} ? ${#temporals.format(po.receivedAt,'yyyy-MM-dd HH:mm')} : '—'">—</td>
         <td>
           <form th:if="${po.status.name() != 'RECEIVED'}" th:action="@{/admin/purchase-orders/receive}" method="post" style="margin:0">
             <input type="hidden" name="poId" th:value="${po.id}" />
@@ -69,9 +67,26 @@
         </td>
       </tr>
       <tr th:if="${#lists.isEmpty(purchaseOrders)}">
-        <td colspan="6">발주 내역이 없습니다.</td>
+        <td colspan="7">발주 내역이 없습니다.</td>
       </tr>
     </tbody>
   </table>
+
+  <script>
+    function addLine() {
+      const lines = document.getElementById('po-lines');
+      const line = lines.firstElementChild.cloneNode(true);
+      const idx = lines.children.length;
+      line.querySelectorAll('select, input').forEach(el => {
+        el.name = el.name.replace(/items\[\d+\]/, 'items[' + idx + ']');
+      });
+      lines.appendChild(line);
+    }
+    function removeLine() {
+      const lines = document.getElementById('po-lines');
+      if (lines.children.length > 1) lines.removeChild(lines.lastElementChild);
+    }
+  </script>
+</main>
 </body>
 </html>

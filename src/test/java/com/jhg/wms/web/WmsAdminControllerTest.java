@@ -79,4 +79,17 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("reservations", List.of(shipped)));
     }
+
+    @Test
+    void 발주화면_상태_필터가_동작한다() throws Exception {
+        PurchaseOrder ordered = PurchaseOrder.create("대기", PurchaseOrderItem.create(1L, 10));
+        PurchaseOrder received = PurchaseOrder.create("완료", PurchaseOrderItem.create(2L, 5));
+        received.receive();
+        when(purchaseOrderService.findAllWithItems()).thenReturn(List.of(ordered, received));
+        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, 10, 0, 10)));
+
+        mockMvc.perform(get("/admin/purchase-orders").param("status", "RECEIVED"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("purchaseOrders", List.of(received)));
+    }
 }

@@ -68,8 +68,12 @@ public class WmsAdminController {
     }
 
     @GetMapping("/admin/purchase-orders")
-    public String purchaseOrders(Model model) {
-        model.addAttribute("purchaseOrders", purchaseOrderService.findAllWithItems());
+    public String purchaseOrders(@RequestParam(required = false) PurchaseOrderStatus status, Model model) {
+        List<PurchaseOrder> pos = purchaseOrderService.findAllWithItems();
+        if (status != null)
+            pos = pos.stream().filter(po -> po.getStatus() == status).toList();
+        model.addAttribute("purchaseOrders", pos);
+        model.addAttribute("activeStatus", status);
         model.addAttribute("products", inventoryService.findAllRows());
         return "admin/purchaseorders";
     }
