@@ -9,6 +9,7 @@
 
   <h3>수동 재고 조정</h3>
   <form th:action="@{/admin/inventory/adjust}" method="post" class="form-row">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
     <div>
       <label>상품 ID</label><br/>
       <select name="productId">

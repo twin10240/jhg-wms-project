@@ -18,7 +18,8 @@ public class Inventory {
     @Version
     private Long version;
 
-    @Column(name = "product_id", nullable = false)
+    // productId당 재고 행은 하나뿐 — findByProductId가 Optional을 반환하는 전제(중복행이면 깨짐).
+    @Column(name = "product_id", nullable = false, unique = true)
     private Long productId;
 
     @Column(nullable = false)

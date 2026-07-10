@@ -83,7 +83,7 @@ public class InventoryService {
             if (inv == null || inv.getAvailableQty() < e.getValue()) return false;
         }
         qtyByProductId.forEach((pid, qty) -> byId.get(pid).reserve(qty));
-        reservationRepository.save(Reservation.reserve(orderId));
+        reservationRepository.save(Reservation.reserve(orderId, qtyByProductId));
         return true;
     }
 
@@ -96,8 +96,8 @@ public class InventoryService {
         if (reservation.getStatus() == ReservationStatus.SHIPPED) return;
         if (reservation.getStatus() == ReservationStatus.RELEASED)
             throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. orderId=" + orderId);
-        inventoryRepository.findByProductIdIn(qtyByProductId.keySet())
-                .forEach(inv -> inv.ship(qtyByProductId.get(inv.getProductId())));
+        // 호출자 요청 수량이 아니라 예약 원장(SSOT)을 재생한다 — 수량 오염·누락행 침묵 스킵 차단.
+        applyFromLedger(reservation.getQtyByProductId(), Inventory::ship);
         reservation.ship();
     }
 
@@ -109,9 +109,20 @@ public class InventoryService {
             if (r.getStatus() == ReservationStatus.RELEASED) return;
             if (r.getStatus() == ReservationStatus.SHIPPED)
                 throw new IllegalStateException("출고된 예약은 해제할 수 없습니다. orderId=" + orderId);
-            inventoryRepository.findByProductIdIn(qtyByProductId.keySet())
-                    .forEach(inv -> inv.release(qtyByProductId.get(inv.getProductId())));
+            applyFromLedger(r.getQtyByProductId(), Inventory::release);
             r.release();
+        });
+    }
+
+    /** 예약 원장의 상품별 수량을 재고에 적용한다. 재고 행이 없으면 침묵 스킵 대신 예외(reserve 가드와 대칭). */
+    private void applyFromLedger(Map<Long, Integer> ledger, java.util.function.BiConsumer<Inventory, Integer> op) {
+        Map<Long, Inventory> byId = inventoryRepository.findByProductIdIn(ledger.keySet())
+                .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));
+        ledger.forEach((pid, qty) -> {
+            Inventory inv = byId.get(pid);
+            if (inv == null)
+                throw new IllegalStateException("재고 행이 없어 처리할 수 없습니다. productId=" + pid);
+            op.accept(inv, qty);
         });
     }
 

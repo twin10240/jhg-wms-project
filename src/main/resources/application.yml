@@ -33,6 +33,13 @@ server:
 oms:
   base-url: ${OMS_BASE_URL:http://localhost:8080}
 
+# WMS 공개 URL 대비 HTTP Basic 인증 계정. OMS 어댑터가 같은 자격증명으로 호출해야 로컬 통합이 안 깨진다.
+# 로컬 기본값은 wms/wms(OMS와 일치). 운영은 WMS_BASIC_USER/WMS_BASIC_PASSWORD로 override.
+wms:
+  basic:
+    user: ${WMS_BASIC_USER:wms}
+    password: ${WMS_BASIC_PASSWORD:wms}
+
 ---
 # 스키마 리셋용: --spring.profiles.active=local
 spring:

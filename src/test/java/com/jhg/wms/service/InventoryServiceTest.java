@@ -221,10 +221,95 @@ class InventoryServiceTest {
 
     @Test
     void findAllReservations_ID_역순으로_반환한다() {
-        reservationRepo.save(Reservation.reserve(1L));
-        reservationRepo.save(Reservation.reserve(2L));
+        reservationRepo.save(Reservation.reserve(1L, Map.of(1L, 1)));
+        reservationRepo.save(Reservation.reserve(2L, Map.of(1L, 1)));
         var list = service.findAllReservations();
         assertThat(list).hasSize(2);
         assertThat(list.get(0).getOrderId()).isEqualTo(2L);
+    }
+
+    // ── T1: 동시 예약 경합(가용분 부족 시 check-then-act 방어) ────────────
+
+    @Test
+    void reserveAll_가용분이_부족하면_두번째_예약은_실패한다() {
+        // 시나리오: 재고 5개, 같은 상품에서 두 orderId가 각각 3개 예약 시도
+        // ① orderId=1, qty=3 → 성공 (available=5 >= 3), reserved=3
+        // ② orderId=2, qty=3 → 실패 (available=2 < 3), reserved 변경 없음 (= 3)
+        // check-then-act 방어: 첫 번째만 성공해야 함 (가용분 경합의 계약)
+        seed(1L, 5);
+
+        // 첫 번째 예약: 성공
+        boolean first = service.reserveAll(1L, Map.of(1L, 3));
+        assertThat(first).isTrue();
+        Inventory after1st = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after1st.getReservedQty()).isEqualTo(3);
+        assertThat(after1st.getAvailableQty()).isEqualTo(2); // 5 - 3 = 2
+
+        // 두 번째 예약: 실패 (가용 2 < 요청 3)
+        boolean second = service.reserveAll(2L, Map.of(1L, 3));
+        assertThat(second).isFalse();
+        Inventory after2nd = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after2nd.getReservedQty()).isEqualTo(3); // 변경 없음
+        assertThat(after2nd.getAvailableQty()).isEqualTo(2); // 변경 없음
+    }
+
+    @Test
+    void reserveAll_경합시_부분예약_없이_전체_롤백한다() {
+        // 시나리오: 다중 상품 예약에서 하나만 부족 → 전부 실패(원자성)
+        // ① productId=1: qty=3 (available=5 충분)
+        // ② productId=2: qty=4 (available=2 부족)
+        // → 둘 다 예약 안 함
+        seed(1L, 5); seed(2L, 2);
+
+        boolean result = service.reserveAll(99L, Map.of(1L, 3, 2L, 4));
+        assertThat(result).isFalse();
+
+        Inventory inv1 = repo.findByProductIdIn(List.of(1L)).get(0);
+        Inventory inv2 = repo.findByProductIdIn(List.of(2L)).get(0);
+        assertThat(inv1.getReservedQty()).isEqualTo(0); // 부분 예약 없음
+        assertThat(inv2.getReservedQty()).isEqualTo(0); // 부분 예약 없음
+    }
+
+    // ── P0-2: 예약 원장(SSOT) 기반 ship/release ────────────────────
+
+    @Test
+    void reserveAll_예약수량을_원장에_저장한다() {
+        seed(1L, 10); seed(2L, 5);
+        service.reserveAll(99L, Map.of(1L, 3, 2L, 4));
+        var reservation = reservationRepo.findByOrderId(99L).orElseThrow();
+        assertThat(reservation.getQtyByProductId())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(1L, 3, 2L, 4));
+    }
+
+    @Test
+    void shipAll_호출자가_잘못된_수량을_보내도_원장수량으로_출고한다() {
+        // SSOT: 예약은 6이었으므로, 출고 요청이 9로 와도 원장의 6만 차감해야 한다(수량 오염 차단).
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.shipAll(99L, Map.of(1L, 9));
+        Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after.getOnHandQty()).isEqualTo(4);   // 10 - 6
+        assertThat(after.getReservedQty()).isEqualTo(0); // 6 - 6
+    }
+
+    @Test
+    void releaseAll_호출자가_잘못된_수량을_보내도_원장수량으로_해제한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.releaseAll(99L, Map.of(1L, 2));
+        Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after.getReservedQty()).isEqualTo(0); // 6 - 6 (요청 2가 아님)
+        assertThat(after.getOnHandQty()).isEqualTo(10);
+    }
+
+    @Test
+    void shipAll_원장_상품의_재고행이_사라졌으면_침묵스킵대신_예외() {
+        // 예약 후 재고 행이 사라진 비정상 상태 — 예약은 SHIPPED로 넘기고 재고는 안 깎는 침묵 누수를 막는다.
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        repo.deleteAll();
+
+        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
+                .isInstanceOf(IllegalStateException.class);
     }
 }

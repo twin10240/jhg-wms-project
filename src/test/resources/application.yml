@@ -18,3 +18,8 @@ spring:
 # 테스트에서 실제 OMS 호출 없음(커밋 후 발화 + 테스트 트랜잭션 롤백) — 빈 생성용 값만 제공
 oms:
   base-url: http://localhost:8080
+
+wms:
+  basic:
+    user: wms
+    password: wms
