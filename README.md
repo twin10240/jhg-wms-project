@@ -34,8 +34,8 @@ JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 
 - Dockerfile(멀티스테이지 JDK21) 존재 시 Railway가 자동 사용. `.dockerignore`로 build/·.git/ 제외.
 - `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`, H2 콘솔 off. 빈 DB면 `InitDb`가 재고 1~20 시드.
-- Variables: `SPRING_PROFILES_ACTIVE=prod`, `PORT=8081`(private networking 주소 고정용), `OMS_BASE_URL=http://<oms>.railway.internal:8080`.
-- 공개 도메인 없음 — OMS가 private networking으로만 호출. 관리 작업은 OMS 관리자 화면이 프록시.
+- Variables: `SPRING_PROFILES_ACTIVE=prod`, `PORT=8081`(private networking 주소 고정용), `OMS_BASE_URL=http://<oms>.railway.internal:8080`, `WMS_BASIC_USER`/`WMS_BASIC_PASSWORD`(Basic Auth 자격증명 — OMS 서비스에도 동일 값 필수).
+- 공개 도메인: `https://jhg-wms-project-production.up.railway.app` (Basic Auth 필수). OMS는 여전히 private networking(`WMS_BASE_URL`)으로 호출.
 - 주의: `org.gradle.java.home`은 레포 `gradle.properties`에 커밋 금지(Windows 경로가 컨테이너 빌드를 죽임) — 머신 로컬 `~/.gradle/gradle.properties`에서 지정한다.
 
 ## API
@@ -99,7 +99,7 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 | `/admin/reservations` | 예약 현황 조회 (상태 필터, 조회 전용) |
 | `/admin/purchase-orders` | 발주 생성(다품목)·입고 처리 (상태 필터) |
 
-> ⚠️ 관리자 UI는 **인증이 없습니다**. 루트 `/`가 관리자 콘솔이고 상태 변경 POST(재고 조정·발주·입고)에 CSRF 방어도 없으므로, **공개 인그레스 없음**(내부망/Railway private networking 전용)이 하드 불변식입니다. 공개 도메인을 붙이려면 반드시 Spring Security를 먼저 도입할 것.
+> 관리자 UI를 포함한 전 경로(`/`, `/admin/**`, `/api/**`)가 **HTTP Basic 인증**을 요구합니다(`WMS_BASIC_USER`/`WMS_BASIC_PASSWORD`, 로컬 기본 wms/wms). admin 폼 POST는 CSRF 토큰 필수, `/api/**`는 서버간 호출용으로 CSRF 예외. 이 전제로 공개 도메인이 붙어 있습니다 — 자격증명 변경 시 OMS 쪽 변수도 함께 바꿀 것(안 그러면 OMS→WMS 전면 401).
 
 ### 예약 멱등성
 

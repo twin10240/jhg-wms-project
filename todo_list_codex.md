@@ -4,7 +4,11 @@
 
 Expose WMS through a Railway public URL only after adding minimal authentication.
 
-## Status: 구현 완료 (2026-07-10) — 남은 건 운영 배포뿐
+## Status: 완료 (2026-07-13) — 운영 배포·공개 도메인 생성까지 전부 끝
+
+공개 URL: `https://jhg-wms-project-production.up.railway.app` (Basic Auth `wms-admin`, 비밀번호는 Railway Variables).
+배포 런북 검증 통과: 무자격 `/`·API 401, Basic Auth 대시보드·API 200, 무CSRF admin POST 403,
+OMS 관리자 화면 경유 재고 조회·조정(+1/−1 원복) 정상 — OMS→WMS private networking 유지.
 
 코드 작업(1~6)은 전부 구현·테스트 완료. WMS 76 tests / OMS 163 tests BUILD SUCCESSFUL, 회귀 0.
 로컬 기본 자격증명 **wms/wms**(양쪽 일치), env로 override.
@@ -27,7 +31,7 @@ Use HTTP Basic Auth for the whole WMS app. Skip users, roles, JWT, and form logi
 - [x] **5. OMS WMS 어댑터가 Basic Auth 전송** — `WmsInventoryAdapter`·`WmsInventoryQueryAdapter`·`WmsPurchaseOrderAdapter` 생성자에서 `RestClient.Builder.defaultHeaders(setBasicAuth)`.
 - [x] **6. WMS admin POST 폼에 CSRF hidden** — `templates/admin/inventory.html`(재고조정), `templates/admin/purchaseorders.html`(발주생성·입고).
 - [x] **(추가) 보안 슬라이스 테스트** — `SecurityConfigTest`(무자격 API 401 / 무CSRF admin POST 403 / 인증 200) + 기존 @WebMvcTest 3종 인증 대응 수정.
-- [ ] **7. Railway 공개 도메인 생성** — 아래 배포 런북의 검증을 전부 통과한 뒤에만. (운영 작업)
+- [x] **7. Railway 공개 도메인 생성** — 2026-07-13 런북 순서대로 완료 (env → OMS 재배포 → WMS 배포 → 검증 → 도메인).
 
 ## 배포 런북 (운영 — Railway 콘솔, 사용자 수행)
 
