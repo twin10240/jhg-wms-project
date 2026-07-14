@@ -3,6 +3,7 @@ package com.jhg.wms.service;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.Reservation;
+import com.jhg.wms.repository.InventoryAdjustmentRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,13 +24,14 @@ class InventoryServiceTest {
 
     @Autowired InventoryRepository repo;
     @Autowired ReservationRepository reservationRepo;
+    @Autowired InventoryAdjustmentRepository adjustmentRepo;
     InventoryService service;
     OmsReplenishmentNotifier notifier;
 
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
-        service = new InventoryService(repo, reservationRepo, notifier);
+        service = new InventoryService(repo, reservationRepo, adjustmentRepo, notifier);
     }
 
     private void seed(long pid, int qty) {
@@ -124,6 +126,27 @@ class InventoryServiceTest {
         assertThatThrownBy(() -> service.adjust(1L, -10))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()).isEqualTo(5);
+    }
+
+    @Test
+    void adjust_수동조정은_내역을_before_after_사유와_함께_남긴다() {
+        seed(1L, 10);
+        service.adjust(1L, 5, "정기실사");
+        var log = adjustmentRepo.findAllByOrderByIdDesc();
+        assertThat(log).hasSize(1);
+        assertThat(log.get(0).getProductId()).isEqualTo(1L);
+        assertThat(log.get(0).getDelta()).isEqualTo(5);
+        assertThat(log.get(0).getBeforeQty()).isEqualTo(10);
+        assertThat(log.get(0).getAfterQty()).isEqualTo(15);
+        assertThat(log.get(0).getReason()).isEqualTo("정기실사");
+        assertThat(log.get(0).getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void adjust_2arg_코어경로는_내역을_남기지_않는다() {
+        seed(1L, 10);
+        service.adjust(1L, 5); // 발주 입고 등 자동 증가 경로
+        assertThat(adjustmentRepo.count()).isZero();
     }
 
     @Test

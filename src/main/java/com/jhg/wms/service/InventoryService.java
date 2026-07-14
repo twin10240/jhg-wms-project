@@ -2,8 +2,10 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.InventoryAdjustment;
 import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.domain.ReservationStatus;
+import com.jhg.wms.repository.InventoryAdjustmentRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
@@ -24,9 +26,21 @@ public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final ReservationRepository reservationRepository;
+    private final InventoryAdjustmentRepository adjustmentRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
 
-    /** 관리자 수동 재고 조정(+/-). 조정 후 수량을 반환한다. */
+    /** 관리자 수동 재고 조정(+/-) + 내역 기록. 조정 후 수량을 반환한다. 발주 입고 등 자동 증가는 2-arg를 쓴다(미기록). */
+    @Transactional
+    public int adjust(Long productId, int delta, String reason) {
+        int before = inventoryRepository.findByProductId(productId)
+                .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId))
+                .getOnHandQty();
+        int after = adjust(productId, delta);
+        adjustmentRepository.save(InventoryAdjustment.of(productId, delta, before, after, reason));
+        return after;
+    }
+
+    /** 재고 증가/감소 코어. 내역 미기록 — 수동 경로는 3-arg adjust를 통해 기록한다. */
     @Transactional
     public int adjust(Long productId, int delta) {
         Inventory inv = inventoryRepository.findByProductId(productId)
@@ -130,5 +144,10 @@ public class InventoryService {
     /** 관리자 예약 화면·대시보드용 전체 예약 목록 (최신 먼저). */
     public List<Reservation> findAllReservations() {
         return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+    }
+
+    /** 관리자 재고 화면용 수동 조정 내역 (최신 먼저). */
+    public List<InventoryAdjustment> findAllAdjustments() {
+        return adjustmentRepository.findAllByOrderByIdDesc();
     }
 }

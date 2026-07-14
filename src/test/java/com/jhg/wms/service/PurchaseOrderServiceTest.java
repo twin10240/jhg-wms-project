@@ -4,6 +4,7 @@ import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.domain.PurchaseOrderItem;
 import com.jhg.wms.domain.PurchaseOrderStatus;
+import com.jhg.wms.repository.InventoryAdjustmentRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.PurchaseOrderRepository;
 import com.jhg.wms.repository.ReservationRepository;
@@ -23,6 +24,7 @@ class PurchaseOrderServiceTest {
 
     @Autowired InventoryRepository inventoryRepo;
     @Autowired ReservationRepository reservationRepo;
+    @Autowired InventoryAdjustmentRepository adjustmentRepo;
     @Autowired PurchaseOrderRepository poRepo;
     InventoryService inventoryService;
     PurchaseOrderService service;
@@ -31,7 +33,7 @@ class PurchaseOrderServiceTest {
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
-        inventoryService = new InventoryService(inventoryRepo, reservationRepo, notifier);
+        inventoryService = new InventoryService(inventoryRepo, reservationRepo, adjustmentRepo, notifier);
         service = new PurchaseOrderService(poRepo, inventoryService);
     }
 

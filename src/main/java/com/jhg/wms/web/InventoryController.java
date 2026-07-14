@@ -41,7 +41,7 @@ public class InventoryController {
     @PostMapping("/adjust")
     public ResponseEntity<Integer> adjust(@RequestBody AdjustRequest req) {
         try {
-            return ResponseEntity.ok(inventoryService.adjust(req.productId(), req.delta()));
+            return ResponseEntity.ok(inventoryService.adjust(req.productId(), req.delta(), req.reason()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

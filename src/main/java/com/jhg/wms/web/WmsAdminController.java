@@ -51,6 +51,7 @@ public class WmsAdminController {
     @GetMapping("/admin/inventory")
     public String inventory(Model model) {
         model.addAttribute("products", inventoryService.findAllRows());
+        model.addAttribute("adjustments", inventoryService.findAllAdjustments());
         return "admin/inventory";
     }
 
@@ -59,7 +60,7 @@ public class WmsAdminController {
                          @RequestParam(defaultValue = "") String reason,
                          RedirectAttributes ra) {
         try {
-            int adjusted = inventoryService.adjust(productId, delta);
+            int adjusted = inventoryService.adjust(productId, delta, reason);
             ra.addFlashAttribute("successMessage", "재고 조정 완료. (현재 " + adjusted + "개)");
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());

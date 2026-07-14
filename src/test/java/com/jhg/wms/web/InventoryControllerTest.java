@@ -62,7 +62,7 @@ class InventoryControllerTest {
 
     @Test
     void adjust_조정후_수량을_반환한다() throws Exception {
-        when(inventoryService.adjust(1L, 5)).thenReturn(15);
+        when(inventoryService.adjust(1L, 5, "정기조사")).thenReturn(15);
 
         mockMvc.perform(post("/api/inventory/adjust").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,7 +73,7 @@ class InventoryControllerTest {
 
     @Test
     void adjust_잘못된_요청은_400을_반환한다() throws Exception {
-        when(inventoryService.adjust(1L, -99)).thenThrow(new IllegalArgumentException("재고 부족"));
+        when(inventoryService.adjust(1L, -99, "조정")).thenThrow(new IllegalArgumentException("재고 부족"));
 
         mockMvc.perform(post("/api/inventory/adjust").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)

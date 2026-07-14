@@ -44,6 +44,23 @@
       </tr>
     </tbody>
   </table>
+
+  <h3>수동 조정 내역</h3>
+  <table>
+    <thead><tr><th>일시</th><th>상품 ID</th><th>증감</th><th>전 → 후</th><th>사유</th></tr></thead>
+    <tbody>
+      <tr th:each="a : ${adjustments}">
+        <td th:text="${#temporals.format(a.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-14 15:00</td>
+        <td th:text="${a.productId}">1</td>
+        <td th:text="${(a.delta > 0 ? '+' : '') + a.delta}">+10</td>
+        <td th:text="${a.beforeQty + ' → ' + a.afterQty}">15 → 25</td>
+        <td th:text="${a.reason}"></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(adjustments)}">
+        <td colspan="5">조정 내역 없음</td>
+      </tr>
+    </tbody>
+  </table>
 </main>
 </body>
 </html>
