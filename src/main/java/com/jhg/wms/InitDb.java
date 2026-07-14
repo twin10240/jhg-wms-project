@@ -33,7 +33,8 @@ public class InitDb {
             for (int i = 0; i < 20; i++) {
                 long productId = i + 1;          // OMS 시드의 상품 id 1~20과 일치
                 int onHandQty = 15 * (i + 1);    // OMS initDb와 동일: 15, 30, ..., 300
-                inventoryRepository.save(Inventory.create(productId, onHandQty));
+                String productName = "상품 " + productId; // ponytail: OMS 실제 상품명 확보 시 교체
+                inventoryRepository.save(Inventory.create(productId, productName, onHandQty));
             }
         }
     }

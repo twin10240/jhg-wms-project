@@ -49,7 +49,8 @@ public class InventoryService {
     public List<InventoryRowResponse> findAllRows() {
         return inventoryRepository.findAll().stream()
                 .map(inv -> new InventoryRowResponse(
-                        inv.getProductId(), inv.getOnHandQty(), inv.getReservedQty(), inv.getAvailableQty()))
+                        inv.getProductId(), inv.getProductName(),
+                        inv.getOnHandQty(), inv.getReservedQty(), inv.getAvailableQty()))
                 .sorted(Comparator.comparing(InventoryRowResponse::productId))
                 .toList();
     }

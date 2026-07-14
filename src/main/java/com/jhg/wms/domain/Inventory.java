@@ -22,6 +22,9 @@ public class Inventory {
     @Column(name = "product_id", nullable = false, unique = true)
     private Long productId;
 
+    // 표시용 상품명. 마스터는 OMS 소유 — 여기선 재고 화면 편의를 위한 비정규화 복제(InitDb 시드). null 허용.
+    private String productName;
+
     @Column(nullable = false)
     private int onHandQty = 0;
 
@@ -32,6 +35,12 @@ public class Inventory {
         Inventory inv = new Inventory();
         inv.productId = productId;
         inv.onHandQty = onHandQty;
+        return inv;
+    }
+
+    public static Inventory create(Long productId, String productName, int onHandQty) {
+        Inventory inv = create(productId, onHandQty);
+        inv.productName = productName;
         return inv;
     }
 

@@ -31,20 +31,21 @@ class WmsAdminControllerTest {
 
     @Test
     void 재고화면_보유_예약_가용_컬럼을_렌더링한다() throws Exception {
-        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, 10, 3, 7)));
+        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
 
         mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/inventory"))
                 .andExpect(content().string(containsString("가용")))
+                .andExpect(content().string(containsString("상품 1")))
                 .andExpect(content().string(containsString("admin.css")));
     }
 
     @Test
     void 대시보드_재고_발주_예약_요약을_모델에_담는다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(
-                new InventoryRowResponse(1L, 10, 3, 7),
-                new InventoryRowResponse(2L, 5, 0, 5)));
+                new InventoryRowResponse(1L, "상품 1", 10, 3, 7),
+                new InventoryRowResponse(2L, "상품 2", 5, 0, 5)));
         when(purchaseOrderService.findAllWithItems()).thenReturn(List.of(
                 PurchaseOrder.create("대기", PurchaseOrderItem.create(1L, 10))));
         Reservation shipped = Reservation.reserve(2L, Map.of(1L, 1));
@@ -92,7 +93,7 @@ class WmsAdminControllerTest {
         PurchaseOrder received = PurchaseOrder.create("완료", PurchaseOrderItem.create(2L, 5));
         received.receive();
         when(purchaseOrderService.findAllWithItems()).thenReturn(List.of(ordered, received));
-        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, 10, 0, 10)));
+        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
 
         mockMvc.perform(get("/admin/purchase-orders").with(httpBasic("wms", "wms")).param("status", "RECEIVED"))
                 .andExpect(status().isOk())

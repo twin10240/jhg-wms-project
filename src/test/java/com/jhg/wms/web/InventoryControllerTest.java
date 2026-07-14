@@ -83,11 +83,12 @@ class InventoryControllerTest {
 
     @Test
     void rows_전체_재고_목록을_반환한다() throws Exception {
-        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, 10, 3, 7)));
+        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
 
         mockMvc.perform(get("/api/inventory/rows").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].productId").value(1))
+                .andExpect(jsonPath("$[0].productName").value("상품 1"))
                 .andExpect(jsonPath("$[0].onHandQty").value(10))
                 .andExpect(jsonPath("$[0].reservedQty").value(3))
                 .andExpect(jsonPath("$[0].availableQty").value(7));
