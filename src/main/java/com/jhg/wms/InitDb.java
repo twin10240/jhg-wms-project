@@ -15,7 +15,10 @@ public class InitDb {
 
     @PostConstruct
     public void init() {
-        if (initService.alreadySeeded()) return;
+        if (initService.alreadySeeded()) {
+            initService.backfillNames(); // 이름 컬럼 도입 전 시드된 기존 배포분 보정 — 채워지면 no-op
+            return;
+        }
         initService.seed();
     }
 
@@ -27,6 +30,14 @@ public class InitDb {
 
         public boolean alreadySeeded() {
             return inventoryRepository.count() > 0;
+        }
+
+        // ponytail: 일회성 백필. 모든 행이 이름을 가지면 삭제 가능(그때까진 부팅당 null만 스캔, 20행이라 무해).
+        public void backfillNames() {
+            inventoryRepository.findAll().forEach(inv -> {
+                if (inv.getProductName() == null)
+                    inv.setProductName("상품 " + inv.getProductId());
+            });
         }
 
         public void seed() {
