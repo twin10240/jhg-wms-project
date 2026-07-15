@@ -15,4 +15,7 @@ WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
 # Railway가 ${PORT}를 주입하면 application.yml의 server.port가 받는다(기본 8081).
 EXPOSE 8081
-ENTRYPOINT ["sh", "-c", "java -jar app.jar"]
+# 힙 상한을 컨테이너 한도의 75%로 고정 — 나머지 25%는 Metaspace·스레드·direct buffer용.
+# 없으면 non-heap 증가로 RSS가 Railway 메모리 한도를 넘겨 커널 OOM-killer가 조용히 kill(SIGKILL).
+# ExitOnOutOfMemoryError: 진짜 힙 부족 시 조용한 kill 대신 즉시 종료·로깅으로 진단 가능하게.
+ENTRYPOINT ["sh", "-c", "java -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError -jar app.jar"]
