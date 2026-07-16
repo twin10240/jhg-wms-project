@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OMS와 WMS 사이의 보충 요청 승인 워크플로우 설계">
+  <title>보충 요청 승인 워크플로우 — 설계</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-2: #f0f4fa;
+      --text: #172033;
+      --muted: #5b6578;
+      --line: #d9e0eb;
+      --accent: #315efb;
+      --accent-soft: #e8edff;
+      --good: #087f5b;
+      --good-soft: #e6fcf5;
+      --warn: #9c5b00;
+      --warn-soft: #fff4d6;
+      --danger: #c92a2a;
+      --danger-soft: #fff0f0;
+      --code: #18212f;
+      --code-text: #e8edf5;
+      --shadow: 0 14px 40px rgba(30, 45, 75, .08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.68;
+    }
+    a { color: var(--accent); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    code {
+      padding: .1rem .32rem;
+      border-radius: .3rem;
+      background: var(--surface-2);
+      font-size: .92em;
+    }
+
+    .hero {
+      padding: 64px 24px 52px;
+      color: white;
+      background: linear-gradient(135deg, #172554, #315efb 62%, #5b7cfa);
+    }
+    .hero-inner, .layout { max-width: 1180px; margin: 0 auto; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #cdd8ff;
+      font-size: .82rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.45rem); line-height: 1.13; letter-spacing: -.04em; }
+    .subtitle { max-width: 760px; margin: 18px 0 0; color: #e2e8ff; font-size: 1.08rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 25px; }
+    .meta span { padding: 6px 11px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; background: rgba(255,255,255,.09); font-size: .86rem; }
+
+    .layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 28px; padding: 32px 24px 72px; }
+    nav {
+      position: sticky;
+      top: 20px;
+      align-self: start;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    nav strong { display: block; margin-bottom: 9px; font-size: .83rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    nav a { display: block; padding: 6px 8px; border-radius: 7px; color: var(--text); text-decoration: none; font-size: .9rem; }
+    nav a:hover { background: var(--accent-soft); color: var(--accent); }
+
+    main { min-width: 0; }
+    section {
+      margin-bottom: 24px;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    h2 { margin: 0 0 19px; font-size: 1.55rem; letter-spacing: -.025em; }
+    h3 { margin: 30px 0 12px; font-size: 1.12rem; }
+    p { margin: 10px 0; }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: 6px; }
+
+    .callout {
+      margin: 18px 0;
+      padding: 16px 18px;
+      border-left: 4px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+      background: var(--accent-soft);
+    }
+    .callout.good { border-color: var(--good); background: var(--good-soft); }
+    .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+    .callout strong { display: block; margin-bottom: 3px; }
+
+    .table-wrap { overflow-x: auto; margin: 15px 0; }
+    table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: .92rem; }
+    th, td { padding: 12px 13px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--surface-2); font-weight: 750; }
+
+    pre {
+      overflow-x: auto;
+      margin: 15px 0;
+      padding: 18px;
+      border-radius: 12px;
+      background: var(--code);
+      color: var(--code-text);
+      line-height: 1.55;
+      font-size: .88rem;
+    }
+    pre code { padding: 0; background: transparent; color: inherit; }
+
+    .states { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin: 18px 0; }
+    .state { position: relative; padding: 15px 12px; border-radius: 12px; text-align: center; font-weight: 800; background: var(--surface-2); }
+    .state.requested { color: var(--accent); background: var(--accent-soft); }
+    .state.approved { color: var(--warn); background: var(--warn-soft); }
+    .state.fulfilled { color: var(--good); background: var(--good-soft); }
+    .state.rejected { color: var(--danger); background: var(--danger-soft); }
+    .state small { display: block; margin-top: 4px; color: var(--muted); font-weight: 500; }
+
+    .steps { counter-reset: step; display: grid; gap: 13px; padding: 0; list-style: none; }
+    .steps li { position: relative; padding: 15px 16px 15px 56px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 15px; top: 14px; display: grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; color: white; background: var(--accent); font-weight: 800; }
+    footer { padding: 0 24px 38px; color: var(--muted); text-align: center; font-size: .84rem; }
+
+    @media (max-width: 850px) {
+      .layout { grid-template-columns: 1fr; }
+      nav { position: static; }
+      nav .links { columns: 2; }
+      .states { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 560px) {
+      .hero { padding: 45px 19px 38px; }
+      .layout { padding: 20px 12px 50px; }
+      section { padding: 22px 17px; }
+      nav .links { columns: 1; }
+      .states { grid-template-columns: 1fr; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1420;
+        --surface: #151f2d;
+        --surface-2: #202c3c;
+        --text: #e6ebf3;
+        --muted: #a9b4c5;
+        --line: #334155;
+        --accent: #8ba4ff;
+        --accent-soft: #202e5c;
+        --good: #63e6be;
+        --good-soft: #123d36;
+        --warn: #ffd166;
+        --warn-soft: #493916;
+        --danger: #ff8787;
+        --danger-soft: #4b2025;
+        --shadow: none;
+      }
+    }
+    @media print {
+      :root { color-scheme: light; }
+      body { background: white; }
+      .hero { padding: 30px 0; color: #172033; background: white; border-bottom: 2px solid #172033; }
+      .eyebrow, .subtitle { color: #445; }
+      .meta span { color: #172033; border-color: #ccd3df; background: white; }
+      .layout { display: block; max-width: none; padding: 24px 0; }
+      nav { display: none; }
+      section { break-inside: avoid; box-shadow: none; }
+      footer { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">OMS ↔ WMS Architecture</p>
+      <h1>보충 요청 승인 워크플로우</h1>
+      <p class="subtitle">OMS는 보충을 요청하고, WMS는 창고 작업을 승인·실행한다. 재고 원장과 처리 이력의 책임을 WMS로 되돌리는 설계.</p>
+      <div class="meta">
+        <span>작성일 2026-07-16</span>
+        <span>jhg-wms-project</span>
+        <span>jhg-commerce-project</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="문서 목차">
+      <strong>Contents</strong>
+      <div class="links">
+        <a href="#background">배경과 목표</a>
+        <a href="#ownership">책임 재배치</a>
+        <a href="#model">데이터 모델</a>
+        <a href="#idempotency">멱등성과 검증</a>
+        <a href="#state">상태 전이</a>
+        <a href="#flow">전체 흐름</a>
+        <a href="#api">API</a>
+        <a href="#cleanup">삭제 대상</a>
+        <a href="#naming">네이밍</a>
+        <a href="#tests">테스트</a>
+        <a href="#deploy">배포</a>
+        <a href="#deferred">범위 밖</a>
+      </div>
+    </nav>
+
+    <main>
+      <section id="background">
+        <h2>배경과 목표</h2>
+        <p>현재 OMS 관리자 화면은 WMS의 창고 작업을 직접 원격 변경한다.</p>
+        <ul>
+          <li><code>wmsInventoryAdapter.adjust(...)</code> → WMS <code>POST /api/inventory/adjust</code></li>
+          <li><code>wmsPurchaseOrderAdapter.create(...)</code> → WMS <code>POST /api/purchase-orders</code></li>
+          <li><code>wmsPurchaseOrderAdapter.receive(...)</code> → WMS <code>POST /api/purchase-orders/receive</code></li>
+        </ul>
+        <p>OMS가 다른 바운디드 컨텍스트인 WMS의 실물 수량·발주·입고를 직접 손대면서 창고 권한이 요청자에게 새어 있다.</p>
+        <div class="callout good">
+          <strong>목표</strong>
+          OMS는 보충을 요청하고 WMS 관리자가 검토 후 승인 또는 반려한다. 요청과 처리 이력의 원본은 WMS가 보관하고 OMS는 API로 조회한다.
+        </div>
+      </section>
+
+      <section id="ownership">
+        <h2>책임 재배치</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>시스템</th><th>제거</th><th>유지</th><th>추가</th></tr></thead>
+            <tbody>
+              <tr>
+                <th>OMS</th>
+                <td>수동 재고 조정<br>발주 생성<br>입고 처리</td>
+                <td>WMS 재고 조회<br>주문 흐름(reserve/ship/release)<br>보충 요청 작성·이력 조회</td>
+                <td>보충 요청 폼·이력 화면<br>요청 어댑터</td>
+              </tr>
+              <tr>
+                <th>WMS</th>
+                <td>사용하지 않는 OMS 전용 REST</td>
+                <td>자체 admin의 수동 조정·이력·발주·입고<br><code>PurchaseOrderService</code></td>
+                <td><code>ReplenishmentRequest</code> 접수·승인·반려<br>검토 화면</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn">
+          <strong>핵심 불변식</strong>
+          OMS→WMS의 <code>reserve/ship/release</code>와 재고 조회(availability, rows)는 건드리지 않는다. 제거 대상은 수동 관리자 쓰기뿐이다.
+        </div>
+      </section>
+
+      <section id="model">
+        <h2>데이터 모델 — WMS 원본</h2>
+        <h3>ReplenishmentRequest</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>필드</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td><code>id</code></td><td>PK, 내부 요청번호</td></tr>
+              <tr><td><code>requestKey</code></td><td>OMS 요청 폼을 열 때 한 번 생성한 UUID, UNIQUE 멱등 키</td></tr>
+              <tr><td><code>reason</code></td><td>요청 사유, 필수</td></tr>
+              <tr><td><code>status</code></td><td>REQUESTED / APPROVED / REJECTED / FULFILLED</td></tr>
+              <tr><td><code>requestedAt</code></td><td>요청 접수 시각</td></tr>
+              <tr><td><code>decidedAt</code></td><td>승인 또는 반려 시각</td></tr>
+              <tr><td><code>fulfilledAt</code></td><td>연결된 발주의 입고 완료 시각</td></tr>
+              <tr><td><code>wmsMemo</code></td><td>승인 시 선택, 반려 시 필수인 WMS 처리 메모</td></tr>
+              <tr><td><code>purchaseOrderId</code></td><td>승인 시 생성된 발주 연결, nullable + UNIQUE</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>processedAt</code> 하나로 합치지 않는다. 승인 시각과 입고 완료 시각은 서로 다른 사건이며 그 사이에는 실제 리드타임이 있다.</p>
+
+        <h3>ReplenishmentRequestItem</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>필드</th><th>설명</th></tr></thead>
+            <tbody>
+              <tr><td><code>productId</code></td><td>필수이며 WMS 재고에 존재해야 하는 품목</td></tr>
+              <tr><td><code>requestedQty</code></td><td>1 이상의 요청 수량</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>다품목 요청은 기존 다라인 PO로 1:1 매핑한다. 한 요청 안에서 같은 <code>productId</code>를 여러 라인으로 보내는 것은 거부한다.</p>
+      </section>
+
+      <section id="idempotency">
+        <h2>멱등성과 접수 검증</h2>
+        <pre><code>OMS 요청 전송
+→ WMS 저장 성공
+→ 응답 유실
+→ OMS 재전송
+→ requestKey가 없다면 서로 다른 PK의 중복 요청 2건</code></pre>
+        <p><code>requestKey</code>는 폼 GET에서 한 번 생성해 hidden 필드로 전달한다. 컨트롤러와 어댑터는 새 키를 만들지 않으며 전송 내부 재시도에서도 같은 키를 사용한다.</p>
+        <ul>
+          <li>동일 키 + 동일 내용 → 기존 요청 반환</li>
+          <li>동일 키 + 다른 내용 → <strong>409 Conflict</strong></li>
+          <li>신규 키 → REQUESTED 저장 후 반환</li>
+        </ul>
+        <p>내용은 중복 품목을 거부한 뒤 품목 순서와 무관한 <code>Map&lt;productId, requestedQty&gt;</code>와 reason으로 비교한다. UNIQUE 제약이 최종 방어선이며 동시 삽입 경쟁도 기존 행을 다시 조회해 수렴시킨다.</p>
+        <h3>WMS 접수 경계 검증</h3>
+        <ul>
+          <li><code>requestKey</code>와 공백이 아닌 reason 필수</li>
+          <li>품목 한 개 이상</li>
+          <li>필수 productId가 WMS 재고에 존재</li>
+          <li>requestedQty 1 이상</li>
+          <li>동일 productId 중복 라인 거부</li>
+        </ul>
+      </section>
+
+      <section id="state">
+        <h2>상태 전이</h2>
+        <div class="states" aria-label="요청 상태">
+          <div class="state requested">REQUESTED<small>접수</small></div>
+          <div class="state approved">APPROVED<small>PO 생성</small></div>
+          <div class="state fulfilled">FULFILLED<small>입고 완료</small></div>
+          <div class="state rejected">REJECTED<small>반려</small></div>
+        </div>
+        <pre><code>REQUESTED ──승인 / PO 생성──&gt; APPROVED ──PO 입고──&gt; FULFILLED
+     └────────── 반려 ──────────&gt; REJECTED</code></pre>
+        <ul>
+          <li>승인·반려는 REQUESTED에서만 허용한다.</li>
+          <li>도메인 서비스가 잘못된 재처리를 거부하고 관리자 컨트롤러는 오류 flash 후 목록으로 redirect한다.</li>
+          <li>반려에는 공백이 아닌 wmsMemo가 필수이며 승인 메모는 선택이다.</li>
+          <li>승인은 ORDERED PO 생성까지만 수행하며 입고와 재고 증가는 실제 물건 도착 시 처리한다.</li>
+          <li>PO 입고 트랜잭션에서 연결 요청이 있을 때만 FULFILLED로 전이한다. 직접 생성 PO도 정상 입고된다.</li>
+          <li>OMS 재입고 콜백은 기존처럼 커밋 후 실행한다.</li>
+        </ul>
+      </section>
+
+      <section id="flow">
+        <h2>전체 흐름</h2>
+        <pre><code>OMS 관리자
+  재고 조회 화면 진입 → requestKey UUID 1회 생성(hidden)
+  → 품목·수량·사유 입력 → POST /api/replenishment-requests
+                           → WMS: REQUESTED 저장
+
+WMS 관리자
+  검토 → 반려: REJECTED + wmsMemo + decidedAt
+       → 승인: PurchaseOrderService.create → ORDERED PO
+               APPROVED + purchaseOrderId + decidedAt
+
+WMS 관리자
+  실제 물건 도착 → 기존 발주 화면에서 receive
+  → 한 트랜잭션: 재고 증가 + 연결 요청 FULFILLED + fulfilledAt
+  → 커밋 후: OmsReplenishmentNotifier → OMS 백오더 승격
+
+OMS 관리자
+  GET /api/replenishment-requests → 요청 상태와 처리 이력 확인</code></pre>
+      </section>
+
+      <section id="api">
+        <h2>API와 화면 액션</h2>
+        <h3>WMS 신규</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Method</th><th>URL</th><th>인증 / CSRF</th><th>용도</th></tr></thead>
+            <tbody>
+              <tr><td>POST</td><td><code>/api/replenishment-requests</code></td><td>Basic, CSRF 예외</td><td>멱등 요청 접수</td></tr>
+              <tr><td>GET</td><td><code>/api/replenishment-requests</code></td><td>Basic</td><td>OMS 이력 조회</td></tr>
+              <tr><td>POST</td><td><code>/admin/replenishment-requests/{id}/approve</code></td><td>Basic + CSRF</td><td>승인 후 PO 생성</td></tr>
+              <tr><td>POST</td><td><code>/admin/replenishment-requests/{id}/reject</code></td><td>Basic + CSRF</td><td>반려</td></tr>
+              <tr><td>GET</td><td><code>/admin/replenishment-requests</code></td><td>Basic</td><td>WMS 검토 화면</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <strong>관리자 액션</strong>
+          승인·반려 POST는 REST가 아닌 HTML 폼 액션이다. 성공과 도메인 오류 모두 목록 화면으로 redirect하고 오류는 flash 메시지로 표시한다.
+        </div>
+        <h3>OMS 신규</h3>
+        <ul>
+          <li>폼 GET에서 requestKey를 생성해 hidden 필드로 제공</li>
+          <li>폼에서 받은 키를 그대로 전달하는 보충 요청 어댑터</li>
+          <li>요청 이력 조회 어댑터</li>
+          <li>기존 재고 조회를 유지한 보충 요청 폼·이력 화면</li>
+        </ul>
+      </section>
+
+      <section id="cleanup">
+        <h2>삭제 대상</h2>
+        <h3>OMS</h3>
+        <ul>
+          <li><code>InventoryAdminController</code>의 adjust, PO create/receive 액션과 PO 관리자 화면</li>
+          <li><code>WmsInventoryAdapter.adjust()</code> 메서드만 제거 — reserve/ship/release 때문에 클래스는 유지</li>
+          <li><code>WmsPurchaseOrderAdapter</code> 전체와 관련 폼·DTO·템플릿</li>
+        </ul>
+        <h3>WMS</h3>
+        <ul>
+          <li><code>InventoryController</code>의 <code>POST /api/inventory/adjust</code>만 제거</li>
+          <li><code>PurchaseOrderController</code> 전체와 전용 Request/Response DTO, 컨트롤러 테스트 제거</li>
+          <li><code>PurchaseOrderService</code>, 폼, 도메인, 저장소는 WMS admin과 승인 흐름 때문에 유지</li>
+        </ul>
+        <p>삭제 직전 각 대상의 참조를 다시 검색해 호출자 0을 확인한다.</p>
+      </section>
+
+      <section id="naming">
+        <h2>네이밍</h2>
+        <ul>
+          <li>OMS→WMS: <strong>보충 요청</strong> — <code>ReplenishmentRequest</code></li>
+          <li>WMS→OMS: <strong>재입고 통지(callback)</strong> — 기존 <code>OmsReplenishmentNotifier</code></li>
+        </ul>
+        <p>기존 클래스명 변경은 하지 않는다. 코드 주석과 문서의 용어 구분으로 충분하다.</p>
+      </section>
+
+      <section id="tests">
+        <h2>테스트</h2>
+        <h3>WMS</h3>
+        <ul>
+          <li>REQUESTED→APPROVED→FULFILLED, REQUESTED→REJECTED와 잘못된 전이 방어</li>
+          <li>승인 시 ORDERED PO 생성과 purchaseOrderId 연결</li>
+          <li>입고 시 연결 요청만 FULFILLED, 직접 생성 PO도 정상 입고</li>
+          <li>같은 requestKey·같은 내용은 기존 요청 반환, 다른 내용은 409</li>
+          <li>빈 reason/items, 잘못된 productId·수량, 중복 productId 거부</li>
+          <li>무자격 401, 무CSRF 403, 관리자 성공·오류 3xx redirect와 flash</li>
+        </ul>
+        <h3>OMS</h3>
+        <ul>
+          <li>폼 GET에서 키 생성 후 POST와 재시도에서 같은 키 유지</li>
+          <li>Basic Auth를 포함한 요청·이력 조회 어댑터</li>
+          <li>폼 입력 검증과 WMS 오류 표시</li>
+        </ul>
+      </section>
+
+      <section id="deploy">
+        <h2>배포 순서</h2>
+        <ol class="steps">
+          <li><strong>WMS 확장 배포</strong><br>신규 요청 API·도메인·검토 화면을 추가하되 기존 관리자 REST는 임시 유지한다.</li>
+          <li><strong>OMS 전환 배포</strong><br>수동 조정·발주·입고 화면과 어댑터를 제거하고 보충 요청 화면으로 교체한다.</li>
+          <li><strong>WMS 정리 배포</strong><br>OMS 전환을 확인한 뒤 기존 관리자 REST와 전용 DTO·테스트를 제거한다.</li>
+        </ol>
+        <p>코드 작업 범위에는 기존 API 삭제까지 포함하지만 WMS 확장과 정리는 서로 다른 배포로 내보낸다. 신규 테이블은 현재 운영 정책대로 <code>ddl-auto: update</code>로 생성한다.</p>
+      </section>
+
+      <section id="deferred">
+        <h2>범위 밖</h2>
+        <ul>
+          <li>REQUESTED 요청 취소</li>
+          <li>라인별 수량을 바꾸는 부분 승인</li>
+          <li>승인자 감사 로그</li>
+          <li>다중 운영자와 세부 역할 분리</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <footer>보충 요청 승인 워크플로우 설계 · 2026-07-16</footer>
+</body>
+</html>
