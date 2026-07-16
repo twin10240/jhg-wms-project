@@ -54,12 +54,12 @@ public class ReplenishmentRequestService {
                 throw new IllegalArgumentException("lines must have unique products");
         }
 
-        if (inventoryRepository.findByProductIdIn(quantities.keySet()).size() != quantities.size())
-            throw new IllegalArgumentException("inventory is missing");
-
         var existing = requestRepository.findByRequestKeyWithItems(key);
         if (existing.isPresent())
             return reconcile(existing.get(), normalizedReason, quantities);
+
+        if (inventoryRepository.findByProductIdIn(quantities.keySet()).size() != quantities.size())
+            throw new IllegalArgumentException("inventory is missing");
 
         ReplenishmentRequest request = ReplenishmentRequest.create(key, normalizedReason,
                 quantities.entrySet().stream()

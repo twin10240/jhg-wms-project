@@ -62,6 +62,18 @@ class ReplenishmentRequestServiceTest {
     }
 
     @Test
+    void retryReconcilesExistingRequestWhenInventoryWasRemoved() {
+        UUID key = UUID.randomUUID();
+        var first = service.request(key, "low stock", List.of(new RequestLine(1L, 3)));
+        inventoryRepository.deleteAll();
+
+        var retry = service.request(key, "low stock", List.of(new RequestLine(1L, 3)));
+
+        assertThat(retry.created()).isFalse();
+        assertThat(retry.request().getId()).isEqualTo(first.request().getId());
+    }
+
+    @Test
     void sameKeyRejectsDifferentReasonOrItems() {
         UUID reasonKey = UUID.randomUUID();
         service.request(reasonKey, "low stock", List.of(new RequestLine(1L, 3)));
