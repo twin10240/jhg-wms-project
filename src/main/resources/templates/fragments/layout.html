@@ -12,6 +12,7 @@
     <a th:href="@{/admin/inventory}" th:classappend="${active == 'inventory'} ? 'active'">재고</a>
     <a th:href="@{/admin/reservations}" th:classappend="${active == 'reservations'} ? 'active'">예약</a>
     <a th:href="@{/admin/purchase-orders}" th:classappend="${active == 'purchase-orders'} ? 'active'">발주</a>
+    <a th:href="@{/admin/replenishment-requests}" th:classappend="${active == 'replenishment-requests'} ? 'active'">보충 요청</a>
   </nav>
   <div th:fragment="flash" th:remove="tag">
     <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>

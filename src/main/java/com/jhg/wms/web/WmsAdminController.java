@@ -4,6 +4,7 @@ import com.jhg.wms.domain.*;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
+import com.jhg.wms.service.ReplenishmentRequestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,6 +21,7 @@ public class WmsAdminController {
 
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
+    private final ReplenishmentRequestService replenishmentRequestService;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -102,5 +104,37 @@ public class WmsAdminController {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
         return "redirect:/admin/purchase-orders";
+    }
+
+    @GetMapping("/admin/replenishment-requests")
+    public String replenishmentRequests(Model model) {
+        model.addAttribute("requests", replenishmentRequestService.findAll());
+        return "admin/replenishmentrequests";
+    }
+
+    @PostMapping("/admin/replenishment-requests/{id}/approve")
+    public String approveReplenishmentRequest(@PathVariable Long id,
+                                              @RequestParam(defaultValue = "") String wmsMemo,
+                                              RedirectAttributes ra) {
+        try {
+            replenishmentRequestService.approve(id, wmsMemo);
+            ra.addFlashAttribute("successMessage", "Request approved.");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ra.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/admin/replenishment-requests";
+    }
+
+    @PostMapping("/admin/replenishment-requests/{id}/reject")
+    public String rejectReplenishmentRequest(@PathVariable Long id,
+                                             @RequestParam(defaultValue = "") String wmsMemo,
+                                             RedirectAttributes ra) {
+        try {
+            replenishmentRequestService.reject(id, wmsMemo);
+            ra.addFlashAttribute("successMessage", "Request rejected.");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ra.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/admin/replenishment-requests";
     }
 }
