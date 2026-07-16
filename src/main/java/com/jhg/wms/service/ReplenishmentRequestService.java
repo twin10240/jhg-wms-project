@@ -4,10 +4,12 @@ import com.jhg.wms.domain.ReplenishmentRequest;
 import com.jhg.wms.domain.ReplenishmentRequestItem;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReplenishmentRequestRepository;
+import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.LinkedHashMap;
@@ -20,13 +22,16 @@ public class ReplenishmentRequestService {
 
     private final ReplenishmentRequestRepository requestRepository;
     private final InventoryRepository inventoryRepository;
+    private final PurchaseOrderService purchaseOrderService;
     private final TransactionTemplate saveTransaction;
 
     public ReplenishmentRequestService(ReplenishmentRequestRepository requestRepository,
                                        InventoryRepository inventoryRepository,
+                                       PurchaseOrderService purchaseOrderService,
                                        PlatformTransactionManager transactionManager) {
         this.requestRepository = requestRepository;
         this.inventoryRepository = inventoryRepository;
+        this.purchaseOrderService = purchaseOrderService;
         this.saveTransaction = new TransactionTemplate(transactionManager);
         this.saveTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -76,6 +81,26 @@ public class ReplenishmentRequestService {
 
     public List<ReplenishmentRequest> findAll() {
         return requestRepository.findAllWithItems();
+    }
+
+    @Transactional
+    public Long approve(Long requestId, String memo) {
+        ReplenishmentRequest request = requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("request is missing: id=" + requestId));
+        Long purchaseOrderId = purchaseOrderService.create(
+                request.getItems().stream()
+                        .map(item -> new PurchaseOrderLine(item.getProductId(), item.getRequestedQty()))
+                        .toList(),
+                "OMS 보충 요청 #" + request.getId() + " - " + request.getReason());
+        request.approve(purchaseOrderId, memo);
+        return purchaseOrderId;
+    }
+
+    @Transactional
+    public void reject(Long requestId, String memo) {
+        requestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("request is missing: id=" + requestId))
+                .reject(memo);
     }
 
     private RequestResult reconcile(ReplenishmentRequest request, String reason, Map<Long, Integer> quantities) {
