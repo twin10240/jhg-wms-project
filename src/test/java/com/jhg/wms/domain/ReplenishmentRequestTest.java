@@ -59,11 +59,19 @@ class ReplenishmentRequestTest {
     }
 
     @Test
+    void reject_requiresMemo() {
+        assertThatThrownBy(() -> request().reject(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> request().reject("  "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void rejectsInvalidTransitions() {
         ReplenishmentRequest approved = request();
         approved.approve(10L, null);
         ReplenishmentRequest rejected = request();
-        rejected.reject(null);
+        rejected.reject("not needed");
 
         assertThatThrownBy(() -> approved.approve(11L, null)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> approved.reject(null)).isInstanceOf(IllegalStateException.class);

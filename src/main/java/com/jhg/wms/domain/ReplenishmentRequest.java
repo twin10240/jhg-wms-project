@@ -93,9 +93,11 @@ public class ReplenishmentRequest {
 
     public void reject(String memo) {
         requireStatus(ReplenishmentRequestStatus.REQUESTED);
+        if (memo == null || memo.isBlank())
+            throw new IllegalArgumentException("memo is required");
         this.status = ReplenishmentRequestStatus.REJECTED;
         this.decidedAt = LocalDateTime.now();
-        this.wmsMemo = trim(memo);
+        this.wmsMemo = memo.trim();
     }
 
     public void fulfill() {
