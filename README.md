@@ -47,14 +47,15 @@ JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 | GET | `/api/inventory/availability?productIds=1,2,3` | 가용수량 맵 반환 (OMS 채널1 연동) |
 | GET | `/api/inventory/rows` | 전체 재고 목록 (관리자) |
 
-### 재고 쓰기
+### 주문 이행 재고 쓰기
 
 | Method | URL | Body | 설명 |
 |--------|-----|------|------|
-| POST | `/api/inventory/adjust` | `{"productId":1,"delta":10}` | 수동 재고 조정 (±) |
 | POST | `/api/inventory/reserve` | `{"orderId":1,"items":{"1":3,"2":1}}` | 예약 (멱등) |
 | POST | `/api/inventory/ship` | `{"orderId":1,"items":{"1":3,"2":1}}` | 출고 |
 | POST | `/api/inventory/release` | `{"orderId":1,"items":{"1":3,"2":1}}` | 예약 해제 |
+
+수동 재고 조정·발주 생성·입고 처리는 WMS 관리자 UI와 내부 서비스가 소유합니다. 이를 원격으로 수행하던 legacy `/api/inventory/adjust` 및 `/api/purchase-orders` 쓰기 REST는 삭제되었습니다.
 
 ### 재고 상태 흐름
 
@@ -69,21 +70,20 @@ release  → reservedQty -qty
 adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 ```
 
-### 발주 (Purchase Order)
+### 보충 요청과 발주
 
 | Method | URL | Body | 설명 |
 |--------|-----|------|------|
-| GET | `/api/purchase-orders` | | 발주 목록 (품목 포함) |
-| POST | `/api/purchase-orders` | `{"lines":[{"productId":1,"quantity":10}],"memo":"..."}` | 발주 생성 → 201 |
-| POST | `/api/purchase-orders/receive?poId=1` | | 입고 처리 → 재고 자동 증가 |
+| GET | `/api/replenishment-requests` | | 보충 요청 원본·이력 조회 |
+| POST | `/api/replenishment-requests` | `{"requestKey":"...","reason":"...","items":[...]}` | OMS 보충 요청 접수 (신규 201, 멱등 재요청 200) |
 
-발주 상태: `ORDERED → RECEIVED` (중복 입고 시 409)
+OMS는 보충을 요청하고 이력을 관측할 뿐이며, 요청 원본과 수동 재고 조정·발주·입고는 WMS가 소유합니다. WMS 승인은 `ORDERED` 발주를 생성하고 요청을 `APPROVED`로 연결합니다. 실제 입고가 끝나면 발주는 `RECEIVED`, 연결 요청은 `FULFILLED`가 됩니다.
 
 ### OMS 재고보충 통지 (S3, 채널3)
 
-재고가 늘어나면(발주 입고, +조정) 트랜잭션 커밋 후 OMS `POST /api/replenishments` 에 `{"productIds":[...]}` 를 보냅니다 — OMS가 백오더를 FIFO 승격.
+재고가 늘어나면(발주 입고, +조정) `OmsReplenishmentNotifier`가 트랜잭션 커밋 후 OMS `POST /api/replenishments` 에 `{"productIds":[...]}` 를 보냅니다 — OMS가 백오더를 FIFO 승격.
 
-- 발화점은 `InventoryService.adjust` 한 곳 — 모든 재고 증가 경로(입고·REST·UI 조정)가 통과
+- 발화점은 `InventoryService.adjust` 한 곳 — 모든 재고 증가 경로(입고·WMS UI 조정)가 통과
 - best-effort: OMS가 다운이어도 입고/조정은 성공, warn 로그만 남김 (누락 승격은 S4 보상 스윕이 커버)
 - 통지는 자연 멱등(사실 전달뿐) — 중복 수신 시 OMS 쪽 no-op
 - 콜백 대상: `oms.base-url` (기본 `http://localhost:8080`)
@@ -98,6 +98,7 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 | `/admin/inventory` | 재고 조회(보유·예약·가용)·수동 조정 |
 | `/admin/reservations` | 예약 현황 조회 (상태 필터, 조회 전용) |
 | `/admin/purchase-orders` | 발주 생성(다품목)·입고 처리 (상태 필터) |
+| `/admin/replenishment-requests` | OMS 보충 요청 검토·승인·거절과 이력 조회 |
 
 > 관리자 UI를 포함한 전 경로(`/`, `/admin/**`, `/api/**`)가 **HTTP Basic 인증**을 요구합니다(`WMS_BASIC_USER`/`WMS_BASIC_PASSWORD`, 로컬 기본 wms/wms). admin 폼 POST는 CSRF 토큰 필수, `/api/**`는 서버간 호출용으로 CSRF 예외. 이 전제로 공개 도메인이 붙어 있습니다 — 자격증명 변경 시 OMS 쪽 변수도 함께 바꿀 것(안 그러면 OMS→WMS 전면 401).
 
@@ -119,4 +120,4 @@ OMS `InitDb`의 상품 데이터와 수량이 일치합니다.
 
 - `InventoryTest` / `ReservationTest` / `PurchaseOrderTest` — 도메인 단위 테스트
 - `InventoryServiceTest` / `PurchaseOrderServiceTest` — 서비스 레이어 통합 테스트
-- `InventoryControllerTest` / `PurchaseOrderControllerTest` — MockMvc 슬라이스 테스트
+- `InventoryControllerTest` / `ReplenishmentRequestControllerTest` — MockMvc 슬라이스 테스트
