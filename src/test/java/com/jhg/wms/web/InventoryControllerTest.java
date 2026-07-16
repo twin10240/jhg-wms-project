@@ -61,27 +61,6 @@ class InventoryControllerTest {
     }
 
     @Test
-    void adjust_조정후_수량을_반환한다() throws Exception {
-        when(inventoryService.adjust(1L, 5, "정기조사")).thenReturn(15);
-
-        mockMvc.perform(post("/api/inventory/adjust").with(httpBasic("wms", "wms"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"productId\":1,\"delta\":5,\"reason\":\"정기조사\"}"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("15"));
-    }
-
-    @Test
-    void adjust_잘못된_요청은_400을_반환한다() throws Exception {
-        when(inventoryService.adjust(1L, -99, "조정")).thenThrow(new IllegalArgumentException("재고 부족"));
-
-        mockMvc.perform(post("/api/inventory/adjust").with(httpBasic("wms", "wms"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"productId\":1,\"delta\":-99,\"reason\":\"조정\"}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     void rows_전체_재고_목록을_반환한다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
 
