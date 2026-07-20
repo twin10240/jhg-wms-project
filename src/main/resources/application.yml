@@ -24,10 +24,14 @@ spring:
     client:
       connect-timeout: 1s
       read-timeout: 2s
-  # 기본은 서블릿 컨테이너 인메모리 세션(Railway 단일 인스턴스·로컬 개발). scale 프로파일에서만 redis로 전환.
-  # classpath에 spring-session-data-redis가 있으면 기본이 redis가 되므로 여기서 명시적으로 끈다.
-  session:
-    store-type: none
+  # 기본은 서블릿 컨테이너 인메모리 세션(Railway 단일 인스턴스·로컬 개발).
+  # store-type=none은 StoreType enum에 없어 무시되므로(=Redis 세션이 그대로 켜짐) 쓰면 안 된다.
+  # 대신 Redis 세션·리포지토리 auto-config 자체를 제외한다. scale 프로파일의
+  # RedisSessionConfig(@EnableRedisHttpSession)가 명시적으로 Redis 세션을 켠다.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.session.SessionAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
 # OMS가 8080이므로 WMS는 8081로 동시 기동 가능. Railway는 PORT 주입(Variables로 8081 고정 권장).
 server:
@@ -84,8 +88,8 @@ spring:
   config:
     activate:
       on-profile: scale
-  session:
-    store-type: redis
+  # 세션은 RedisSessionConfig(@Profile("scale") @EnableRedisHttpSession)가 켠다.
+  # 여기선 그 세션과 Redisson 락이 붙을 Redis 연결 좌표만 준다.
   data:
     redis:
       host: ${REDIS_HOST:redis}
