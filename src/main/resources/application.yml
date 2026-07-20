@@ -24,6 +24,10 @@ spring:
     client:
       connect-timeout: 1s
       read-timeout: 2s
+  # 기본은 서블릿 컨테이너 인메모리 세션(Railway 단일 인스턴스·로컬 개발). scale 프로파일에서만 redis로 전환.
+  # classpath에 spring-session-data-redis가 있으면 기본이 redis가 되므로 여기서 명시적으로 끈다.
+  session:
+    store-type: none
 
 # OMS가 8080이므로 WMS는 8081로 동시 기동 가능. Railway는 PORT 주입(Variables로 8081 고정 권장).
 server:
@@ -71,3 +75,18 @@ spring:
   h2:
     console:
       enabled: false
+---
+# 수평 확장 데모 프로파일(로컬 docker-compose 전용) — prod와 함께 활성: SPRING_PROFILES_ACTIVE=prod,scale
+# prod가 Postgres 데이터소스를 제공하고, scale은 그 위에 Redis 공유 세션을 얹는다.
+# Redis 공유 세션 → 인스턴스 간 HttpSession(및 세션 기반 CSRF 토큰) 공유 → 관리자 UI가 다중 인스턴스에서 안 깨짐.
+# 분산 락(RedissonConfig, @Profile("scale"))은 InitDb 시딩 경합을 막는다. Railway(prod 단독)에는 영향 없음.
+spring:
+  config:
+    activate:
+      on-profile: scale
+  session:
+    store-type: redis
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}

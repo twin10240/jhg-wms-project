@@ -1,0 +1,82 @@
+# 로컬 로드밸런싱 데모 스택 (포트폴리오용) — Railway 배포 경로와 무관(railway.json은 Dockerfile 하나만 사용).
+#   nginx(:8080) → wms1/wms2/wms3(:8081) → postgres(공유 DB) + redis(공유 세션·분산 락)
+# 실행:  docker compose up --build
+# 접속:  http://localhost:8080  (Basic Auth: wms / wms)
+
+# 3개 WMS 인스턴스 공통 설정 — YAML 앵커로 중복 제거.
+x-wms-base: &wms-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  # prod: Postgres 데이터소스 / scale: Redis 공유 세션 + 분산 락
+  environment: &wms-env
+    SPRING_PROFILES_ACTIVE: prod,scale
+    PGHOST: postgres
+    PGPORT: "5432"
+    PGDATABASE: wms
+    PGUSER: wms
+    PGPASSWORD: wms
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    WMS_BASIC_USER: wms
+    WMS_BASIC_PASSWORD: wms
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wms
+      POSTGRES_USER: wms
+      POSTGRES_PASSWORD: wms
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wms -d wms"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  wms1:
+    <<: *wms-base
+    container_name: wms1
+    environment:
+      <<: *wms-env
+      INSTANCE_ID: wms1
+
+  wms2:
+    <<: *wms-base
+    container_name: wms2
+    environment:
+      <<: *wms-env
+      INSTANCE_ID: wms2
+
+  wms3:
+    <<: *wms-base
+    container_name: wms3
+    environment:
+      <<: *wms-env
+      INSTANCE_ID: wms3
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - wms1
+      - wms2
+      - wms3
+    restart: unless-stopped

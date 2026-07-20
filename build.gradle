@@ -23,6 +23,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// 수평 확장(scale 프로파일) 전용 — 공유 세션 스토어 + 분산 락.
+	// Railway 단일 인스턴스(prod)에선 session.store-type=none·RedissonConfig 비활성이라 미사용.
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.session:spring-session-data-redis'
+	implementation 'org.redisson:redisson:3.37.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'org.postgresql:postgresql'   // prod(Railway Postgres) 전용 — H2와 공존

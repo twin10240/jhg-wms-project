@@ -4,22 +4,51 @@ import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.repository.InventoryRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class InitDb {
 
     private final InitService initService;
+    // scale 프로파일에서만 존재(RedissonConfig). 단일 인스턴스에선 비어 있어 락 없이 기존 경로로 시딩.
+    private final ObjectProvider<RedissonClient> redissonProvider;
+
+    @Value("${INSTANCE_ID:single}")
+    private String instanceId;
 
     @PostConstruct
     public void init() {
+        RedissonClient redisson = redissonProvider.getIfAvailable();
+        if (redisson == null) {
+            seedIfNeeded();   // 단일 인스턴스 — 경합 없음, 기존과 동일
+            return;
+        }
+        // 다중 인스턴스 동시 기동 시 시딩 경합(product_id UNIQUE 충돌) 방지 — 락 잡은 1개만 시딩.
+        RLock lock = redisson.getLock("wms:init-lock");
+        lock.lock();
+        try {
+            seedIfNeeded();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void seedIfNeeded() {
         if (initService.alreadySeeded()) {
             initService.backfillNames(); // 이름 컬럼 도입 전 시드된 기존 배포분 보정 — 채워지면 no-op
+            log.info("[{}] 재고 이미 시드됨 — 시딩 skip", instanceId);
             return;
         }
         initService.seed();
+        log.info("[{}] 재고 1~20 시드 완료", instanceId);
     }
 
     @Component

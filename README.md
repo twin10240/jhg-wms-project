@@ -120,3 +120,48 @@ OMS `InitDb`의 상품 데이터와 수량이 일치합니다.
 - `InventoryTest` / `ReservationTest` / `PurchaseOrderTest` — 도메인 단위 테스트
 - `InventoryServiceTest` / `PurchaseOrderServiceTest` — 서비스 레이어 통합 테스트
 - `InventoryControllerTest` / `PurchaseOrderControllerTest` — MockMvc 슬라이스 테스트
+
+## 로컬 로드밸런싱 데모 (docker-compose)
+
+WMS 웹 티어를 3개 인스턴스로 수평 확장하고 Nginx로 분산하는 로컬 데모입니다.
+**Railway 배포 경로와 무관** — `railway.json`은 `Dockerfile` 하나만 쓰므로 `docker-compose.yml`·`nginx/`는 무시됩니다.
+
+```
+  요청 → nginx(:8080) → wms1/wms2/wms3(:8081) → postgres(공유 DB)
+                                              → redis(공유 세션 · 분산 락)
+```
+
+### 실행
+
+```bash
+docker compose up --build      # 6개 컨테이너: postgres, redis, wms1~3, nginx
+# 접속: http://localhost:8080  (Basic Auth: wms / wms)
+docker compose down            # 정리
+```
+
+### 핵심 설계 — 수평 확장을 막는 상태(state) 2곳을 제거
+
+| 병목 | 원인 | 해결 |
+|------|------|------|
+| 세션 기반 CSRF | Spring 기본 CSRF 토큰이 인스턴스별 세션 메모리에 저장 → 다른 인스턴스로 라우팅되면 폼 POST 403 | **Redis 공유 세션**(Spring Session Data Redis) — `SecurityConfig` 무수정, 세션이 공유되니 CSRF 토큰도 공유 |
+| 초기화 경합 | 다중 인스턴스 동시 기동 시 `InitDb`가 빈 DB에 동시 시딩 → `product_id` UNIQUE 충돌 | **Redisson 분산 락**(`wms:init-lock`) — 락 잡은 1개만 시딩 |
+
+- **프로파일 게이팅**: Redis 세션·분산 락은 `scale` 프로파일에서만 활성(`SPRING_PROFILES_ACTIVE=prod,scale`).
+  Railway(prod 단독)는 `session.store-type=none` + `RedissonConfig` 비활성이라 **Redis 없이 그대로 동작**.
+- **로드밸런싱**: `nginx/nginx.conf`의 `upstream` 블록. 현재 `least_conn`(활성 연결 최소 인스턴스 우선).
+  기본값은 라운드로빈이며, `least_conn` 한 줄 제거 시 RR로 전환.
+
+### 검증
+
+```bash
+# ① 로드밸런싱 — 매 요청 처리 인스턴스를 X-Served-By 헤더로 확인
+curl -s -u wms:wms -D - -o /dev/null http://localhost:8080/api/inventory/rows | grep -i X-Served-By
+
+# ② 분산 락 — 정확히 1개 인스턴스만 시딩, 나머지는 skip
+docker compose logs wms1 wms2 wms3 | grep -E "시드 완료|시딩 skip"
+
+# ③ 공유 세션 — 세션이 Redis에 저장됐는지
+docker compose exec redis redis-cli --scan --pattern "spring:session:*"
+```
+
+`X-Served-By`는 nginx가 `$upstream_addr`(요청을 넘긴 백엔드)를 응답 헤더에 찍은 것으로, 분산 동작의 증거입니다.
