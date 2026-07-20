@@ -4,20 +4,25 @@ import com.jhg.wms.config.SecurityConfig;
 import com.jhg.wms.domain.*;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
+import com.jhg.wms.service.ReplenishmentRequestService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 // 관리자 화면은 인증 필요(SecurityConfig) — 모든 GET 호출에 httpBasic("wms","wms") 부여.
@@ -28,6 +33,7 @@ class WmsAdminControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean InventoryService inventoryService;
     @MockitoBean PurchaseOrderService purchaseOrderService;
+    @MockitoBean ReplenishmentRequestService replenishmentRequestService;
 
     @Test
     void 재고화면_보유_예약_가용_컬럼을_렌더링한다() throws Exception {
@@ -98,5 +104,50 @@ class WmsAdminControllerTest {
         mockMvc.perform(get("/admin/purchase-orders").with(httpBasic("wms", "wms")).param("status", "RECEIVED"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("purchaseOrders", List.of(received)));
+    }
+    @Test
+    void replenishmentRequestsShowsHistory() throws Exception {
+        ReplenishmentRequest request = ReplenishmentRequest.create(UUID.randomUUID(), "low stock",
+                ReplenishmentRequestItem.create(1L, 3));
+        ReflectionTestUtils.setField(request, "id", 7L);
+        when(replenishmentRequestService.findAll()).thenReturn(List.of(request));
+
+        mockMvc.perform(get("/admin/replenishment-requests").with(httpBasic("wms", "wms")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/replenishmentrequests"))
+                .andExpect(model().attribute("requests", List.of(request)));
+    }
+
+    @Test
+    void approvesReplenishmentRequest() throws Exception {
+        mockMvc.perform(post("/admin/replenishment-requests/7/approve")
+                        .with(httpBasic("wms", "wms")).with(csrf())
+                        .param("wmsMemo", "ready"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/replenishment-requests"))
+                .andExpect(flash().attributeExists("successMessage"));
+
+        verify(replenishmentRequestService).approve(7L, "ready");
+    }
+
+    @Test
+    void rejectRequiresCsrf() throws Exception {
+        mockMvc.perform(post("/admin/replenishment-requests/7/reject")
+                        .with(httpBasic("wms", "wms"))
+                        .param("wmsMemo", "no"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void decisionStateErrorRedirectsWithFlash() throws Exception {
+        doThrow(new IllegalStateException("already decided"))
+                .when(replenishmentRequestService).reject(7L, "late");
+
+        mockMvc.perform(post("/admin/replenishment-requests/7/reject")
+                        .with(httpBasic("wms", "wms")).with(csrf())
+                        .param("wmsMemo", "late"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/replenishment-requests"))
+                .andExpect(flash().attribute("errorMessage", "already decided"));
     }
 }

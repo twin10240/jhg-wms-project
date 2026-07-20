@@ -4,9 +4,13 @@ import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.domain.PurchaseOrderItem;
 import com.jhg.wms.domain.PurchaseOrderStatus;
+import com.jhg.wms.domain.ReplenishmentRequest;
+import com.jhg.wms.domain.ReplenishmentRequestItem;
+import com.jhg.wms.domain.ReplenishmentRequestStatus;
 import com.jhg.wms.repository.InventoryAdjustmentRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.PurchaseOrderRepository;
+import com.jhg.wms.repository.ReplenishmentRequestRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -26,6 +31,7 @@ class PurchaseOrderServiceTest {
     @Autowired ReservationRepository reservationRepo;
     @Autowired InventoryAdjustmentRepository adjustmentRepo;
     @Autowired PurchaseOrderRepository poRepo;
+    @Autowired ReplenishmentRequestRepository requestRepo;
     InventoryService inventoryService;
     PurchaseOrderService service;
     OmsReplenishmentNotifier notifier;
@@ -34,7 +40,7 @@ class PurchaseOrderServiceTest {
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
         inventoryService = new InventoryService(inventoryRepo, reservationRepo, adjustmentRepo, notifier);
-        service = new PurchaseOrderService(poRepo, inventoryService);
+        service = new PurchaseOrderService(poRepo, inventoryService, requestRepo);
     }
 
     @Test
@@ -98,5 +104,23 @@ class PurchaseOrderServiceTest {
         service.receive(poId);
 
         verify(notifier).notifyAfterCommit(1L);
+    }
+
+    @Test
+    void receive_fulfillsLinkedReplenishmentRequest() {
+        inventoryRepo.save(com.jhg.wms.domain.Inventory.create(1L, 5));
+        Long poId = service.create(List.of(new PurchaseOrderLine(1L, 10)), "replenishment");
+        ReplenishmentRequest request = ReplenishmentRequest.create(UUID.randomUUID(), "low stock",
+                ReplenishmentRequestItem.create(1L, 10));
+        request.approve(poId, "ordered");
+        Long requestId = requestRepo.save(request).getId();
+
+        service.receive(poId);
+
+        ReplenishmentRequest fulfilled = requestRepo.findById(requestId).orElseThrow();
+        assertThat(fulfilled.getStatus()).isEqualTo(ReplenishmentRequestStatus.FULFILLED);
+        assertThat(fulfilled.getFulfilledAt()).isNotNull();
+        assertThat(poRepo.findById(poId).orElseThrow().getStatus()).isEqualTo(PurchaseOrderStatus.RECEIVED);
+        assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(15);
     }
 }

@@ -3,7 +3,9 @@ package com.jhg.wms.config;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
+import com.jhg.wms.service.ReplenishmentRequestService;
 import com.jhg.wms.web.InventoryController;
+import com.jhg.wms.web.ReplenishmentRequestController;
 import com.jhg.wms.web.WmsAdminController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * WMS Basic 인증(SecurityConfig) 슬라이스 검증. API는 인증만 있으면 CSRF 없이 통과(서버간 호출),
  * 관리자 폼(admin/**)은 인증 + CSRF 둘 다 필요.
  */
-@WebMvcTest(controllers = {InventoryController.class, WmsAdminController.class})
+@WebMvcTest(controllers = {InventoryController.class, ReplenishmentRequestController.class, WmsAdminController.class})
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
 
@@ -33,6 +35,13 @@ class SecurityConfigTest {
     @MockitoBean InventoryRepository inventoryRepository;
     @MockitoBean InventoryService inventoryService;
     @MockitoBean PurchaseOrderService purchaseOrderService;
+    @MockitoBean ReplenishmentRequestService replenishmentRequestService;
+
+    @Test
+    void replenishmentApiRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/replenishment-requests"))
+                .andExpect(status().isUnauthorized());
+    }
 
     @Test
     void 인증없이_API를_호출하면_401을_반환한다() throws Exception {

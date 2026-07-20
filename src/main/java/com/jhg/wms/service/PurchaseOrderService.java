@@ -2,7 +2,9 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.domain.PurchaseOrderItem;
+import com.jhg.wms.domain.ReplenishmentRequest;
 import com.jhg.wms.repository.PurchaseOrderRepository;
+import com.jhg.wms.repository.ReplenishmentRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,7 @@ public class PurchaseOrderService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final InventoryService inventoryService;
+    private final ReplenishmentRequestRepository requestRepository;
 
     public record PurchaseOrderLine(Long productId, int quantity) {}
 
@@ -39,6 +42,7 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
         po.receive(); // 중복 입고 시 IllegalStateException
         po.getItems().forEach(item -> inventoryService.adjust(item.getProductId(), item.getQuantity()));
+        requestRepository.findByPurchaseOrderId(poId).ifPresent(ReplenishmentRequest::fulfill);
         return po.getId();
     }
 
