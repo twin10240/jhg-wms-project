@@ -1,7 +1,10 @@
 package com.jhg.wms;
 
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.InventoryTransaction;
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.repository.InventoryRepository;
+import com.jhg.wms.repository.InventoryTransactionRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,7 @@ public class InitDb {
     private void seedIfNeeded() {
         if (initService.alreadySeeded()) {
             initService.backfillNames(); // 이름 컬럼 도입 전 시드된 기존 배포분 보정 — 채워지면 no-op
+            initService.migrateLegacy(); // 트랜잭션 원장 도입 전 배포분 보정(type 백필 + OPENING 소급) — 채워지면 no-op
             log.info("[{}] 재고 이미 시드됨 — 시딩 skip", instanceId);
             return;
         }
@@ -56,6 +60,7 @@ public class InitDb {
     @RequiredArgsConstructor
     static class InitService {
         private final InventoryRepository inventoryRepository;
+        private final InventoryTransactionRepository transactionRepository;
 
         public boolean alreadySeeded() {
             return inventoryRepository.count() > 0;
@@ -75,7 +80,19 @@ public class InitDb {
                 int onHandQty = 15 * (i + 1);    // OMS initDb와 동일: 15, 30, ..., 300
                 String productName = "상품 " + productId; // ponytail: OMS 실제 상품명 확보 시 교체
                 inventoryRepository.save(Inventory.create(productId, productName, onHandQty));
+                transactionRepository.save(InventoryTransaction.of(
+                        productId, InventoryTransactionType.OPENING, onHandQty, 0, onHandQty, null, null));
             }
+        }
+
+        /** 기존 배포분 보정(멱등): 구 조정행 type 백필 + 재고별 OPENING 소급. */
+        public void migrateLegacy() {
+            transactionRepository.assignAdjustTypeToLegacy();
+            inventoryRepository.findAll().forEach(inv -> {
+                if (!transactionRepository.existsByProductIdAndType(inv.getProductId(), InventoryTransactionType.OPENING))
+                    transactionRepository.save(InventoryTransaction.of(
+                            inv.getProductId(), InventoryTransactionType.OPENING, inv.getOnHandQty(), 0, inv.getOnHandQty(), null, null));
+            });
         }
     }
 }
