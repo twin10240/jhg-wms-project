@@ -115,7 +115,7 @@ class InventoryServiceTest {
     @Test
     void adjust_재고를_증가시킨다() {
         seed(1L, 10);
-        int result = service.adjust(1L, 5);
+        int result = service.adjust(1L, 5, "정기실사");
         assertThat(result).isEqualTo(15);
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()).isEqualTo(15);
     }
@@ -123,7 +123,7 @@ class InventoryServiceTest {
     @Test
     void adjust_재고가_음수가_되면_예외를_던진다() {
         seed(1L, 5);
-        assertThatThrownBy(() -> service.adjust(1L, -10))
+        assertThatThrownBy(() -> service.adjust(1L, -10, "정기실사"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()).isEqualTo(5);
     }
@@ -143,10 +143,17 @@ class InventoryServiceTest {
     }
 
     @Test
-    void adjust_2arg_코어경로는_내역을_남기지_않는다() {
+    void adjust_수동조정하면_ADJUST_트랜잭션이_남는다() {
         seed(1L, 10);
-        service.adjust(1L, 5); // 발주 입고 등 자동 증가 경로
-        assertThat(adjustmentRepo.count()).isZero();
+        service.adjust(1L, -3, "파손");
+        var txns = adjustmentRepo.findAllByOrderByIdDesc();
+        assertThat(txns).hasSize(1);
+        assertThat(txns.get(0).getType()).isEqualTo(com.jhg.wms.domain.InventoryTransactionType.ADJUST);
+        assertThat(txns.get(0).getDelta()).isEqualTo(-3);
+        assertThat(txns.get(0).getBeforeQty()).isEqualTo(10);
+        assertThat(txns.get(0).getAfterQty()).isEqualTo(7);
+        assertThat(txns.get(0).getReason()).isEqualTo("파손");
+        assertThat(txns.get(0).getReference()).isNull();
     }
 
     @Test
@@ -171,14 +178,14 @@ class InventoryServiceTest {
     @Test
     void adjust_증가면_커밋_후_OMS_통지를_예약한다() {
         seed(1L, 10);
-        service.adjust(1L, 5);
+        service.adjust(1L, 5, "정기실사");
         verify(notifier).notifyAfterCommit(1L);
     }
 
     @Test
     void adjust_감소면_OMS_통지를_예약하지_않는다() {
         seed(1L, 10);
-        service.adjust(1L, -3);
+        service.adjust(1L, -3, "정기실사");
         verify(notifier, never()).notifyAfterCommit(any());
     }
 

@@ -30,35 +30,31 @@ public class InventoryService {
     private final InventoryTransactionRepository transactionRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
 
-    /** 관리자 수동 재고 조정(+/-) + 내역 기록. 조정 후 수량을 반환한다. 발주 입고 등 자동 증가는 2-arg를 쓴다(미기록). */
+    /** onHand 변경 + 원장 기록의 유일 지점. 모든 실물 변동 경로가 통과한다. */
     @Transactional
-    public int adjust(Long productId, int delta, String reason) {
-        int before = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId))
-                .getOnHandQty();
-        int after = adjust(productId, delta);
-        transactionRepository.save(
-                InventoryTransaction.of(productId, InventoryTransactionType.ADJUST, delta, before, after, null, reason));
+    public int applyDelta(Long productId, int delta, InventoryTransactionType type,
+                          String reference, String reason) {
+        Inventory inv = inventoryRepository.findByProductId(productId)
+                .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId));
+        int before = inv.getOnHandQty();
+        int after = before + delta;
+        if (after < 0)
+            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + before + "개)");
+        if (after < inv.getReservedQty())
+            throw new IllegalArgumentException("예약된 수량(" + inv.getReservedQty() + "개) 미만으로 줄일 수 없습니다.");
+        inv.setOnHandQty(after);
+        transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after, reference, reason));
+        if (delta > 0) {
+            // 모든 재고 증가가 통과 — OMS 백오더 승격 트리거(트랜잭션 커밋 후).
+            omsReplenishmentNotifier.notifyAfterCommit(productId);
+        }
         return after;
     }
 
-    /** 재고 증가/감소 코어. 내역 미기록 — 수동 경로는 3-arg adjust를 통해 기록한다. */
+    /** 관리자 수동 재고 조정(+/-). */
     @Transactional
-    public int adjust(Long productId, int delta) {
-        Inventory inv = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId));
-        int adjusted = inv.getOnHandQty() + delta;
-        if (adjusted < 0)
-            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + inv.getOnHandQty() + "개)");
-        if (adjusted < inv.getReservedQty())
-            throw new IllegalArgumentException("예약된 수량(" + inv.getReservedQty() + "개) 미만으로 줄일 수 없습니다.");
-        inv.setOnHandQty(adjusted);
-        if (delta > 0) {
-            // 모든 재고 증가(입고·REST·UI 조정)가 이 지점을 통과한다 — OMS 백오더 승격 트리거.
-            // ponytail: adjust 호출당 HTTP 1발(3품목 입고=3발). 자연 멱등이라 무해 — 배치 필요 시 트랜잭션 스코프 Set으로 모을 것.
-            omsReplenishmentNotifier.notifyAfterCommit(productId);
-        }
-        return adjusted;
+    public int adjust(Long productId, int delta, String reason) {
+        return applyDelta(productId, delta, InventoryTransactionType.ADJUST, null, reason);
     }
 
     /** 관리자 재고 화면용 전체 목록. */

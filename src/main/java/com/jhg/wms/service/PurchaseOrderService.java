@@ -1,5 +1,6 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.domain.PurchaseOrderItem;
 import com.jhg.wms.domain.ReplenishmentRequest;
@@ -41,7 +42,9 @@ public class PurchaseOrderService {
         PurchaseOrder po = purchaseOrderRepository.findById(poId)
                 .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
         po.receive(); // 중복 입고 시 IllegalStateException
-        po.getItems().forEach(item -> inventoryService.adjust(item.getProductId(), item.getQuantity()));
+        po.getItems().forEach(item ->
+                inventoryService.applyDelta(item.getProductId(), item.getQuantity(),
+                        InventoryTransactionType.RECEIVE, "PO#" + poId, null));
         requestRepository.findByPurchaseOrderId(poId).ifPresent(ReplenishmentRequest::fulfill);
         return po.getId();
     }
