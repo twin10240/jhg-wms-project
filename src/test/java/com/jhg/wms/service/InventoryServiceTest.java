@@ -342,4 +342,18 @@ class InventoryServiceTest {
         assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    // ── Task 4: 출고 → SHIP 기록 ────────────────────────────────
+
+    @Test
+    void shipAll_출고하면_SHIP_트랜잭션이_상품당_남는다() {
+        seed(1L, 10); seed(2L, 5);
+        service.reserveAll(77L, Map.of(1L, 3, 2L, 2));
+        service.shipAll(77L, Map.of(1L, 3, 2L, 2));
+        var ships = adjustmentRepo.findAllByOrderByIdDesc().stream()
+                .filter(t -> t.getType() == com.jhg.wms.domain.InventoryTransactionType.SHIP).toList();
+        assertThat(ships).hasSize(2);
+        assertThat(ships).allSatisfy(t -> assertThat(t.getReference()).isEqualTo("ORDER#77"));
+        assertThat(ships.stream().mapToInt(t -> t.getDelta()).sum()).isEqualTo(-5); // -3 + -2
+    }
 }

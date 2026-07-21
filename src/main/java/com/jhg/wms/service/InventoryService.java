@@ -110,7 +110,19 @@ public class InventoryService {
         if (reservation.getStatus() == ReservationStatus.RELEASED)
             throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. orderId=" + orderId);
         // 호출자 요청 수량이 아니라 예약 원장(SSOT)을 재생한다 — 수량 오염·누락행 침묵 스킵 차단.
-        applyFromLedger(reservation.getQtyByProductId(), Inventory::ship);
+        // ship()은 onHand·reserved를 동시에 깎아 applyDelta(onHand 전용)를 못 쓰므로 전용 루프로 SHIP을 기록한다.
+        Map<Long, Integer> ledger = reservation.getQtyByProductId();
+        Map<Long, Inventory> byId = inventoryRepository.findByProductIdIn(ledger.keySet())
+                .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));
+        ledger.forEach((pid, qty) -> {
+            Inventory inv = byId.get(pid);
+            if (inv == null)
+                throw new IllegalStateException("재고 행이 없어 처리할 수 없습니다. productId=" + pid);
+            int before = inv.getOnHandQty();
+            inv.ship(qty);
+            transactionRepository.save(InventoryTransaction.of(
+                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(), "ORDER#" + orderId, null));
+        });
         reservation.ship();
     }
 
