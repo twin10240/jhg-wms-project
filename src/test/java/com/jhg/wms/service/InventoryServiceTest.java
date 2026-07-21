@@ -3,7 +3,7 @@ package com.jhg.wms.service;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.Reservation;
-import com.jhg.wms.repository.InventoryAdjustmentRepository;
+import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +24,7 @@ class InventoryServiceTest {
 
     @Autowired InventoryRepository repo;
     @Autowired ReservationRepository reservationRepo;
-    @Autowired InventoryAdjustmentRepository adjustmentRepo;
+    @Autowired InventoryTransactionRepository adjustmentRepo;
     InventoryService service;
     OmsReplenishmentNotifier notifier;
 

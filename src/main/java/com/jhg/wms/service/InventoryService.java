@@ -2,10 +2,11 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
-import com.jhg.wms.domain.InventoryAdjustment;
+import com.jhg.wms.domain.InventoryTransaction;
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.domain.ReservationStatus;
-import com.jhg.wms.repository.InventoryAdjustmentRepository;
+import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
@@ -26,7 +27,7 @@ public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final ReservationRepository reservationRepository;
-    private final InventoryAdjustmentRepository adjustmentRepository;
+    private final InventoryTransactionRepository transactionRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
 
     /** 관리자 수동 재고 조정(+/-) + 내역 기록. 조정 후 수량을 반환한다. 발주 입고 등 자동 증가는 2-arg를 쓴다(미기록). */
@@ -36,7 +37,8 @@ public class InventoryService {
                 .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId))
                 .getOnHandQty();
         int after = adjust(productId, delta);
-        adjustmentRepository.save(InventoryAdjustment.of(productId, delta, before, after, reason));
+        transactionRepository.save(
+                InventoryTransaction.of(productId, InventoryTransactionType.ADJUST, delta, before, after, null, reason));
         return after;
     }
 
@@ -147,7 +149,7 @@ public class InventoryService {
     }
 
     /** 관리자 재고 화면용 수동 조정 내역 (최신 먼저). */
-    public List<InventoryAdjustment> findAllAdjustments() {
-        return adjustmentRepository.findAllByOrderByIdDesc();
+    public List<InventoryTransaction> findAllAdjustments() {
+        return transactionRepository.findAllByOrderByIdDesc();
     }
 }

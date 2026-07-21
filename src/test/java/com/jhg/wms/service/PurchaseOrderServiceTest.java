@@ -7,7 +7,7 @@ import com.jhg.wms.domain.PurchaseOrderStatus;
 import com.jhg.wms.domain.ReplenishmentRequest;
 import com.jhg.wms.domain.ReplenishmentRequestItem;
 import com.jhg.wms.domain.ReplenishmentRequestStatus;
-import com.jhg.wms.repository.InventoryAdjustmentRepository;
+import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.PurchaseOrderRepository;
 import com.jhg.wms.repository.ReplenishmentRequestRepository;
@@ -29,7 +29,7 @@ class PurchaseOrderServiceTest {
 
     @Autowired InventoryRepository inventoryRepo;
     @Autowired ReservationRepository reservationRepo;
-    @Autowired InventoryAdjustmentRepository adjustmentRepo;
+    @Autowired InventoryTransactionRepository adjustmentRepo;
     @Autowired PurchaseOrderRepository poRepo;
     @Autowired ReplenishmentRequestRepository requestRepo;
     InventoryService inventoryService;
