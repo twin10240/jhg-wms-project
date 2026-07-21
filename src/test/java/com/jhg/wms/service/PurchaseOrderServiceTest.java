@@ -1,6 +1,7 @@
 package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.domain.PurchaseOrderItem;
 import com.jhg.wms.domain.PurchaseOrderStatus;
@@ -78,6 +79,19 @@ class PurchaseOrderServiceTest {
         assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.RECEIVED);
         assertThat(po.getReceivedAt()).isNotNull();
         assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(15);
+    }
+
+    @Test
+    void receive_입고하면_RECEIVE_트랜잭션이_남는다() {
+        inventoryRepo.save(com.jhg.wms.domain.Inventory.create(1L, 5));
+        Long poId = service.create(List.of(new PurchaseOrderLine(1L, 10)), "발주");
+
+        service.receive(poId);
+
+        var txns = adjustmentRepo.findAllByOrderByIdDesc();
+        assertThat(txns.get(0).getType()).isEqualTo(InventoryTransactionType.RECEIVE);
+        assertThat(txns.get(0).getReference()).isEqualTo("PO#" + poId);
+        assertThat(txns.get(0).getDelta()).isEqualTo(10);
     }
 
     @Test
