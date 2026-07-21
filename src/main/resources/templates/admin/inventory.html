@@ -45,19 +45,29 @@
     </tbody>
   </table>
 
-  <h3>수동 조정 내역</h3>
+  <h3>재고 트랜잭션 이력</h3>
+  <p>
+    <a href="/admin/inventory">전체</a>
+    | <a href="/admin/inventory?type=OPENING">기초</a>
+    | <a href="/admin/inventory?type=RECEIVE">입고</a>
+    | <a href="/admin/inventory?type=SHIP">출고</a>
+    | <a href="/admin/inventory?type=ADJUST">조정</a>
+  </p>
   <table>
-    <thead><tr><th>일시</th><th>상품 ID</th><th>증감</th><th>전 → 후</th><th>사유</th></tr></thead>
+    <thead>
+      <tr><th>일시</th><th>상품</th><th>유형</th><th>변동</th><th>참조</th><th>사유</th></tr>
+    </thead>
     <tbody>
-      <tr th:each="a : ${adjustments}">
-        <td th:text="${#temporals.format(a.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-14 15:00</td>
-        <td th:text="${a.productId}">1</td>
-        <td th:text="${(a.delta > 0 ? '+' : '') + a.delta}">+10</td>
-        <td th:text="${a.beforeQty + ' → ' + a.afterQty}">15 → 25</td>
-        <td th:text="${a.reason}"></td>
+      <tr th:each="t : ${transactions}">
+        <td th:text="${#temporals.format(t.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-21 15:00</td>
+        <td th:text="${t.productId}">1</td>
+        <td th:text="${t.type}">ADJUST</td>
+        <td th:text="${(t.delta > 0 ? '+' : '') + t.delta}">+10</td>
+        <td th:text="${t.reference}"></td>
+        <td th:text="${t.reason}"></td>
       </tr>
-      <tr th:if="${#lists.isEmpty(adjustments)}">
-        <td colspan="5">조정 내역 없음</td>
+      <tr th:if="${#lists.isEmpty(transactions)}">
+        <td colspan="6">트랜잭션 없음</td>
       </tr>
     </tbody>
   </table>

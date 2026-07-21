@@ -48,6 +48,27 @@ class WmsAdminControllerTest {
     }
 
     @Test
+    void inventory_화면에_transactions_모델이_담긴다() throws Exception {
+        when(inventoryService.findAllTransactions()).thenReturn(List.of());
+
+        mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("transactions"));
+    }
+
+    @Test
+    void 재고화면_트랜잭션_유형_필터가_동작한다() throws Exception {
+        InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null);
+        InventoryTransaction adjust = InventoryTransaction.of(1L, InventoryTransactionType.ADJUST, -1, 10, 9, null, "손상");
+        when(inventoryService.findAllTransactions()).thenReturn(List.of(receive, adjust));
+
+        mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")).param("type", "RECEIVE"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("transactions", List.of(receive)))
+                .andExpect(model().attribute("filterType", InventoryTransactionType.RECEIVE));
+    }
+
+    @Test
     void 대시보드_재고_발주_예약_요약을_모델에_담는다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(
                 new InventoryRowResponse(1L, "상품 1", 10, 3, 7),

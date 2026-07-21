@@ -156,8 +156,8 @@ public class InventoryService {
         return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
     }
 
-    /** 관리자 재고 화면용 수동 조정 내역 (최신 먼저). */
-    public List<InventoryTransaction> findAllAdjustments() {
+    /** 관리자 화면용 재고 트랜잭션 이력(최신 먼저). */
+    public List<InventoryTransaction> findAllTransactions() {
         return transactionRepository.findAllByOrderByIdDesc();
     }
 }
