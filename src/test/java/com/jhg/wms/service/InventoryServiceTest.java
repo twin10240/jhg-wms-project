@@ -2,6 +2,7 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
@@ -355,5 +356,24 @@ class InventoryServiceTest {
         assertThat(ships).hasSize(2);
         assertThat(ships).allSatisfy(t -> assertThat(t.getReference()).isEqualTo("ORDER#77"));
         assertThat(ships.stream().mapToInt(t -> t.getDelta()).sum()).isEqualTo(-5); // -3 + -2
+    }
+
+    // ── Task 6: 재구성 불변식(Σdelta==onHand) ────────────────────
+
+    @Test
+    void 원장_델타합이_현재_onHand와_같다() {
+        seed(1L, 0);
+        service.applyDelta(1L, 100, InventoryTransactionType.OPENING, null, null); // 100
+        service.applyDelta(1L, 50, InventoryTransactionType.RECEIVE, "PO#1", null); // 150
+        service.reserveAll(10L, Map.of(1L, 30));
+        service.shipAll(10L, Map.of(1L, 30));                                       // 120
+        service.adjust(1L, -5, "파손");                                            // 115
+
+        int deltaSum = adjustmentRepo.findAllByOrderByIdDesc().stream()
+                .filter(t -> t.getProductId() == 1L)
+                .mapToInt(t -> t.getDelta()).sum();
+        int onHand = repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty();
+        assertThat(deltaSum).isEqualTo(onHand);   // 115
+        assertThat(onHand).isEqualTo(115);
     }
 }
