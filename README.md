@@ -70,8 +70,9 @@ release  → reservedQty -qty
 adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 ```
 
-onHandQty를 바꾸는 모든 경로(발주 입고·출고·수동 조정·초기 시드)는 `InventoryService.applyDelta` 한 곳을 통과하며
-`InventoryTransaction` 원장에 한 행씩 남는다(OPENING/RECEIVE/SHIP/ADJUST). 불변식: 상품별 원장 delta 합 == 현재 onHandQty.
+발주 입고·수동 조정·초기 시드는 `InventoryService.applyDelta` 한 곳을 통과하며, 출고는 예약분 동시 차감 때문에
+별도 경로로 SHIP 트랜잭션을 기록한다 — 모든 경로가 `InventoryTransaction` 원장에 한 행씩 남긴다(OPENING/RECEIVE/SHIP/ADJUST).
+불변식: 상품별 원장 delta 합 == 현재 onHandQty.
 
 ### 보충 요청과 발주
 
