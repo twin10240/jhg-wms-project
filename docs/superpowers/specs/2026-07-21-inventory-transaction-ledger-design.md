@@ -97,6 +97,7 @@ private int applyDelta(Long productId, int delta, InventoryTransactionType type,
   3. OPENING 백필(3절)을 이어서 수행.
 - Flyway 미도입 프로젝트이므로 이 마이그레이션은 **기동 루틴**으로 한다(`InitDb`와 동일 결). 전부 멱등.
 - 로컬 H2는 `ddl-auto` 재생성이라 무관.
+- **as-built 편차:** 실제 구현은 "테이블 리네임 + 크로스테이블 이관" 대신 **테이블명(`inventory_adjustment`) 유지 + `type`·`reference` 컬럼 추가 + 기존 행 NULL→ADJUST 백필**로 처리했다(운영 리스크 감소, 외부 동작 동일).
 
 ## 5. 조회 화면
 

@@ -46,6 +46,7 @@ public class InventoryService {
         transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after, reference, reason));
         if (delta > 0) {
             // 모든 재고 증가가 통과 — OMS 백오더 승격 트리거(트랜잭션 커밋 후).
+            // ponytail: adjust 호출당 HTTP 1발(3품목 입고=3발). 자연 멱등이라 무해 — 배치 필요 시 트랜잭션 스코프 Set으로 모을 것.
             omsReplenishmentNotifier.notifyAfterCommit(productId);
         }
         return after;
