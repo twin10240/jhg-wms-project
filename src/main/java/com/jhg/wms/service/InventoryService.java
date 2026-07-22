@@ -2,10 +2,11 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
-import com.jhg.wms.domain.InventoryAdjustment;
+import com.jhg.wms.domain.InventoryTransaction;
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.domain.ReservationStatus;
-import com.jhg.wms.repository.InventoryAdjustmentRepository;
+import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
@@ -26,37 +27,35 @@ public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final ReservationRepository reservationRepository;
-    private final InventoryAdjustmentRepository adjustmentRepository;
+    private final InventoryTransactionRepository transactionRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
 
-    /** 관리자 수동 재고 조정(+/-) + 내역 기록. 조정 후 수량을 반환한다. 발주 입고 등 자동 증가는 2-arg를 쓴다(미기록). */
+    /** onHand 변경 + 원장 기록의 유일 지점. 모든 실물 변동 경로가 통과한다. */
     @Transactional
-    public int adjust(Long productId, int delta, String reason) {
-        int before = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId))
-                .getOnHandQty();
-        int after = adjust(productId, delta);
-        adjustmentRepository.save(InventoryAdjustment.of(productId, delta, before, after, reason));
-        return after;
-    }
-
-    /** 재고 증가/감소 코어. 내역 미기록 — 수동 경로는 3-arg adjust를 통해 기록한다. */
-    @Transactional
-    public int adjust(Long productId, int delta) {
+    public int applyDelta(Long productId, int delta, InventoryTransactionType type,
+                          String reference, String reason) {
         Inventory inv = inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId));
-        int adjusted = inv.getOnHandQty() + delta;
-        if (adjusted < 0)
-            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + inv.getOnHandQty() + "개)");
-        if (adjusted < inv.getReservedQty())
+        int before = inv.getOnHandQty();
+        int after = before + delta;
+        if (after < 0)
+            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + before + "개)");
+        if (after < inv.getReservedQty())
             throw new IllegalArgumentException("예약된 수량(" + inv.getReservedQty() + "개) 미만으로 줄일 수 없습니다.");
-        inv.setOnHandQty(adjusted);
+        inv.setOnHandQty(after);
+        transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after, reference, reason));
         if (delta > 0) {
-            // 모든 재고 증가(입고·REST·UI 조정)가 이 지점을 통과한다 — OMS 백오더 승격 트리거.
+            // 모든 재고 증가가 통과 — OMS 백오더 승격 트리거(트랜잭션 커밋 후).
             // ponytail: adjust 호출당 HTTP 1발(3품목 입고=3발). 자연 멱등이라 무해 — 배치 필요 시 트랜잭션 스코프 Set으로 모을 것.
             omsReplenishmentNotifier.notifyAfterCommit(productId);
         }
-        return adjusted;
+        return after;
+    }
+
+    /** 관리자 수동 재고 조정(+/-). */
+    @Transactional
+    public int adjust(Long productId, int delta, String reason) {
+        return applyDelta(productId, delta, InventoryTransactionType.ADJUST, null, reason);
     }
 
     /** 관리자 재고 화면용 전체 목록. */
@@ -112,7 +111,19 @@ public class InventoryService {
         if (reservation.getStatus() == ReservationStatus.RELEASED)
             throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. orderId=" + orderId);
         // 호출자 요청 수량이 아니라 예약 원장(SSOT)을 재생한다 — 수량 오염·누락행 침묵 스킵 차단.
-        applyFromLedger(reservation.getQtyByProductId(), Inventory::ship);
+        // ship()은 onHand·reserved를 동시에 깎아 applyDelta(onHand 전용)를 못 쓰므로 전용 루프로 SHIP을 기록한다.
+        Map<Long, Integer> ledger = reservation.getQtyByProductId();
+        Map<Long, Inventory> byId = inventoryRepository.findByProductIdIn(ledger.keySet())
+                .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));
+        ledger.forEach((pid, qty) -> {
+            Inventory inv = byId.get(pid);
+            if (inv == null)
+                throw new IllegalStateException("재고 행이 없어 처리할 수 없습니다. productId=" + pid);
+            int before = inv.getOnHandQty();
+            inv.ship(qty);
+            transactionRepository.save(InventoryTransaction.of(
+                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(), "ORDER#" + orderId, null));
+        });
         reservation.ship();
     }
 
@@ -146,8 +157,10 @@ public class InventoryService {
         return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
     }
 
-    /** 관리자 재고 화면용 수동 조정 내역 (최신 먼저). */
-    public List<InventoryAdjustment> findAllAdjustments() {
-        return adjustmentRepository.findAllByOrderByIdDesc();
+    /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */
+    public List<InventoryTransaction> findTransactions(InventoryTransactionType type) {
+        return type == null
+                ? transactionRepository.findTop200ByOrderByIdDesc()
+                : transactionRepository.findTop200ByTypeOrderByIdDesc(type);
     }
 }

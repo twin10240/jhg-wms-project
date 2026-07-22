@@ -2,8 +2,9 @@ package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
-import com.jhg.wms.repository.InventoryAdjustmentRepository;
+import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,7 @@ class InventoryServiceTest {
 
     @Autowired InventoryRepository repo;
     @Autowired ReservationRepository reservationRepo;
-    @Autowired InventoryAdjustmentRepository adjustmentRepo;
+    @Autowired InventoryTransactionRepository adjustmentRepo;
     InventoryService service;
     OmsReplenishmentNotifier notifier;
 
@@ -115,7 +116,7 @@ class InventoryServiceTest {
     @Test
     void adjust_재고를_증가시킨다() {
         seed(1L, 10);
-        int result = service.adjust(1L, 5);
+        int result = service.adjust(1L, 5, "정기실사");
         assertThat(result).isEqualTo(15);
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()).isEqualTo(15);
     }
@@ -123,7 +124,7 @@ class InventoryServiceTest {
     @Test
     void adjust_재고가_음수가_되면_예외를_던진다() {
         seed(1L, 5);
-        assertThatThrownBy(() -> service.adjust(1L, -10))
+        assertThatThrownBy(() -> service.adjust(1L, -10, "정기실사"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()).isEqualTo(5);
     }
@@ -143,10 +144,17 @@ class InventoryServiceTest {
     }
 
     @Test
-    void adjust_2arg_코어경로는_내역을_남기지_않는다() {
+    void adjust_수동조정하면_ADJUST_트랜잭션이_남는다() {
         seed(1L, 10);
-        service.adjust(1L, 5); // 발주 입고 등 자동 증가 경로
-        assertThat(adjustmentRepo.count()).isZero();
+        service.adjust(1L, -3, "파손");
+        var txns = adjustmentRepo.findAllByOrderByIdDesc();
+        assertThat(txns).hasSize(1);
+        assertThat(txns.get(0).getType()).isEqualTo(com.jhg.wms.domain.InventoryTransactionType.ADJUST);
+        assertThat(txns.get(0).getDelta()).isEqualTo(-3);
+        assertThat(txns.get(0).getBeforeQty()).isEqualTo(10);
+        assertThat(txns.get(0).getAfterQty()).isEqualTo(7);
+        assertThat(txns.get(0).getReason()).isEqualTo("파손");
+        assertThat(txns.get(0).getReference()).isNull();
     }
 
     @Test
@@ -171,14 +179,14 @@ class InventoryServiceTest {
     @Test
     void adjust_증가면_커밋_후_OMS_통지를_예약한다() {
         seed(1L, 10);
-        service.adjust(1L, 5);
+        service.adjust(1L, 5, "정기실사");
         verify(notifier).notifyAfterCommit(1L);
     }
 
     @Test
     void adjust_감소면_OMS_통지를_예약하지_않는다() {
         seed(1L, 10);
-        service.adjust(1L, -3);
+        service.adjust(1L, -3, "정기실사");
         verify(notifier, never()).notifyAfterCommit(any());
     }
 
@@ -334,5 +342,38 @@ class InventoryServiceTest {
 
         assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    // ── Task 4: 출고 → SHIP 기록 ────────────────────────────────
+
+    @Test
+    void shipAll_출고하면_SHIP_트랜잭션이_상품당_남는다() {
+        seed(1L, 10); seed(2L, 5);
+        service.reserveAll(77L, Map.of(1L, 3, 2L, 2));
+        service.shipAll(77L, Map.of(1L, 3, 2L, 2));
+        var ships = adjustmentRepo.findAllByOrderByIdDesc().stream()
+                .filter(t -> t.getType() == com.jhg.wms.domain.InventoryTransactionType.SHIP).toList();
+        assertThat(ships).hasSize(2);
+        assertThat(ships).allSatisfy(t -> assertThat(t.getReference()).isEqualTo("ORDER#77"));
+        assertThat(ships.stream().mapToInt(t -> t.getDelta()).sum()).isEqualTo(-5); // -3 + -2
+    }
+
+    // ── Task 6: 재구성 불변식(Σdelta==onHand) ────────────────────
+
+    @Test
+    void 원장_델타합이_현재_onHand와_같다() {
+        seed(1L, 0);
+        service.applyDelta(1L, 100, InventoryTransactionType.OPENING, null, null); // 100
+        service.applyDelta(1L, 50, InventoryTransactionType.RECEIVE, "PO#1", null); // 150
+        service.reserveAll(10L, Map.of(1L, 30));
+        service.shipAll(10L, Map.of(1L, 30));                                       // 120
+        service.adjust(1L, -5, "파손");                                            // 115
+
+        int deltaSum = adjustmentRepo.findAllByOrderByIdDesc().stream()
+                .filter(t -> t.getProductId() == 1L)
+                .mapToInt(t -> t.getDelta()).sum();
+        int onHand = repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty();
+        assertThat(deltaSum).isEqualTo(onHand);   // 115
+        assertThat(onHand).isEqualTo(115);
     }
 }
