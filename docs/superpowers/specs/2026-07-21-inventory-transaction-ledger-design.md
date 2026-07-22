@@ -82,8 +82,10 @@ private int applyDelta(Long productId, int delta, InventoryTransactionType type,
 ## 3. OPENING 백필 — 신규·기존 모두 완결
 
 - **신규 기동(빈 DB):** `InitDb`가 시드하면서 상품별 OPENING 트랜잭션을 남긴다 → 원장이 0부터 완결.
-- **기존 prod(재고 이미 있음):** 기동 시 1회, 원장에 OPENING이 없는 상품은 현재 onHand를
-  OPENING으로 소급 기록(`before=0, after=현재onHand`). 이미 있으면 skip(멱등).
+- **기존 prod(재고 이미 있음):** 기동 시 1회, 원장에 OPENING이 없는 상품은 OPENING으로 소급 기록.
+  단 delta는 현재 onHand 전체가 아니라 **원장 잔여분**(`현재onHand - 기존 델타합`, `before=0, after=opening`) —
+  구 조정행이 이미 원장에 있는 상태(prod)에서 onHand 전체를 다시 더하면 이중계상되어 완료 기준(Σdelta==onHand)이
+  깨지기 때문. 이미 있으면 skip(멱등).
 
 ## 4. 기존 데이터·prod 스키마 마이그레이션 (유일한 운영 리스크)
 

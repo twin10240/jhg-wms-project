@@ -157,8 +157,10 @@ public class InventoryService {
         return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
     }
 
-    /** 관리자 화면용 재고 트랜잭션 이력(최신 먼저). */
-    public List<InventoryTransaction> findAllTransactions() {
-        return transactionRepository.findAllByOrderByIdDesc();
+    /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */
+    public List<InventoryTransaction> findTransactions(InventoryTransactionType type) {
+        return type == null
+                ? transactionRepository.findTop200ByOrderByIdDesc()
+                : transactionRepository.findTop200ByTypeOrderByIdDesc(type);
     }
 }

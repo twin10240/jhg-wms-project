@@ -53,9 +53,7 @@ public class WmsAdminController {
     @GetMapping("/admin/inventory")
     public String inventory(@RequestParam(required = false) InventoryTransactionType type, Model model) {
         model.addAttribute("products", inventoryService.findAllRows());
-        var txns = inventoryService.findAllTransactions();
-        if (type != null) txns = txns.stream().filter(t -> t.getType() == type).toList();
-        model.addAttribute("transactions", txns);
+        model.addAttribute("transactions", inventoryService.findTransactions(type));
         model.addAttribute("filterType", type);
         return "admin/inventory";
     }

@@ -85,13 +85,18 @@ public class InitDb {
             }
         }
 
-        /** 기존 배포분 보정(멱등): 구 조정행 type 백필 + 재고별 OPENING 소급. */
+        /** 기존 배포분 보정(멱등): 구 조정행 type 백필 + 재고별 OPENING 소급.
+         *  OPENING delta는 현재 onHand 전체가 아니라 "원장 잔여분"(onHand - 기존 델타합)이어야
+         *  Σdelta==onHand 불변식이 유지된다 — 구 조정행이 이미 원장에 있으므로 그만큼을 빼야 이중계상을 피한다. */
         public void migrateLegacy() {
             transactionRepository.assignAdjustTypeToLegacy();
             inventoryRepository.findAll().forEach(inv -> {
-                if (!transactionRepository.existsByProductIdAndType(inv.getProductId(), InventoryTransactionType.OPENING))
+                if (!transactionRepository.existsByProductIdAndType(inv.getProductId(), InventoryTransactionType.OPENING)) {
+                    int prior = transactionRepository.sumDeltaByProductId(inv.getProductId());
+                    int opening = inv.getOnHandQty() - prior;
                     transactionRepository.save(InventoryTransaction.of(
-                            inv.getProductId(), InventoryTransactionType.OPENING, inv.getOnHandQty(), 0, inv.getOnHandQty(), null, null));
+                            inv.getProductId(), InventoryTransactionType.OPENING, opening, 0, opening, null, null));
+                }
             });
         }
     }

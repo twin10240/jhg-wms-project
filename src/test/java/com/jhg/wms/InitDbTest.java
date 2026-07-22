@@ -57,6 +57,13 @@ class InitDbTest {
         var opening = all.stream().filter(t -> t.getType() == InventoryTransactionType.OPENING).findFirst().orElseThrow();
         assertThat(opening.getProductId()).isEqualTo(1L);
         assertThat(opening.getBeforeQty()).isEqualTo(0);
-        assertThat(opening.getAfterQty()).isEqualTo(30);
+        // 원장 잔여분 = 현재 onHand(30) - 기존 델타합(-1) = 31. onHand(30)을 그대로 넣으면 이중계상됨.
+        assertThat(opening.getDelta()).isEqualTo(31);
+        assertThat(opening.getAfterQty()).isEqualTo(31);
+
+        // Σdelta == onHandQty 불변식 — 기존 배포분(레거시 조정 有) 마이그레이션 경로에서도 성립해야 한다.
+        int deltaSum = all.stream().mapToInt(InventoryTransaction::getDelta).sum();
+        int onHand = inventoryRepository.findByProductId(1L).orElseThrow().getOnHandQty();
+        assertThat(deltaSum).isEqualTo(onHand);
     }
 }

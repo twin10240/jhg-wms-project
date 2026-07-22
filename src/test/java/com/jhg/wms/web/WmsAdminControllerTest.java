@@ -49,7 +49,7 @@ class WmsAdminControllerTest {
 
     @Test
     void inventory_화면에_transactions_모델이_담긴다() throws Exception {
-        when(inventoryService.findAllTransactions()).thenReturn(List.of());
+        when(inventoryService.findTransactions(null)).thenReturn(List.of());
 
         mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
@@ -59,8 +59,7 @@ class WmsAdminControllerTest {
     @Test
     void 재고화면_트랜잭션_유형_필터가_동작한다() throws Exception {
         InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null);
-        InventoryTransaction adjust = InventoryTransaction.of(1L, InventoryTransactionType.ADJUST, -1, 10, 9, null, "손상");
-        when(inventoryService.findAllTransactions()).thenReturn(List.of(receive, adjust));
+        when(inventoryService.findTransactions(InventoryTransactionType.RECEIVE)).thenReturn(List.of(receive));
 
         mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")).param("type", "RECEIVE"))
                 .andExpect(status().isOk())
