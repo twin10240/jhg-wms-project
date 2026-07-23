@@ -99,7 +99,11 @@ public class WmsAdminController {
     @PostMapping("/admin/purchase-orders/receive")
     public String receive(@RequestParam Long poId, RedirectAttributes ra) {
         try {
-            purchaseOrderService.receive(poId);
+            // TODO(Task 4): 부분 입고 UI로 교체. 지금은 전량 입고로 옛 동작을 유지하는 임시 다리.
+            PurchaseOrder po = purchaseOrderService.findWithItems(poId);
+            Map<Long, Integer> everything = new java.util.LinkedHashMap<>();
+            po.getItems().forEach(item -> everything.put(item.getId(), item.remainingQty()));
+            purchaseOrderService.receive(poId, everything);
             ra.addFlashAttribute("successMessage", "입고 처리 완료. (발주 #" + poId + ")");
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
