@@ -10,7 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -41,10 +43,11 @@ public class PurchaseOrderService {
     public Long receive(Long poId) {
         PurchaseOrder po = purchaseOrderRepository.findById(poId)
                 .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
-        po.receive(); // 중복 입고 시 IllegalStateException
-        po.getItems().forEach(item ->
-                inventoryService.applyDelta(item.getProductId(), item.getQuantity(),
-                        InventoryTransactionType.RECEIVE, "PO#" + poId, null));
+        // TODO(Task 2): replace with partial receive(Long, Map) — this bridge preserves the old all-at-once behavior.
+        Map<Long, Integer> everything = new LinkedHashMap<>();
+        po.getItems().forEach(item -> everything.put(item.getId(), item.remainingQty()));
+        po.receive(everything).forEach((productId, delta) ->
+                inventoryService.applyDelta(productId, delta, InventoryTransactionType.RECEIVE, "PO#" + poId, null));
         requestRepository.findByPurchaseOrderId(poId).ifPresent(ReplenishmentRequest::fulfill);
         return po.getId();
     }

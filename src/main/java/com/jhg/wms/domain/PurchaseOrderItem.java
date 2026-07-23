@@ -23,11 +23,31 @@ public class PurchaseOrderItem {
 
     private int quantity;
 
+    private int receivedQty;   // 누적 입고량. 신규 생성 시 0.
+
     public static PurchaseOrderItem create(Long productId, int quantity) {
         PurchaseOrderItem item = new PurchaseOrderItem();
         item.productId = productId;
         item.quantity = quantity;
         return item;
+    }
+
+    public int remainingQty() {
+        return quantity - receivedQty;
+    }
+
+    public boolean isFullyReceived() {
+        return remainingQty() == 0;
+    }
+
+    /** 이번 입고분을 누적한다. 0은 "이번에 안 온 품목"이라 허용한다. */
+    void receive(int qty) {
+        if (qty < 0)
+            throw new IllegalArgumentException("상품#" + productId + ": 입고 수량은 0 이상이어야 합니다.");
+        if (qty > remainingQty())
+            throw new IllegalArgumentException(
+                    "상품#" + productId + ": 잔량 " + remainingQty() + "개를 초과했습니다 (요청 " + qty + "개)");
+        this.receivedQty += qty;
     }
 
     void setPurchaseOrder(PurchaseOrder purchaseOrder) {
