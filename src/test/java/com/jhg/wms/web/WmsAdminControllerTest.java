@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -141,6 +142,26 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/purchaseorderdetail"))
                 .andExpect(model().attribute("po", po));
+    }
+
+    @Test
+    void 발주_상세_페이지는_완료된_품목도_itemId를_방출한다_인덱스_갭_방지() throws Exception {
+        PurchaseOrderItem first = PurchaseOrderItem.create(1L, 10);
+        ReflectionTestUtils.setField(first, "id", 42L);
+        PurchaseOrderItem middle = PurchaseOrderItem.create(2L, 5);
+        ReflectionTestUtils.setField(middle, "id", 43L);
+        PurchaseOrderItem last = PurchaseOrderItem.create(3L, 7);
+        ReflectionTestUtils.setField(last, "id", 44L);
+        PurchaseOrder po = PurchaseOrder.create("발주", first, middle, last);
+        po.receive(Map.of(43L, 5)); // 가운데 품목만 완료 처리 — 이후 품목의 인덱스가 앞당겨지지 않아야 한다.
+        when(purchaseOrderService.findWithItems(1L)).thenReturn(po);
+
+        mockMvc.perform(get("/admin/purchase-orders/1").with(httpBasic("wms", "wms")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(allOf(
+                        containsString("items[0].itemId"),
+                        containsString("items[1].itemId"),
+                        containsString("items[2].itemId"))));
     }
 
     @Test
