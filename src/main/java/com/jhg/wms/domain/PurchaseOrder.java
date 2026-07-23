@@ -61,6 +61,10 @@ public class PurchaseOrder {
         if (qtyByItemId.values().stream().allMatch(qty -> qty == null || qty == 0))
             throw new IllegalArgumentException("입고 수량이 없습니다.");
 
+        // 원자성: 하나라도 검증 실패면 아무것도 반영하지 않는다.
+        qtyByItemId.forEach((itemId, qty) ->
+                byItemId.get(itemId).validateReceivable(qty == null ? 0 : qty));
+
         Map<Long, Integer> deltaByProductId = new LinkedHashMap<>();
         qtyByItemId.forEach((itemId, qty) -> {
             int received = qty == null ? 0 : qty;

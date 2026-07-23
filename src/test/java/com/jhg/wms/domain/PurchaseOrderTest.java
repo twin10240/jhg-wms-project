@@ -106,6 +106,22 @@ class PurchaseOrderTest {
     }
 
     @Test
+    void receive_일부_품목이_잔량초과면_전체가_거부되고_아무것도_반영되지_않는다() {
+        PurchaseOrder po = PurchaseOrder.create("발주", item(1L, 1L, 10), item(2L, 2L, 10));
+        Map<Long, Integer> input = new LinkedHashMap<>();
+        input.put(1L, 5);    // 유효
+        input.put(2L, 99);   // 잔량 초과
+
+        assertThatThrownBy(() -> po.receive(input))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("잔량");
+
+        assertThat(po.getItems().get(0).getReceivedQty()).isZero();
+        assertThat(po.getItems().get(1).getReceivedQty()).isZero();
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.ORDERED);
+    }
+
+    @Test
     void receive_음수는_예외를_던진다() {
         PurchaseOrder po = PurchaseOrder.create("발주", item(1L, 1L, 10));
 
