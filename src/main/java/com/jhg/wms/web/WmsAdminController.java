@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -96,19 +97,23 @@ public class WmsAdminController {
         return "redirect:/admin/purchase-orders";
     }
 
-    @PostMapping("/admin/purchase-orders/receive")
-    public String receive(@RequestParam Long poId, RedirectAttributes ra) {
+    @GetMapping("/admin/purchase-orders/{poId}")
+    public String purchaseOrderDetail(@PathVariable Long poId, Model model) {
+        model.addAttribute("po", purchaseOrderService.findWithItems(poId));
+        return "admin/purchaseorderdetail";
+    }
+
+    @PostMapping("/admin/purchase-orders/{poId}/receive")
+    public String receive(@PathVariable Long poId, @ModelAttribute ReceiveForm form, RedirectAttributes ra) {
+        Map<Long, Integer> qtyByItemId = new LinkedHashMap<>();
+        form.getItems().forEach(item -> qtyByItemId.merge(item.getItemId(), item.getQuantity(), Integer::sum));
         try {
-            // TODO(Task 4): 부분 입고 UI로 교체. 지금은 전량 입고로 옛 동작을 유지하는 임시 다리.
-            PurchaseOrder po = purchaseOrderService.findWithItems(poId);
-            Map<Long, Integer> everything = new java.util.LinkedHashMap<>();
-            po.getItems().forEach(item -> everything.put(item.getId(), item.remainingQty()));
-            purchaseOrderService.receive(poId, everything);
+            purchaseOrderService.receive(poId, qtyByItemId);
             ra.addFlashAttribute("successMessage", "입고 처리 완료. (발주 #" + poId + ")");
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
-        return "redirect:/admin/purchase-orders";
+        return "redirect:/admin/purchase-orders/" + poId;
     }
 
     @GetMapping("/admin/replenishment-requests")

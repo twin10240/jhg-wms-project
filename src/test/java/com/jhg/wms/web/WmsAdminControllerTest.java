@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
@@ -127,6 +129,48 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("purchaseOrders", List.of(received)));
     }
+
+    @Test
+    void 발주_상세_페이지를_렌더링한다() throws Exception {
+        PurchaseOrderItem item = PurchaseOrderItem.create(1L, 10);
+        ReflectionTestUtils.setField(item, "id", 42L);
+        PurchaseOrder po = PurchaseOrder.create("발주", item);
+        when(purchaseOrderService.findWithItems(1L)).thenReturn(po);
+
+        mockMvc.perform(get("/admin/purchase-orders/1").with(httpBasic("wms", "wms")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/purchaseorderdetail"))
+                .andExpect(model().attribute("po", po));
+    }
+
+    @Test
+    void 입고_폼_제출은_품목별_수량을_서비스에_전달한다() throws Exception {
+        mockMvc.perform(post("/admin/purchase-orders/1/receive").with(httpBasic("wms", "wms")).with(csrf())
+                        .param("items[0].itemId", "42")
+                        .param("items[0].quantity", "6")
+                        .param("items[1].itemId", "43")
+                        .param("items[1].quantity", "0"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/purchase-orders/1"));
+
+        var expected = new java.util.LinkedHashMap<Long, Integer>();
+        expected.put(42L, 6);
+        expected.put(43L, 0);
+        verify(purchaseOrderService).receive(1L, expected);
+    }
+
+    @Test
+    void 입고_실패하면_에러_플래시를_담는다() throws Exception {
+        doThrow(new IllegalArgumentException("잔량 40개를 초과했습니다"))
+                .when(purchaseOrderService).receive(eq(1L), anyMap());
+
+        mockMvc.perform(post("/admin/purchase-orders/1/receive").with(httpBasic("wms", "wms")).with(csrf())
+                        .param("items[0].itemId", "42")
+                        .param("items[0].quantity", "99"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("errorMessage", "잔량 40개를 초과했습니다"));
+    }
+
     @Test
     void replenishmentRequestsShowsHistory() throws Exception {
         ReplenishmentRequest request = ReplenishmentRequest.create(UUID.randomUUID(), "low stock",

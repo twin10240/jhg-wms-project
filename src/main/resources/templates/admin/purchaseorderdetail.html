@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 발주 상세')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('purchase-orders')}"></nav>
+<main>
+  <h2>발주 #<span th:text="${po.id}">1</span></h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <p>
+    상태:
+    <span th:switch="${po.status.name()}">
+      <span th:case="'RECEIVED'">입고완료</span>
+      <span th:case="'PARTIALLY_RECEIVED'">부분입고</span>
+      <span th:case="*">입고대기</span>
+    </span>
+    · 메모: <span th:text="${po.memo}">긴급</span>
+    · 발주일시: <span th:text="${#temporals.format(po.createdAt,'yyyy-MM-dd HH:mm')}">2026-07-01 10:00</span>
+    · 입고완료일시: <span th:text="${po.receivedAt != null} ? ${#temporals.format(po.receivedAt,'yyyy-MM-dd HH:mm')} : '—'">—</span>
+  </p>
+
+  <form th:action="@{'/admin/purchase-orders/' + ${po.id} + '/receive'}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <table>
+      <thead>
+        <tr><th>상품</th><th>발주량</th><th>입고량</th><th>잔량</th><th>이번 입고</th></tr>
+      </thead>
+      <tbody>
+        <tr th:each="item, stat : ${po.items}">
+          <td th:text="|상품#${item.productId}|">상품#1</td>
+          <td th:text="${item.quantity}">100</td>
+          <td th:text="${item.receivedQty}">60</td>
+          <td th:text="${item.remainingQty()}">40</td>
+          <td>
+            <span th:if="${item.fullyReceived}">완료</span>
+            <span th:unless="${item.fullyReceived}">
+              <input type="hidden" th:name="|items[${stat.index}].itemId|" th:value="${item.id}" />
+              <input type="number" th:name="|items[${stat.index}].quantity|"
+                     min="0" th:max="${item.remainingQty()}" value="0" style="width:80px" />
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="form-row" th:if="${po.status.name() != 'RECEIVED'}">
+      <button type="submit">입고 처리</button>
+    </div>
+  </form>
+
+  <p><a th:href="@{/admin/purchase-orders}">← 발주 목록</a></p>
+</main>
+</body>
+</html>

@@ -41,6 +41,7 @@
   <div class="tabs">
     <a th:href="@{/admin/purchase-orders}" th:classappend="${activeStatus == null} ? 'active'">전체</a>
     <a th:href="@{/admin/purchase-orders(status='ORDERED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'ORDERED'} ? 'active'">입고대기</a>
+    <a th:href="@{/admin/purchase-orders(status='PARTIALLY_RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'PARTIALLY_RECEIVED'} ? 'active'">부분입고</a>
     <a th:href="@{/admin/purchase-orders(status='RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RECEIVED'} ? 'active'">입고완료</a>
   </div>
   <table>
@@ -50,22 +51,21 @@
     <tbody>
       <tr th:each="po : ${purchaseOrders}">
         <td th:text="${po.id}">1</td>
-        <td th:text="${po.status.name() == 'RECEIVED'} ? '입고완료' : '입고대기'">입고대기</td>
+        <td th:switch="${po.status.name()}">
+          <span th:case="'RECEIVED'">입고완료</span>
+          <span th:case="'PARTIALLY_RECEIVED'">부분입고</span>
+          <span th:case="*">입고대기</span>
+        </td>
         <td>
           <span th:each="item, stat : ${po.items}">
-            <span th:text="|상품#${item.productId} x${item.quantity}|">상품#1 x10</span><span th:if="${!stat.last}">, </span>
+            <span th:text="|상품#${item.productId} ${item.receivedQty}/${item.quantity}|">상품#1 60/100</span><span th:if="${!stat.last}">, </span>
           </span>
         </td>
         <td th:text="${po.memo}">긴급</td>
         <td th:text="${#temporals.format(po.createdAt,'yyyy-MM-dd HH:mm')}">2026-07-01 10:00</td>
         <td th:text="${po.receivedAt != null} ? ${#temporals.format(po.receivedAt,'yyyy-MM-dd HH:mm')} : '—'">—</td>
         <td>
-          <form th:if="${po.status.name() != 'RECEIVED'}" th:action="@{/admin/purchase-orders/receive}" method="post" style="margin:0">
-            <input type="hidden" name="poId" th:value="${po.id}" />
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button class="sm" type="submit">입고</button>
-          </form>
-          <span th:if="${po.status.name() == 'RECEIVED'}">—</span>
+          <a class="sm" th:href="@{'/admin/purchase-orders/' + ${po.id}}">상세</a>
         </td>
       </tr>
       <tr th:if="${#lists.isEmpty(purchaseOrders)}">
