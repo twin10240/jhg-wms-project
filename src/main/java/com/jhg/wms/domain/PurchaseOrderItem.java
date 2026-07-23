@@ -23,6 +23,7 @@ public class PurchaseOrderItem {
 
     private int quantity;
 
+    @Column(nullable = true)   // ddl-auto가 nullable 컬럼으로 추가 → 기존 행은 NULL로 생기고, 시동 시 migratePurchaseOrderItems()가 채운다. 읽기는 백필 이후에만 일어나므로 primitive int로 안전.
     private int receivedQty;   // 누적 입고량. 신규 생성 시 0.
 
     public static PurchaseOrderItem create(Long productId, int quantity) {

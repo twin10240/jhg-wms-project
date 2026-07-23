@@ -3,12 +3,19 @@ package com.jhg.wms;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
+import com.jhg.wms.domain.PurchaseOrder;
+import com.jhg.wms.domain.PurchaseOrderItem;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.InventoryTransactionRepository;
+import com.jhg.wms.repository.PurchaseOrderItemRepository;
+import com.jhg.wms.repository.PurchaseOrderRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,11 +25,14 @@ class InitDbTest {
 
     @Autowired InventoryRepository inventoryRepository;
     @Autowired InventoryTransactionRepository transactionRepository;
+    @Autowired PurchaseOrderRepository purchaseOrderRepository;
+    @Autowired PurchaseOrderItemRepository purchaseOrderItemRepository;
+    @Autowired EntityManager entityManager;
     InitDb.InitService initService;
 
     @BeforeEach
     void setUp() {
-        initService = new InitDb.InitService(inventoryRepository, transactionRepository);
+        initService = new InitDb.InitService(inventoryRepository, transactionRepository, purchaseOrderItemRepository);
     }
 
     @Test
@@ -65,5 +75,41 @@ class InitDbTest {
         int deltaSum = all.stream().mapToInt(InventoryTransaction::getDelta).sum();
         int onHand = inventoryRepository.findByProductId(1L).orElseThrow().getOnHandQty();
         assertThat(deltaSum).isEqualTo(onHand);
+    }
+
+    @Test
+    void 발주품목_백필_입고완료는_발주량만큼_대기중은_0으로_채운다() {
+        PurchaseOrder ordered = purchaseOrderRepository.save(
+                PurchaseOrder.create("대기", PurchaseOrderItem.create(1L, 10)));
+        PurchaseOrder received = purchaseOrderRepository.save(
+                PurchaseOrder.create("완료", PurchaseOrderItem.create(2L, 7)));
+        received.receive(Map.of(received.getItems().get(0).getId(), 7));
+        purchaseOrderRepository.flush();
+        // 기존 배포분 재현: 컬럼이 막 추가된 직후처럼 NULL로 되돌린다.
+        entityManager.createNativeQuery("update purchase_order_item set received_qty = null").executeUpdate();
+        entityManager.clear();
+
+        initService.migratePurchaseOrderItems();
+
+        assertThat(purchaseOrderRepository.findById(ordered.getId()).orElseThrow()
+                .getItems().get(0).getReceivedQty()).isZero();
+        assertThat(purchaseOrderRepository.findById(received.getId()).orElseThrow()
+                .getItems().get(0).getReceivedQty()).isEqualTo(7);
+    }
+
+    @Test
+    void 발주품목_백필은_멱등이다() {
+        PurchaseOrder po = purchaseOrderRepository.save(
+                PurchaseOrder.create("완료", PurchaseOrderItem.create(2L, 7)));
+        po.receive(Map.of(po.getItems().get(0).getId(), 3));   // 부분 입고 상태로 저장
+        purchaseOrderRepository.flush();
+        entityManager.clear();
+
+        initService.migratePurchaseOrderItems();
+        initService.migratePurchaseOrderItems();
+
+        // 이미 값이 있으므로 백필이 건드리지 않는다 — 3이 7이나 0으로 덮이지 않는다.
+        assertThat(purchaseOrderRepository.findById(po.getId()).orElseThrow()
+                .getItems().get(0).getReceivedQty()).isEqualTo(3);
     }
 }

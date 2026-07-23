@@ -5,6 +5,7 @@ import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.InventoryTransactionRepository;
+import com.jhg.wms.repository.PurchaseOrderItemRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class InitDb {
     }
 
     private void seedIfNeeded() {
+        initService.migratePurchaseOrderItems(); // 엔티티를 읽기 전에 — NULL이 primitive int로 들어오는 것 방지
         if (initService.alreadySeeded()) {
             initService.backfillNames(); // 이름 컬럼 도입 전 시드된 기존 배포분 보정 — 채워지면 no-op
             initService.migrateLegacy(); // 트랜잭션 원장 도입 전 배포분 보정(type 백필 + OPENING 소급) — 채워지면 no-op
@@ -61,6 +63,16 @@ public class InitDb {
     static class InitService {
         private final InventoryRepository inventoryRepository;
         private final InventoryTransactionRepository transactionRepository;
+        private final PurchaseOrderItemRepository purchaseOrderItemRepository;
+
+        /** 기존 배포분 보정(멱등): receivedQty가 없던 발주 품목을 상태에서 유도해 채운다.
+         *  입고완료 발주는 전량 입고된 것이고(구 receive()가 전량 처리만 했으므로 중간 상태는 존재할 수 없다),
+         *  나머지는 0이다. PurchaseOrderItem을 처음 읽는 코드보다 반드시 먼저 돌아야 한다 —
+         *  primitive int 필드에 NULL이 들어오면 하이드레이션에서 실패한다. */
+        public void migratePurchaseOrderItems() {
+            purchaseOrderItemRepository.backfillReceivedQtyForReceivedOrders();
+            purchaseOrderItemRepository.backfillRemainingReceivedQty();
+        }
 
         public boolean alreadySeeded() {
             return inventoryRepository.count() > 0;
