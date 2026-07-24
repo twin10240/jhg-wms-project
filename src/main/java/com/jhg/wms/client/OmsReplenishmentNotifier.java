@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -21,8 +22,15 @@ public class OmsReplenishmentNotifier {
     private final RestClient restClient;
 
     public OmsReplenishmentNotifier(RestClient.Builder builder,
-                                    @Value("${oms.base-url}") String baseUrl) {
-        this.restClient = builder.baseUrl(baseUrl).build();
+                                    @Value("${oms.base-url}") String baseUrl,
+                                    @Value("${oms.callback.user}") String callbackUser,
+                                    @Value("${oms.callback.password}") String callbackPassword) {
+        if (callbackUser.isBlank() || callbackPassword.isBlank()) {
+            throw new IllegalStateException("oms.callback.user/password must not be blank");
+        }
+        this.restClient = builder.baseUrl(baseUrl)
+                .defaultHeaders(headers -> headers.setBasicAuth(callbackUser, callbackPassword))
+                .build();
     }
 
     private record ReplenishmentRequest(List<Long> productIds) {}
@@ -45,6 +53,8 @@ public class OmsReplenishmentNotifier {
                     .body(new ReplenishmentRequest(List.of(productId)))
                     .retrieve()
                     .toBodilessEntity();
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
+            log.error("OMS 재고보충 통지 인증 실패(OMS_CALLBACK_USER/PASSWORD 확인 필요): productId={}", productId, e);
         } catch (Exception e) {
             log.warn("OMS 재고보충 통지 실패(무시 — 백오더 승격 지연): productId={}", productId, e);
         }
