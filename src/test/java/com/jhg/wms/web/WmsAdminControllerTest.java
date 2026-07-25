@@ -253,4 +253,20 @@ class WmsAdminControllerTest {
         mockMvc.perform(post("/admin/replenishment-requests/7/approve").with(user("op").roles("OPERATOR")).with(csrf()))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void MANAGER는_발주를_취소할_수_있다() throws Exception {
+        mockMvc.perform(post("/admin/purchase-orders/1/cancel")
+                        .with(user("mgr").roles("MANAGER")).with(csrf()))
+               .andExpect(status().is3xxRedirection());
+        verify(purchaseOrderService).cancel(1L);
+    }
+
+    @Test
+    void OPERATOR는_발주_취소가_403() throws Exception {
+        mockMvc.perform(post("/admin/purchase-orders/1/cancel")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+               .andExpect(status().isForbidden());
+        verifyNoInteractions(purchaseOrderService);
+    }
 }

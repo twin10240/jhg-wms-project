@@ -116,6 +116,17 @@ public class WmsAdminController {
         return "redirect:/admin/purchase-orders/" + poId;
     }
 
+    @PostMapping("/admin/purchase-orders/{poId}/cancel")
+    public String cancelPurchaseOrder(@PathVariable Long poId, RedirectAttributes ra) {
+        try {
+            purchaseOrderService.cancel(poId);
+            ra.addFlashAttribute("successMessage", "발주 취소 완료. (발주 #" + poId + ")");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ra.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/admin/purchase-orders/" + poId;
+    }
+
     @GetMapping("/admin/replenishment-requests")
     public String replenishmentRequests(Model model) {
         model.addAttribute("requests", replenishmentRequestService.findAll());
