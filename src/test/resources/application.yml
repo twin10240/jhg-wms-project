@@ -14,6 +14,22 @@ spring:
   h2:
     console:
       enabled: false
+  # main과 동일: 기본(non-scale) 프로파일은 Redis 없이 서블릿 인메모리 세션.
+  # test/resources의 application.yml이 classpath 우선순위상 main 것을 덮어써서
+  # main의 이 exclude가 테스트엔 적용되지 않는다 — 여기 별도 명시 필요.
+  # (없으면 세션에 뭔가 쓰이는 요청에서 RedisSessionRepository가 로컬에 없는
+  #  Redis에 연결을 시도해 500이 난다 — 테스트 환경엔 Redis가 없음)
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.session.SessionAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  # TestRestTemplate이 쓰는 RestTemplateBuilder의 기본 팩토리(HttpComponents)는 리다이렉트를
+  # 자동으로 따라간다 — 세션 쿠키를 수동으로 실어보내는 SecurityChainIntegrationTest 같은 테스트에서
+  # POST /login(302)을 조용히 따라가 미인증 "/" → "/login"까지 이어져 200으로 관측되는 원인이 된다.
+  # 리다이렉트 미추적으로 고정해 raw 상태코드를 그대로 관측하게 한다.
+  http:
+    client:
+      redirects: dont_follow
 
 # 테스트에서 실제 OMS 호출 없음(커밋 후 발화 + 테스트 트랜잭션 롤백) — 빈 생성용 값만 제공
 oms:
