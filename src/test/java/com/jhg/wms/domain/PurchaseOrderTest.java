@@ -167,4 +167,19 @@ class PurchaseOrderTest {
         assertThatThrownBy(() -> po.receive(qty(1L, 1)))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void cancel_ORDERED에서_취소된다() {
+        PurchaseOrder po = PurchaseOrder.create("m", PurchaseOrderItem.create(1L, 10));
+        po.cancel();
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.CANCELLED);
+        assertThat(po.getCancelledAt()).isNotNull();
+    }
+
+    @Test
+    void cancel_중복_취소는_거부() {
+        PurchaseOrder po = PurchaseOrder.create("m", PurchaseOrderItem.create(1L, 10));
+        po.cancel();
+        assertThatThrownBy(po::cancel).isInstanceOf(IllegalStateException.class);
+    }
 }

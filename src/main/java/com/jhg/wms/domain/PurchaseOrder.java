@@ -26,6 +26,7 @@ public class PurchaseOrder {
     private String memo;
     private LocalDateTime createdAt;
     private LocalDateTime receivedAt;
+    private LocalDateTime cancelledAt;
 
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL)
     private List<PurchaseOrderItem> items = new ArrayList<>();
@@ -81,5 +82,13 @@ public class PurchaseOrder {
             this.status = PurchaseOrderStatus.PARTIALLY_RECEIVED;
         }
         return deltaByProductId;
+    }
+
+    /** ORDERED·PARTIALLY_RECEIVED에서만 취소. 입고된 실물 수량은 보존(역산 없음). */
+    public void cancel() {
+        if (status != PurchaseOrderStatus.ORDERED && status != PurchaseOrderStatus.PARTIALLY_RECEIVED)
+            throw new IllegalStateException("취소할 수 없는 상태입니다: " + status + " (발주 #" + id + ")");
+        this.status = PurchaseOrderStatus.CANCELLED;
+        this.cancelledAt = LocalDateTime.now();
     }
 }
