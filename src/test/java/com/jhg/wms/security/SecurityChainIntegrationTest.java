@@ -40,10 +40,9 @@ class SecurityChainIntegrationTest {
     void admin_미인증은_로그인_페이지로_302() {
         // 리다이렉트를 따라가지 않도록 TestRestTemplate 기본 동작 확인
         ResponseEntity<String> res = rest.getForEntity(url("/admin/inventory"), String.class);
-        // 미인증 → 302 /login (혹은 최종적으로 login 페이지 200). 어느 쪽이든 /admin 콘텐츠는 아님.
-        assertThat(res.getStatusCode()).isIn(HttpStatus.FOUND, HttpStatus.OK);
-        if (res.getStatusCode() == HttpStatus.FOUND)
-            assertThat(res.getHeaders().getLocation().getPath()).isEqualTo("/login");
+        // spring.http.client.redirects: dont_follow → 302 /login으로 결정적. 200 허용은 회귀(미인증 열람 가능)를 숨길 수 있어 엄격히 검증.
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(res.getHeaders().getLocation().getPath()).isEqualTo("/login");
     }
 
     @Test

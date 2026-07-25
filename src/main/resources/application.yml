@@ -95,8 +95,11 @@ oms:
   callback:
     user: ${OMS_CALLBACK_USER}
     password: ${OMS_CALLBACK_PASSWORD}
-# 관리자 계정 시드도 로컬 기본값 없이 오버라이드 — 미설정 시 기동 자체가 막힌다.
+# 관리자 계정 시드도, OMS→WMS 서비스 계정도 로컬 기본값 없이 오버라이드 — 미설정 시 기동 자체가 막힌다.
 wms:
+  basic:
+    user: ${WMS_BASIC_USER}
+    password: ${WMS_BASIC_PASSWORD}
   seed-users:
     operator-user: ${WMS_OPERATOR_USER}
     operator-password: ${WMS_OPERATOR_PASSWORD}
