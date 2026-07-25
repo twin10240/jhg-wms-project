@@ -106,6 +106,12 @@ public class ReplenishmentRequest {
         this.fulfilledAt = LocalDateTime.now();
     }
 
+    /** 연결 발주가 취소될 때 함께 종결. APPROVED(발주 연결됨)에서만. */
+    public void cancel() {
+        requireStatus(ReplenishmentRequestStatus.APPROVED);
+        this.status = ReplenishmentRequestStatus.CANCELLED;
+    }
+
     private void requireStatus(ReplenishmentRequestStatus expected) {
         if (status != expected)
             throw new IllegalStateException("Expected status " + expected + " but was " + status);

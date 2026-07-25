@@ -96,6 +96,22 @@ class ReplenishmentRequestTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void cancel_APPROVED에서_CANCELLED로() {
+        ReplenishmentRequest r = ReplenishmentRequest.create(UUID.randomUUID(), "부족",
+                ReplenishmentRequestItem.create(1L, 5));
+        r.approve(99L, "발주함");
+        r.cancel();
+        assertThat(r.getStatus()).isEqualTo(ReplenishmentRequestStatus.CANCELLED);
+    }
+
+    @Test
+    void cancel_REQUESTED에서는_거부() {
+        ReplenishmentRequest r = ReplenishmentRequest.create(UUID.randomUUID(), "부족",
+                ReplenishmentRequestItem.create(1L, 5));
+        assertThatThrownBy(r::cancel).isInstanceOf(IllegalStateException.class);
+    }
+
     private ReplenishmentRequest request() {
         return ReplenishmentRequest.create(UUID.randomUUID(), "reason",
                 ReplenishmentRequestItem.create(1L, 1));
