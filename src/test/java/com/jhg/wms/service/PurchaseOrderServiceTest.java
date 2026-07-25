@@ -201,4 +201,37 @@ class PurchaseOrderServiceTest {
         assertThat(po.getId()).isEqualTo(poId);
         assertThat(po.getItems()).hasSize(1);
     }
+
+    @Test
+    void cancel_부분입고_발주를_취소하고_연결요청을_CANCELLED로_한다() {
+        inventoryRepo.save(com.jhg.wms.domain.Inventory.create(1L, "상품 1", 10));
+        Long poId = service.create(List.of(new PurchaseOrderLine(1L, 100)), "발주");
+
+        // 연결 요청 생성 + 승인으로 poId 연결(approve는 REQUESTED에서만 → 신규 요청 사용)
+        ReplenishmentRequest req = ReplenishmentRequest.create(UUID.randomUUID(), "부족",
+                ReplenishmentRequestItem.create(1L, 100));
+        req.approve(poId, "발주함");
+        requestRepo.save(req);
+
+        // 부분 입고 → PARTIALLY_RECEIVED
+        service.receive(poId, java.util.Map.of(itemIdOf(poId, 0), 60));
+        int onHandBefore = inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty();
+
+        service.cancel(poId);
+
+        assertThat(poRepo.findById(poId).orElseThrow().getStatus())
+                .isEqualTo(PurchaseOrderStatus.CANCELLED);
+        assertThat(requestRepo.findByPurchaseOrderId(poId).orElseThrow().getStatus())
+                .isEqualTo(ReplenishmentRequestStatus.CANCELLED);
+        assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty())
+                .isEqualTo(onHandBefore);   // 재고 불변
+    }
+
+    @Test
+    void cancel_연결요청이_없어도_발주만_취소된다() {
+        Long poId = service.create(List.of(new PurchaseOrderLine(1L, 10)), "직접 발주");
+        service.cancel(poId);
+        assertThat(poRepo.findById(poId).orElseThrow().getStatus())
+                .isEqualTo(PurchaseOrderStatus.CANCELLED);
+    }
 }

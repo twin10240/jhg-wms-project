@@ -56,6 +56,15 @@ public class PurchaseOrderService {
         return po.getId();
     }
 
+    @Transactional
+    public void cancel(Long poId) {
+        PurchaseOrder po = purchaseOrderRepository.findById(poId)
+                .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
+        po.cancel();   // ORDERED·PARTIALLY_RECEIVED만 허용(도메인이 방어)
+        requestRepository.findByPurchaseOrderId(poId)
+                .ifPresent(ReplenishmentRequest::cancel);   // 연결 요청 종결
+    }
+
     public PurchaseOrder findWithItems(Long poId) {
         return purchaseOrderRepository.findWithItemsById(poId)
                 .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
