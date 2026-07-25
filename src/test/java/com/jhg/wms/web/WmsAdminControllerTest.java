@@ -1,5 +1,6 @@
 package com.jhg.wms.web;
 
+import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
 import com.jhg.wms.domain.*;
 import com.jhg.wms.service.InventoryService;
@@ -23,12 +24,13 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-// 관리자 화면은 인증 필요(SecurityConfig) — 모든 GET 호출에 httpBasic("wms","wms") 부여.
+// 관리자 화면은 폼 로그인 + 롤 인가(SecurityConfig webChain) — 조회/입고는 OPERATOR, 발주 생성·보충요청 승인/거절은 MANAGER.
+// webChain은 DbUserDetailsService에 의존하므로 슬라이스 컨텍스트 로딩을 위해 목빈이 필요(직접 호출되지는 않음 — .with(user(...))로 principal 주입).
 @WebMvcTest(WmsAdminController.class)
 @Import(SecurityConfig.class)
 class WmsAdminControllerTest {
@@ -37,12 +39,13 @@ class WmsAdminControllerTest {
     @MockitoBean InventoryService inventoryService;
     @MockitoBean PurchaseOrderService purchaseOrderService;
     @MockitoBean ReplenishmentRequestService replenishmentRequestService;
+    @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
     void 재고화면_보유_예약_가용_컬럼을_렌더링한다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
 
-        mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/inventory"))
                 .andExpect(content().string(containsString("가용")))
@@ -54,7 +57,7 @@ class WmsAdminControllerTest {
     void inventory_화면에_transactions_모델이_담긴다() throws Exception {
         when(inventoryService.findTransactions(null)).thenReturn(List.of());
 
-        mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(model().attributeExists("transactions"));
     }
@@ -64,7 +67,7 @@ class WmsAdminControllerTest {
         InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null);
         when(inventoryService.findTransactions(InventoryTransactionType.RECEIVE)).thenReturn(List.of(receive));
 
-        mockMvc.perform(get("/admin/inventory").with(httpBasic("wms", "wms")).param("type", "RECEIVE"))
+        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")).param("type", "RECEIVE"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("transactions", List.of(receive)))
                 .andExpect(model().attribute("filterType", InventoryTransactionType.RECEIVE));
@@ -81,7 +84,7 @@ class WmsAdminControllerTest {
         shipped.ship();
         when(inventoryService.findAllReservations()).thenReturn(List.of(Reservation.reserve(1L, Map.of(1L, 1)), shipped));
 
-        mockMvc.perform(get("/").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/dashboard"))
                 .andExpect(model().attribute("skuCount", 2))
@@ -98,7 +101,7 @@ class WmsAdminControllerTest {
     void 예약화면_전체_목록을_렌더링한다() throws Exception {
         when(inventoryService.findAllReservations()).thenReturn(List.of(Reservation.reserve(10L, Map.of(1L, 1))));
 
-        mockMvc.perform(get("/admin/reservations").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/reservations"))
                 .andExpect(content().string(containsString("10")))
@@ -111,7 +114,7 @@ class WmsAdminControllerTest {
         shipped.ship();
         when(inventoryService.findAllReservations()).thenReturn(List.of(Reservation.reserve(10L, Map.of(1L, 1)), shipped));
 
-        mockMvc.perform(get("/admin/reservations").with(httpBasic("wms", "wms")).param("status", "SHIPPED"))
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")).param("status", "SHIPPED"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("reservations", List.of(shipped)));
     }
@@ -126,7 +129,7 @@ class WmsAdminControllerTest {
         when(purchaseOrderService.findAllWithItems()).thenReturn(List.of(ordered, received));
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
 
-        mockMvc.perform(get("/admin/purchase-orders").with(httpBasic("wms", "wms")).param("status", "RECEIVED"))
+        mockMvc.perform(get("/admin/purchase-orders").with(user("op").roles("OPERATOR")).param("status", "RECEIVED"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("purchaseOrders", List.of(received)));
     }
@@ -138,7 +141,7 @@ class WmsAdminControllerTest {
         PurchaseOrder po = PurchaseOrder.create("발주", item);
         when(purchaseOrderService.findWithItems(1L)).thenReturn(po);
 
-        mockMvc.perform(get("/admin/purchase-orders/1").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/admin/purchase-orders/1").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/purchaseorderdetail"))
                 .andExpect(model().attribute("po", po));
@@ -156,7 +159,7 @@ class WmsAdminControllerTest {
         po.receive(Map.of(43L, 5)); // 가운데 품목만 완료 처리 — 이후 품목의 인덱스가 앞당겨지지 않아야 한다.
         when(purchaseOrderService.findWithItems(1L)).thenReturn(po);
 
-        mockMvc.perform(get("/admin/purchase-orders/1").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/admin/purchase-orders/1").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(allOf(
                         containsString("items[0].itemId"),
@@ -166,7 +169,7 @@ class WmsAdminControllerTest {
 
     @Test
     void 입고_폼_제출은_품목별_수량을_서비스에_전달한다() throws Exception {
-        mockMvc.perform(post("/admin/purchase-orders/1/receive").with(httpBasic("wms", "wms")).with(csrf())
+        mockMvc.perform(post("/admin/purchase-orders/1/receive").with(user("op").roles("OPERATOR")).with(csrf())
                         .param("items[0].itemId", "42")
                         .param("items[0].quantity", "6")
                         .param("items[1].itemId", "43")
@@ -185,7 +188,7 @@ class WmsAdminControllerTest {
         doThrow(new IllegalArgumentException("잔량 40개를 초과했습니다"))
                 .when(purchaseOrderService).receive(eq(1L), anyMap());
 
-        mockMvc.perform(post("/admin/purchase-orders/1/receive").with(httpBasic("wms", "wms")).with(csrf())
+        mockMvc.perform(post("/admin/purchase-orders/1/receive").with(user("op").roles("OPERATOR")).with(csrf())
                         .param("items[0].itemId", "42")
                         .param("items[0].quantity", "99"))
                 .andExpect(status().is3xxRedirection())
@@ -199,7 +202,7 @@ class WmsAdminControllerTest {
         ReflectionTestUtils.setField(request, "id", 7L);
         when(replenishmentRequestService.findAll()).thenReturn(List.of(request));
 
-        mockMvc.perform(get("/admin/replenishment-requests").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/admin/replenishment-requests").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/replenishmentrequests"))
                 .andExpect(model().attribute("requests", List.of(request)));
@@ -208,7 +211,7 @@ class WmsAdminControllerTest {
     @Test
     void approvesReplenishmentRequest() throws Exception {
         mockMvc.perform(post("/admin/replenishment-requests/7/approve")
-                        .with(httpBasic("wms", "wms")).with(csrf())
+                        .with(user("mgr").roles("MANAGER")).with(csrf())
                         .param("wmsMemo", "ready"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/replenishment-requests"))
@@ -220,7 +223,7 @@ class WmsAdminControllerTest {
     @Test
     void rejectRequiresCsrf() throws Exception {
         mockMvc.perform(post("/admin/replenishment-requests/7/reject")
-                        .with(httpBasic("wms", "wms"))
+                        .with(user("mgr").roles("MANAGER"))
                         .param("wmsMemo", "no"))
                 .andExpect(status().isForbidden());
     }
@@ -231,10 +234,23 @@ class WmsAdminControllerTest {
                 .when(replenishmentRequestService).reject(7L, "late");
 
         mockMvc.perform(post("/admin/replenishment-requests/7/reject")
-                        .with(httpBasic("wms", "wms")).with(csrf())
+                        .with(user("mgr").roles("MANAGER")).with(csrf())
                         .param("wmsMemo", "late"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/replenishment-requests"))
                 .andExpect(flash().attribute("errorMessage", "already decided"));
+    }
+
+    @Test
+    void OPERATOR는_발주_생성이_403() throws Exception {
+        mockMvc.perform(post("/admin/purchase-orders").with(user("op").roles("OPERATOR")).with(csrf())
+                        .param("items[0].productId", "1").param("items[0].quantity", "5"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void OPERATOR는_보충요청_승인이_403() throws Exception {
+        mockMvc.perform(post("/admin/replenishment-requests/7/approve").with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().isForbidden());
     }
 }

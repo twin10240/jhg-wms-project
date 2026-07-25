@@ -1,5 +1,6 @@
 package com.jhg.wms.web;
 
+import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
 import com.jhg.wms.domain.ReplenishmentRequest;
 import com.jhg.wms.domain.ReplenishmentRequestItem;
@@ -26,12 +27,15 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+// SecurityConfig는 webChain도 함께 등록하는데 webChain이 DbUserDetailsService를 요구하므로,
+// 슬라이스 컨텍스트 로딩을 위해 목빈이 필요(직접 호출되지는 않음 — /api는 apiChain의 인메모리 서비스 계정으로 인증).
 @WebMvcTest(ReplenishmentRequestController.class)
 @Import(SecurityConfig.class)
 class ReplenishmentRequestControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean ReplenishmentRequestService service;
+    @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
     void postCreatesRequestAndMapsMultipleItems() throws Exception {

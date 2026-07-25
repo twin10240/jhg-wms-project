@@ -1,5 +1,6 @@
 package com.jhg.wms.web;
 
+import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.repository.InventoryRepository;
@@ -27,7 +28,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import org.mockito.ArgumentCaptor;
 
-// API 엔드포인트는 CSRF 예외(SecurityConfig)라 인증만 필요 — 모든 호출에 httpBasic("wms","wms") 부여.
+// API 엔드포인트는 CSRF 예외(SecurityConfig apiChain)라 인증만 필요 — 모든 호출에 httpBasic("wms","wms") 부여.
+// SecurityConfig는 webChain도 함께 등록하는데 webChain이 DbUserDetailsService를 요구하므로,
+// 슬라이스 컨텍스트 로딩을 위해 목빈이 필요(직접 호출되지는 않음 — /api는 apiChain의 인메모리 서비스 계정으로 인증).
 @WebMvcTest(InventoryController.class)
 @Import(SecurityConfig.class)
 class InventoryControllerTest {
@@ -35,6 +38,7 @@ class InventoryControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean InventoryRepository inventoryRepository;
     @MockitoBean InventoryService inventoryService;
+    @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
     void 상품ID목록으로_가용수량_맵을_반환한다() throws Exception {
