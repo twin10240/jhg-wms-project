@@ -23,6 +23,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
 	// 수평 확장(scale 프로파일) 전용 — 공유 세션 스토어 + 분산 락.
 	// Railway 단일 인스턴스(prod)에선 session.store-type=none·RedissonConfig 비활성이라 미사용.
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
