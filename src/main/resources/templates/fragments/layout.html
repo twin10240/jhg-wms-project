@@ -20,8 +20,8 @@
     </form>
   </nav>
   <div th:fragment="flash" th:remove="tag">
-    <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>
-    <div class="flash-err" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+    <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}" role="alert"></div>
+    <div class="flash-err" th:if="${errorMessage}" th:text="${errorMessage}" role="alert"></div>
   </div>
 </body>
 </html>

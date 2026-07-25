@@ -53,6 +53,8 @@ nav.topnav a {
 }
 nav.topnav a:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 nav.topnav a.active { background: var(--color-primary); color: #fff; }
+nav.topnav .nav-user { margin-left: auto; color: var(--color-nav-text); font-size: .9em; }
+nav.topnav .nav-logout { margin: 0; margin-left: 12px; }
 
 /* ---------- Tables ---------- */
 
@@ -138,8 +140,11 @@ button.ghost:hover, a.ghost:hover { background: #f0f0f0; }
   box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
 }
 .login h1 { font-size: 1.3em; margin-top: 0; text-align: center; }
-.login form { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
-.login button { width: 100%; }
+.login form { display: flex; flex-direction: column; gap: 4px; margin-top: 20px; }
+.login label { margin-top: 10px; }
+.login label:first-child { margin-top: 0; }
+.login input { margin-bottom: 6px; }
+.login button { width: 100%; margin-top: 14px; }
 
 /* ---------- Cards (dashboard) ---------- */
 
