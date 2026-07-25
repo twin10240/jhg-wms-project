@@ -3,6 +3,9 @@ package com.jhg.wms.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -10,41 +13,66 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.http.HttpStatus;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
- * WMS 공개 URL(Railway Private Networking 밖으로 노출될 가능성) 대비 HTTP Basic 인증.
- * OMS→WMS 호출은 세션이 없는 서버간 통신이라 Basic이 적합. 관리자 화면(admin/**)은 폼 기반이라
- * CSRF를 유지하고, API(api/**)는 서버간 호출이라 CSRF 예외(토큰을 주고받을 방법이 없음).
+ * 체인 2분할:
+ *  - apiChain(@Order 1): /api/** — OMS 서버간 호출용 Basic. 인증 실패 시 401 직접 응답
+ *    (폼 로그인 리다이렉트로 새지 않게 HttpStatusEntryPoint 지정). CSRF 예외.
+ *  - webChain(@Order 2): /·/admin/** — 사람용 폼 로그인 + DB 롤 인가. CSRF 활성.
  */
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain web(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
-            .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/error", "/css/**", "/js/**", "/images/**").permitAll()
-                    .requestMatchers("/", "/admin/**", "/api/**").authenticated()
-                    .anyRequest().authenticated()
-            )
-            .httpBasic(withDefaults());
+    PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
 
+    // OMS가 쓰는 서비스 계정 — 사람 계정(DB)과 분리. 기존 wms.basic.* 유지.
+    @Bean
+    @Order(1)
+    SecurityFilterChain apiChain(HttpSecurity http,
+                                 @Value("${wms.basic.user:wms}") String user,
+                                 @Value("${wms.basic.password:wms}") String password,
+                                 PasswordEncoder encoder) throws Exception {
+        UserDetailsService serviceAccount = new InMemoryUserDetailsManager(
+                User.withUsername(user).password(encoder.encode(password)).roles("SERVICE").build());
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(serviceAccount);
+        provider.setPasswordEncoder(encoder);
+
+        http.securityMatcher("/api/**")
+            .csrf(csrf -> csrf.disable())
+            .authenticationProvider(provider)
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .httpBasic(withDefaults())
+            // 인증 실패 시 401 직접 — /error 재디스패치 → 폼 로그인 302 방지
+            .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)));
         return http.build();
     }
 
     @Bean
-    UserDetailsService users(@Value("${wms.basic.user:wms}") String user,
-                              @Value("${wms.basic.password:wms}") String password,
-                              PasswordEncoder encoder) {
-        return new InMemoryUserDetailsManager(
-                User.withUsername(user).password(encoder.encode(password)).roles("WMS").build());
-    }
-
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    @Order(2)
+    SecurityFilterChain webChain(HttpSecurity http, DbUserDetailsService users) throws Exception {
+        http
+            .userDetailsService(users)
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/admin/purchase-orders").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/admin/purchase-orders/*/cancel").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/admin/replenishment-requests/*/approve").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/admin/replenishment-requests/*/reject").hasRole("MANAGER")
+                .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                .loginPage("/login")
+                .defaultSuccessUrl("/", false)
+                .permitAll()
+            )
+            .logout(withDefaults());
+        return http.build();
     }
 }
