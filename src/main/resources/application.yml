@@ -52,6 +52,12 @@ wms:
   basic:
     user: ${WMS_BASIC_USER:wms}
     password: ${WMS_BASIC_PASSWORD:wms}
+  # 관리자 폼 로그인 계정 시드. 로컬 기본값 operator/manager, 운영은 prod에서 기본값 없이 주입.
+  seed-users:
+    operator-user: ${WMS_OPERATOR_USER:operator}
+    operator-password: ${WMS_OPERATOR_PASSWORD:operator}
+    manager-user: ${WMS_MANAGER_USER:manager}
+    manager-password: ${WMS_MANAGER_PASSWORD:manager}
 
 ---
 # 스키마 리셋용: --spring.profiles.active=local
@@ -89,6 +95,13 @@ oms:
   callback:
     user: ${OMS_CALLBACK_USER}
     password: ${OMS_CALLBACK_PASSWORD}
+# 관리자 계정 시드도 로컬 기본값 없이 오버라이드 — 미설정 시 기동 자체가 막힌다.
+wms:
+  seed-users:
+    operator-user: ${WMS_OPERATOR_USER}
+    operator-password: ${WMS_OPERATOR_PASSWORD}
+    manager-user: ${WMS_MANAGER_USER}
+    manager-password: ${WMS_MANAGER_PASSWORD}
 ---
 # 수평 확장 데모 프로파일(로컬 docker-compose 전용) — prod와 함께 활성: SPRING_PROFILES_ACTIVE=prod,scale
 # prod가 Postgres 데이터소스를 제공하고, scale은 그 위에 Redis 공유 세션을 얹는다.

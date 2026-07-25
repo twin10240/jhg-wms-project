@@ -26,3 +26,8 @@ wms:
   basic:
     user: wms
     password: wms
+  seed-users:
+    operator-user: operator
+    operator-password: operator
+    manager-user: manager
+    manager-password: manager
