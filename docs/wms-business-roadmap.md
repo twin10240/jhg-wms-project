@@ -70,7 +70,7 @@
 
 - **Lot / Serial / 유통기한(FEFO)** — 식품·의약품 아니면 불필요.
 - **공급업체 마스터 심화**(단가·리드타임·ETA) — Phase 2에서 최소만, 본격 관리는 보류.
-- **역할 분리(작업자 vs 관리자)** — 이미 `todo_list_codex.md`에 인지됨. 다중 운영자 생길 때.
+- **역할 분리(작업자 vs 관리자)** — 이미 `todo_list_codex.md`에 인지됨. → 2026-07-25 포트폴리오 목적으로 앞당겨 착수. `docs/superpowers/specs/2026-07-25-operational-completeness-access-control-design.md` 참조.
 
 ---
 
