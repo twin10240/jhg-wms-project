@@ -22,9 +22,9 @@
     <div class="card">
       <h3>예약</h3>
       <p>
-        <span class="badge badge-reserved">RESERVED</span> <b th:text="${reservedCount}">0</b><br/>
-        <span class="badge badge-shipped">SHIPPED</span> <b th:text="${shippedCount}">0</b><br/>
-        <span class="badge badge-released">RELEASED</span> <b th:text="${releasedCount}">0</b>
+        <span class="badge badge-reserved">예약 중</span> <b th:text="${reservedCount}">0</b><br/>
+        <span class="badge badge-shipped">출고 완료</span> <b th:text="${shippedCount}">0</b><br/>
+        <span class="badge badge-released">예약 해제</span> <b th:text="${releasedCount}">0</b>
       </p>
       <p><a th:href="@{/admin/reservations}">예약 현황 →</a></p>
     </div>

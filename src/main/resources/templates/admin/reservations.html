@@ -20,7 +20,13 @@
       <tr th:each="r : ${reservations}">
         <td th:text="${r.id}">1</td>
         <td th:text="${r.orderId}">1</td>
-        <td><span class="badge" th:classappend="'badge-' + ${#strings.toLowerCase(r.status.name())}" th:text="${r.status.name()}">RESERVED</span></td>
+        <td>
+          <span th:switch="${r.status.name()}" class="badge" th:classappend="'badge-' + ${#strings.toLowerCase(r.status.name())}">
+            <span th:case="'RESERVED'">예약 중</span>
+            <span th:case="'SHIPPED'">출고 완료</span>
+            <span th:case="'RELEASED'">예약 해제</span>
+          </span>
+        </td>
       </tr>
       <tr th:if="${#lists.isEmpty(reservations)}">
         <td colspan="3">예약 내역이 없습니다.</td>

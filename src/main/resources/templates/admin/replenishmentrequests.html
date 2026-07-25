@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('WMS 보충 요청 검토')}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav('replenishment-requests')}"></nav>
@@ -14,7 +14,16 @@
     <tbody>
       <tr th:each="request : ${requests}">
         <td th:text="${request.id}">1</td>
-        <td th:text="${request.status.name()}">REQUESTED</td>
+        <td>
+          <span th:switch="${request.status.name()}" class="badge"
+                th:classappend="${request.status.name() == 'REQUESTED'} ? 'badge--ordered' : (${request.status.name() == 'APPROVED'} ? 'badge--partial' : (${request.status.name() == 'FULFILLED'} ? 'badge--received' : 'badge--cancelled'))">
+            <span th:case="'REQUESTED'">검토 대기</span>
+            <span th:case="'APPROVED'">발주 진행</span>
+            <span th:case="'REJECTED'">반려</span>
+            <span th:case="'FULFILLED'">입고 완료</span>
+            <span th:case="'CANCELLED'">취소됨</span>
+          </span>
+        </td>
         <td>
           <span th:each="item, stat : ${request.items}">
             <span th:text="|상품#${item.productId} x${item.requestedQty}|">상품#1 x3</span><span th:if="${!stat.last}">, </span>
@@ -27,7 +36,7 @@
           <div th:if="${request.fulfilledAt != null}" th:text="|완료 ${#temporals.format(request.fulfilledAt, 'yyyy-MM-dd HH:mm')}|">완료</div>
         </td>
         <td>
-          <div th:if="${request.status.name() == 'REQUESTED'}">
+          <div th:if="${request.status.name() == 'REQUESTED'}" sec:authorize="hasRole('MANAGER')">
             <form th:action="@{/admin/replenishment-requests/{id}/approve(id=${request.id})}" method="post">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
               <input type="text" name="wmsMemo" placeholder="승인 메모 (선택)" />

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:fragment="head(title)">
   <meta charset="UTF-8" />
   <title th:text="${title}">JHG-WMS</title>
@@ -13,6 +13,11 @@
     <a th:href="@{/admin/reservations}" th:classappend="${active == 'reservations'} ? 'active'">예약</a>
     <a th:href="@{/admin/purchase-orders}" th:classappend="${active == 'purchase-orders'} ? 'active'">발주</a>
     <a th:href="@{/admin/replenishment-requests}" th:classappend="${active == 'replenishment-requests'} ? 'active'">보충 요청</a>
+    <span class="nav-user" sec:authentication="name">user</span>
+    <form class="nav-logout" th:action="@{/logout}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <button type="submit" class="ghost sm">로그아웃</button>
+    </form>
   </nav>
   <div th:fragment="flash" th:remove="tag">
     <div class="flash-ok" th:if="${successMessage}" th:text="${successMessage}"></div>

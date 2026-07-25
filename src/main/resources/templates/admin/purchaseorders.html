@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('WMS 발주 관리')}"></head>
 <body>
 <nav th:replace="~{fragments/layout :: nav('purchase-orders')}"></nav>
@@ -7,8 +7,8 @@
   <h2>발주 관리</h2>
   <div th:replace="~{fragments/layout :: flash}"></div>
 
-  <h3>발주 생성</h3>
-  <form th:action="@{/admin/purchase-orders}" method="post">
+  <h3 sec:authorize="hasRole('MANAGER')">발주 생성</h3>
+  <form sec:authorize="hasRole('MANAGER')" th:action="@{/admin/purchase-orders}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
     <div id="po-lines">
       <div class="form-row po-line">
@@ -43,6 +43,7 @@
     <a th:href="@{/admin/purchase-orders(status='ORDERED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'ORDERED'} ? 'active'">입고대기</a>
     <a th:href="@{/admin/purchase-orders(status='PARTIALLY_RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'PARTIALLY_RECEIVED'} ? 'active'">부분입고</a>
     <a th:href="@{/admin/purchase-orders(status='RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RECEIVED'} ? 'active'">입고완료</a>
+    <a th:href="@{/admin/purchase-orders(status='CANCELLED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'CANCELLED'} ? 'active'">취소됨</a>
   </div>
   <table>
     <thead>
@@ -51,10 +52,14 @@
     <tbody>
       <tr th:each="po : ${purchaseOrders}">
         <td th:text="${po.id}">1</td>
-        <td th:switch="${po.status.name()}">
-          <span th:case="'RECEIVED'">입고완료</span>
-          <span th:case="'PARTIALLY_RECEIVED'">부분입고</span>
-          <span th:case="*">입고대기</span>
+        <td>
+          <span th:switch="${po.status.name()}" class="badge"
+                th:classappend="${po.status.name() == 'ORDERED'} ? 'badge--ordered' : (${po.status.name() == 'PARTIALLY_RECEIVED'} ? 'badge--partial' : (${po.status.name() == 'RECEIVED'} ? 'badge--received' : 'badge--cancelled'))">
+            <span th:case="'ORDERED'">발주됨</span>
+            <span th:case="'PARTIALLY_RECEIVED'">부분 입고</span>
+            <span th:case="'RECEIVED'">입고 완료</span>
+            <span th:case="'CANCELLED'">취소됨</span>
+          </span>
         </td>
         <td>
           <span th:each="item, stat : ${po.items}">

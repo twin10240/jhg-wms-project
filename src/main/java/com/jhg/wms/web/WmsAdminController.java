@@ -139,7 +139,7 @@ public class WmsAdminController {
                                               RedirectAttributes ra) {
         try {
             replenishmentRequestService.approve(id, wmsMemo);
-            ra.addFlashAttribute("successMessage", "Request approved.");
+            ra.addFlashAttribute("successMessage", "보충 요청을 승인했습니다.");
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
@@ -152,7 +152,7 @@ public class WmsAdminController {
                                              RedirectAttributes ra) {
         try {
             replenishmentRequestService.reject(id, wmsMemo);
-            ra.addFlashAttribute("successMessage", "Request rejected.");
+            ra.addFlashAttribute("successMessage", "보충 요청을 반려했습니다.");
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
