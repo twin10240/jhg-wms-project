@@ -21,15 +21,7 @@
     · 입고완료일시: <span th:text="${po.receivedAt != null} ? ${#temporals.format(po.receivedAt,'yyyy-MM-dd HH:mm')} : '—'">—</span>
   </p>
 
-  <form sec:authorize="hasRole('MANAGER')"
-        th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}"
-        th:action="@{/admin/purchase-orders/{id}/cancel(id=${po.id})}" method="post"
-        onsubmit="return confirm('이 발주를 취소하시겠습니까? 이미 입고된 수량은 유지됩니다.');">
-    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-    <button type="submit" class="btn btn--danger">발주 취소</button>
-  </form>
-
-  <form th:action="@{'/admin/purchase-orders/' + ${po.id} + '/receive'}" method="post">
+  <form id="poReceive" th:action="@{'/admin/purchase-orders/' + ${po.id} + '/receive'}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
     <table>
       <thead>
@@ -54,10 +46,24 @@
         </tr>
       </tbody>
     </table>
-    <div class="form-row" th:if="${po.status.name() != 'RECEIVED'}">
-      <button type="submit">입고 처리</button>
-    </div>
   </form>
+
+  <!-- 발주 취소 폼(빈 폼) — 버튼은 아래 액션 행에서 form= 속성으로 제출 -->
+  <form id="poCancel" sec:authorize="hasRole('MANAGER')"
+        th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}"
+        th:action="@{/admin/purchase-orders/{id}/cancel(id=${po.id})}" method="post"
+        onsubmit="return confirm('이 발주를 취소하시겠습니까? 이미 입고된 수량은 유지됩니다.');">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+  </form>
+
+  <!-- 테이블 아래 우측: 발주 취소 · 입고 처리 나란히 -->
+  <div class="detail-actions">
+    <button type="submit" form="poCancel" class="btn btn--danger"
+            sec:authorize="hasRole('MANAGER')"
+            th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}">발주 취소</button>
+    <button type="submit" form="poReceive"
+            th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}">입고 처리</button>
+  </div>
 
   <p><a th:href="@{/admin/purchase-orders}">← 발주 목록</a></p>
 </main>

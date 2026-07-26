@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -70,7 +71,23 @@ public class PurchaseOrderService {
                 .orElseThrow(() -> new IllegalArgumentException("발주가 없습니다: id=" + poId));
     }
 
+    /** 더 진행할 일이 없는 발주(입고완료·취소됨) — 목록에서 뒤로 보낸다. */
+    private static boolean isClosed(PurchaseOrder po) {
+        return po.getStatus() == PurchaseOrderStatus.RECEIVED
+                || po.getStatus() == PurchaseOrderStatus.CANCELLED;
+    }
+
+    /**
+     * 처리할 발주를 위로: 미완료를 발주일시 오래된 순으로 먼저, 종료된 건(입고완료·취소됨)은 뒤로 보낸다.
+     * 정렬을 JPQL이 아니라 여기서 하는 이유 — 조회 쿼리가 {@code select distinct ... join fetch}라
+     * PostgreSQL(운영)에서는 "DISTINCT는 ORDER BY 식이 select 목록에 있어야 한다" 제약에 걸린다.
+     * 목록은 페이지네이션 없이 전건을 이미 메모리에 올리므로 여기서 정렬해도 추가 비용이 없다.
+     * (동일 발주일시는 쿼리의 id desc 순서가 그대로 유지된다 — sorted()가 안정 정렬)
+     */
     public List<PurchaseOrder> findAllWithItems() {
-        return purchaseOrderRepository.findAllWithItems();
+        return purchaseOrderRepository.findAllWithItems().stream()
+                .sorted(Comparator.comparing(PurchaseOrderService::isClosed)
+                        .thenComparing(PurchaseOrder::getCreatedAt))
+                .toList();
     }
 }

@@ -58,6 +58,9 @@ nav.topnav .nav-logout { margin: 0; margin-left: 12px; }
 
 /* ---------- Tables ---------- */
 
+/* 넓은 표는 자체 영역에서 가로 스크롤 — 페이지 본문이 밀리지 않게 */
+.table-wrap { overflow-x: auto; }
+.table-wrap table { min-width: max-content; }
 table { width: 100%; border-collapse: collapse; background: var(--color-surface); border: 1px solid var(--color-border); }
 th, td { padding: 10px 14px; border-bottom: 1px solid var(--color-border); text-align: left; }
 th { background: #eef0f4; font-weight: 600; font-size: .9em; text-transform: uppercase; letter-spacing: .03em; color: var(--color-text-muted); }
@@ -76,7 +79,20 @@ input, select {
   font-size: 1em;
   background: var(--color-surface);
   color: var(--color-text);
+  height: 44px;              /* 버튼(44px)과 높이 고정 정렬 — select도 동일 */
+  line-height: 1.2;
 }
+/* 수동 재고 조정 폼: select·사유 폭 통일(수량 input은 인라인 80px 유지) */
+.form-row select, .form-row input[type="text"] { width: 200px; }
+.form-row select { vertical-align: middle; }
+
+/* 보충 요청 처리 칸: 승인/반려 폼을 콤팩트 행으로(겹침 방지). input 높이를 .sm 버튼(32px)에 맞춤 */
+.decision { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.decision:last-child { margin-bottom: 0; }
+.decision input[type="text"] { width: 150px; height: 32px; }
+
+/* 발주 상세: 취소·입고 처리 버튼을 테이블 아래 우측에 나란히 */
+.detail-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 input:focus, select:focus, button:focus, a.btn:focus, a.sm:focus {
   outline: 2px solid var(--color-primary);
   outline-offset: 1px;

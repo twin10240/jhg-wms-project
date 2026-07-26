@@ -7,9 +7,10 @@
   <h2>보충 요청 검토</h2>
   <div th:replace="~{fragments/layout :: flash}"></div>
 
+  <div class="table-wrap">
   <table>
     <thead>
-      <tr><th>ID</th><th>상태</th><th>품목</th><th>사유</th><th>요청/결정/완료 시각</th><th>처리</th></tr>
+      <tr><th>ID</th><th>상태</th><th>품목</th><th>수량</th><th>사유</th><th>요청/결정/완료 시각</th><th>처리</th></tr>
     </thead>
     <tbody>
       <tr th:each="request : ${requests}">
@@ -25,9 +26,10 @@
           </span>
         </td>
         <td>
-          <span th:each="item, stat : ${request.items}">
-            <span th:text="|상품#${item.productId} x${item.requestedQty}|">상품#1 x3</span><span th:if="${!stat.last}">, </span>
-          </span>
+          <div th:each="item : ${request.items}" th:text="|상품#${item.productId}|">상품#1</div>
+        </td>
+        <td>
+          <div th:each="item : ${request.items}" th:text="|${item.requestedQty}개|">3개</div>
         </td>
         <td th:text="${request.reason}">low stock</td>
         <td>
@@ -37,12 +39,12 @@
         </td>
         <td>
           <div th:if="${request.status.name() == 'REQUESTED'}" sec:authorize="hasRole('MANAGER')">
-            <form th:action="@{/admin/replenishment-requests/{id}/approve(id=${request.id})}" method="post">
+            <form class="decision" th:action="@{/admin/replenishment-requests/{id}/approve(id=${request.id})}" method="post">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
               <input type="text" name="wmsMemo" placeholder="승인 메모 (선택)" />
               <button class="sm" type="submit">승인</button>
             </form>
-            <form th:action="@{/admin/replenishment-requests/{id}/reject(id=${request.id})}" method="post">
+            <form class="decision" th:action="@{/admin/replenishment-requests/{id}/reject(id=${request.id})}" method="post">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
               <input type="text" name="wmsMemo" placeholder="거절 사유" required />
               <button class="sm" type="submit">거절</button>
@@ -54,9 +56,10 @@
           </div>
         </td>
       </tr>
-      <tr th:if="${#lists.isEmpty(requests)}"><td colspan="6">보충 요청이 없습니다.</td></tr>
+      <tr th:if="${#lists.isEmpty(requests)}"><td colspan="7">보충 요청이 없습니다.</td></tr>
     </tbody>
   </table>
+  </div>
 </main>
 </body>
 </html>

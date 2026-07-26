@@ -15,7 +15,8 @@
         <div>
           <label>상품 ID</label><br/>
           <select name="items[0].productId">
-            <option th:each="p : ${products}" th:value="${p.productId}" th:text="${p.productId}">1</option>
+            <option th:each="p : ${products}" th:value="${p.productId}"
+                    th:text="${p.productId + ' — ' + p.productName}">1 — 상품 1</option>
           </select>
         </div>
         <div>
@@ -45,9 +46,10 @@
     <a th:href="@{/admin/purchase-orders(status='RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RECEIVED'} ? 'active'">입고완료</a>
     <a th:href="@{/admin/purchase-orders(status='CANCELLED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'CANCELLED'} ? 'active'">취소됨</a>
   </div>
+  <div class="table-wrap">
   <table>
     <thead>
-      <tr><th>발주번호</th><th>상태</th><th>품목</th><th>메모</th><th>발주일시</th><th>입고일시</th><th>입고</th></tr>
+      <tr><th>발주번호</th><th>상태</th><th>상품ID</th><th>상품명</th><th>입고/발주</th><th>메모</th><th>발주일시</th><th>입고일시</th><th>입고</th></tr>
     </thead>
     <tbody>
       <tr th:each="po : ${purchaseOrders}">
@@ -62,9 +64,13 @@
           </span>
         </td>
         <td>
-          <span th:each="item, stat : ${po.items}">
-            <span th:text="|상품#${item.productId} ${item.receivedQty}/${item.quantity}|">상품#1 60/100</span><span th:if="${!stat.last}">, </span>
-          </span>
+          <div th:each="item : ${po.items}" th:text="${item.productId}">1</div>
+        </td>
+        <td>
+          <div th:each="item : ${po.items}" th:text="${productNames.get(item.productId)}">상품 1</div>
+        </td>
+        <td>
+          <div th:each="item : ${po.items}" th:text="|${item.receivedQty} / ${item.quantity}|">60 / 100</div>
         </td>
         <td th:text="${po.memo}">긴급</td>
         <td th:text="${#temporals.format(po.createdAt,'yyyy-MM-dd HH:mm')}">2026-07-01 10:00</td>
@@ -74,10 +80,11 @@
         </td>
       </tr>
       <tr th:if="${#lists.isEmpty(purchaseOrders)}">
-        <td colspan="7">발주 내역이 없습니다.</td>
+        <td colspan="9">발주 내역이 없습니다.</td>
       </tr>
     </tbody>
   </table>
+  </div>
 
   <script>
     function addLine() {

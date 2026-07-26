@@ -54,32 +54,63 @@ class WmsAdminControllerTest {
     }
 
     @Test
-    void inventory_화면에_transactions_모델이_담긴다() throws Exception {
+    void 이력화면에_transactions_모델이_담긴다() throws Exception {
         when(inventoryService.findTransactions(null)).thenReturn(List.of());
 
-        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")))
+        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
+                .andExpect(view().name("admin/inventory-transactions"))
                 .andExpect(model().attributeExists("transactions"));
     }
 
     @Test
-    void 재고화면_트랜잭션_유형_필터가_동작한다() throws Exception {
+    void 이력화면_트랜잭션_유형_필터가_동작한다() throws Exception {
         InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null);
         when(inventoryService.findTransactions(InventoryTransactionType.RECEIVE)).thenReturn(List.of(receive));
 
-        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")).param("type", "RECEIVE"))
+        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")).param("type", "RECEIVE"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("transactions", List.of(receive)))
                 .andExpect(model().attribute("filterType", InventoryTransactionType.RECEIVE));
     }
 
     @Test
+    void 이력화면은_상품명_한글유형_한글참조를_표시한다() throws Exception {
+        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
+        when(inventoryService.findTransactions(null)).thenReturn(List.of(
+                InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null),
+                InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null)));
+
+        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("productNames"))
+                .andExpect(content().string(containsString("출고")))      // SHIP 한글
+                .andExpect(content().string(containsString("주문 #52")))  // ORDER#52 한글
+                .andExpect(content().string(containsString("입고")))      // RECEIVE 한글
+                .andExpect(content().string(containsString("발주 #7")))   // PO#7 한글
+                .andExpect(content().string(containsString("12 → 10")))   // SHIP 변경 전 → 후
+                .andExpect(content().string(containsString("10 → 15")));  // RECEIVE 변경 전 → 후
+    }
+
+    @Test
+    void 재고화면은_이력_페이지_링크를_보여준다() throws Exception {
+        when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
+
+        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/admin/inventory/transactions")));
+    }
+
+    @Test
     void 대시보드_재고_발주_예약_요약을_모델에_담는다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(
                 new InventoryRowResponse(1L, "상품 1", 10, 3, 7),
-                new InventoryRowResponse(2L, "상품 2", 5, 0, 5)));
+                new InventoryRowResponse(2L, "상품 2", 5, 0, 5),
+                new InventoryRowResponse(3L, "상품 3", 0, 0, 0)));   // 가용 0
         when(purchaseOrderService.findAllWithItems()).thenReturn(List.of(
                 PurchaseOrder.create("대기", PurchaseOrderItem.create(1L, 10))));
+        when(replenishmentRequestService.findAll()).thenReturn(List.of(
+                ReplenishmentRequest.create(UUID.randomUUID(), "부족", ReplenishmentRequestItem.create(1L, 5))));
         Reservation shipped = Reservation.reserve(2L, Map.of(1L, 1));
         shipped.ship();
         when(inventoryService.findAllReservations()).thenReturn(List.of(Reservation.reserve(1L, Map.of(1L, 1)), shipped));
@@ -87,14 +118,18 @@ class WmsAdminControllerTest {
         mockMvc.perform(get("/").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/dashboard"))
-                .andExpect(model().attribute("skuCount", 2))
+                .andExpect(model().attribute("skuCount", 3))
                 .andExpect(model().attribute("totalOnHand", 15))
                 .andExpect(model().attribute("totalReserved", 3))
                 .andExpect(model().attribute("totalAvailable", 12))
                 .andExpect(model().attribute("orderedPoCount", 1L))
                 .andExpect(model().attribute("reservedCount", 1L))
                 .andExpect(model().attribute("shippedCount", 1L))
-                .andExpect(model().attribute("releasedCount", 0L));
+                .andExpect(model().attribute("releasedCount", 0L))
+                // 처리 대기 카드
+                .andExpect(model().attribute("pendingRequestCount", 1L))   // 검토 대기 보충 요청
+                .andExpect(model().attribute("partialPoCount", 0L))        // 부분 입고 발주
+                .andExpect(model().attribute("zeroAvailableCount", 1L));   // 가용 0 SKU
     }
 
     @Test

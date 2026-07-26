@@ -7,6 +7,17 @@
   <h2>대시보드</h2>
   <div class="cards">
     <div class="card">
+      <h3>처리 대기</h3>
+      <p class="big" th:text="${pendingRequestCount}">0</p>
+      <p class="label">검토 대기 보충 요청</p>
+      <p><a th:href="@{/admin/replenishment-requests}">보충 요청 검토 →</a></p>
+      <p>부분 입고 발주 <b th:text="${partialPoCount}">0</b> · 가용 0 SKU <b th:text="${zeroAvailableCount}">0</b></p>
+      <p>
+        <a th:href="@{/admin/purchase-orders(status='PARTIALLY_RECEIVED')}">부분 입고 →</a> ·
+        <a th:href="@{/admin/inventory}">재고 →</a>
+      </p>
+    </div>
+    <div class="card">
       <h3>재고</h3>
       <p class="big" th:text="${skuCount}">20</p>
       <p class="label">SKU</p>
@@ -22,7 +33,7 @@
     <div class="card">
       <h3>예약</h3>
       <p>
-        <span class="badge badge-reserved">예약 중</span> <b th:text="${reservedCount}">0</b><br/>
+        <span class="badge badge-reserved">예약</span> <b th:text="${reservedCount}">0</b><br/>
         <span class="badge badge-shipped">출고 완료</span> <b th:text="${shippedCount}">0</b><br/>
         <span class="badge badge-released">예약 해제</span> <b th:text="${releasedCount}">0</b>
       </p>

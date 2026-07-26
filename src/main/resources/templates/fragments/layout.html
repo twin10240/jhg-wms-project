@@ -10,6 +10,7 @@
     <span class="brand">JHG-WMS</span>
     <a th:href="@{/}" th:classappend="${active == 'dashboard'} ? 'active'">대시보드</a>
     <a th:href="@{/admin/inventory}" th:classappend="${active == 'inventory'} ? 'active'">재고</a>
+    <a th:href="@{/admin/inventory/transactions}" th:classappend="${active == 'transactions'} ? 'active'">이력</a>
     <a th:href="@{/admin/reservations}" th:classappend="${active == 'reservations'} ? 'active'">예약</a>
     <a th:href="@{/admin/purchase-orders}" th:classappend="${active == 'purchase-orders'} ? 'active'">발주</a>
     <a th:href="@{/admin/replenishment-requests}" th:classappend="${active == 'replenishment-requests'} ? 'active'">보충 요청</a>

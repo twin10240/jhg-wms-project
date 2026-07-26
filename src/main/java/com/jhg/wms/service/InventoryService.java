@@ -11,7 +11,6 @@ import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -154,7 +153,7 @@ public class InventoryService {
 
     /** 관리자 예약 화면·대시보드용 전체 예약 목록 (최신 먼저). */
     public List<Reservation> findAllReservations() {
-        return reservationRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+        return reservationRepository.findAllByOrderByIdDesc();   // qtyByProductId 즉시 페치(EntityGraph)
     }
 
     /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */

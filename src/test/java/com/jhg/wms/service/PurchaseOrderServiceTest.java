@@ -19,6 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,6 +73,34 @@ class PurchaseOrderServiceTest {
     /** 저장된 발주의 n번째 품목 id를 꺼낸다. */
     private Long itemIdOf(Long poId, int index) {
         return poRepo.findById(poId).orElseThrow().getItems().get(index).getId();
+    }
+
+    /** 발주일시를 명시적으로 지정한다(생성 시각이 마이크로초 차이라 테스트가 흔들리는 것을 막는다). */
+    private void setCreatedAt(Long poId, LocalDateTime at) {
+        ReflectionTestUtils.setField(poRepo.findById(poId).orElseThrow(), "createdAt", at);
+    }
+
+    @Test
+    void findAllWithItems_오래된_발주부터_보여주되_종료된_건은_뒤로_보낸다() {
+        inventoryRepo.save(com.jhg.wms.domain.Inventory.create(1L, "상품 1", 100));
+        Long oldestCancelled = service.create(List.of(new PurchaseOrderLine(1L, 5)), "가장 오래됨 - 취소됨");
+        Long oldestDone = service.create(List.of(new PurchaseOrderLine(1L, 5)), "오래됨 - 입고완료");
+        Long older = service.create(List.of(new PurchaseOrderLine(1L, 5)), "오래됨 - 대기");
+        Long newer = service.create(List.of(new PurchaseOrderLine(1L, 5)), "최신 - 대기");
+
+        service.cancel(oldestCancelled);                                            // → CANCELLED
+        service.receive(oldestDone, java.util.Map.of(itemIdOf(oldestDone, 0), 5));  // 전량 입고 → RECEIVED
+        setCreatedAt(oldestCancelled, LocalDateTime.of(2026, 1, 1, 8, 0));
+        setCreatedAt(oldestDone, LocalDateTime.of(2026, 1, 1, 9, 0));
+        setCreatedAt(older, LocalDateTime.of(2026, 1, 2, 9, 0));
+        setCreatedAt(newer, LocalDateTime.of(2026, 1, 3, 9, 0));
+        poRepo.flush();
+
+        List<PurchaseOrder> result = service.findAllWithItems();
+
+        // 미완료가 오래된 순으로 먼저, 종료된 건(입고완료·취소됨)은 가장 오래됐어도 맨 뒤
+        assertThat(result).extracting(PurchaseOrder::getId)
+                .containsExactly(older, newer, oldestCancelled, oldestDone);
     }
 
     @Test

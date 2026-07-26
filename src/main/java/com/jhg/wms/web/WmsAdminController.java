@@ -31,8 +31,15 @@ public class WmsAdminController {
         model.addAttribute("totalOnHand", rows.stream().mapToInt(InventoryRowResponse::onHandQty).sum());
         model.addAttribute("totalReserved", rows.stream().mapToInt(InventoryRowResponse::reservedQty).sum());
         model.addAttribute("totalAvailable", rows.stream().mapToInt(InventoryRowResponse::availableQty).sum());
-        model.addAttribute("orderedPoCount", purchaseOrderService.findAllWithItems().stream()
+        model.addAttribute("zeroAvailableCount", rows.stream().filter(r -> r.availableQty() == 0).count());
+
+        List<PurchaseOrder> pos = purchaseOrderService.findAllWithItems();
+        model.addAttribute("orderedPoCount", pos.stream()
                 .filter(po -> po.getStatus() == PurchaseOrderStatus.ORDERED).count());
+        model.addAttribute("partialPoCount", pos.stream()
+                .filter(po -> po.getStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED).count());
+        model.addAttribute("pendingRequestCount", replenishmentRequestService.findAll().stream()
+                .filter(r -> r.getStatus() == ReplenishmentRequestStatus.REQUESTED).count());
         Map<ReservationStatus, Long> resCounts = inventoryService.findAllReservations().stream()
                 .collect(Collectors.groupingBy(Reservation::getStatus, Collectors.counting()));
         model.addAttribute("reservedCount", resCounts.getOrDefault(ReservationStatus.RESERVED, 0L));
@@ -48,15 +55,24 @@ public class WmsAdminController {
             reservations = reservations.stream().filter(r -> r.getStatus() == status).toList();
         model.addAttribute("reservations", reservations);
         model.addAttribute("activeStatus", status);
+        model.addAttribute("productNames", inventoryService.findAllRows().stream()
+                .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         return "admin/reservations";
     }
 
     @GetMapping("/admin/inventory")
-    public String inventory(@RequestParam(required = false) InventoryTransactionType type, Model model) {
+    public String inventory(Model model) {
         model.addAttribute("products", inventoryService.findAllRows());
+        return "admin/inventory";
+    }
+
+    @GetMapping("/admin/inventory/transactions")
+    public String inventoryTransactions(@RequestParam(required = false) InventoryTransactionType type, Model model) {
+        model.addAttribute("productNames", inventoryService.findAllRows().stream()
+                .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         model.addAttribute("transactions", inventoryService.findTransactions(type));
         model.addAttribute("filterType", type);
-        return "admin/inventory";
+        return "admin/inventory-transactions";
     }
 
     @PostMapping("/admin/inventory/adjust")
@@ -79,7 +95,10 @@ public class WmsAdminController {
             pos = pos.stream().filter(po -> po.getStatus() == status).toList();
         model.addAttribute("purchaseOrders", pos);
         model.addAttribute("activeStatus", status);
-        model.addAttribute("products", inventoryService.findAllRows());
+        List<InventoryRowResponse> rows = inventoryService.findAllRows();
+        model.addAttribute("products", rows);
+        model.addAttribute("productNames", rows.stream()
+                .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         return "admin/purchaseorders";
     }
 
