@@ -182,4 +182,18 @@ class PurchaseOrderTest {
         po.cancel();
         assertThatThrownBy(po::cancel).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void receive_취소된_발주는_입고할_수_없다() {
+        PurchaseOrder po = PurchaseOrder.create("m", item(1L, 1L, 10));
+        po.receive(Map.of(1L, 5));   // 부분 입고 후 취소
+        po.cancel();
+
+        assertThatThrownBy(() -> po.receive(Map.of(1L, 5)))
+                .isInstanceOf(IllegalStateException.class);
+
+        // 취소가 되살아나지 않고, 기존 입고량도 그대로여야 한다
+        assertThat(po.getStatus()).isEqualTo(PurchaseOrderStatus.CANCELLED);
+        assertThat(po.getItems().get(0).getReceivedQty()).isEqualTo(5);
+    }
 }

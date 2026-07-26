@@ -51,6 +51,8 @@ public class PurchaseOrder {
     public Map<Long, Integer> receive(Map<Long, Integer> qtyByItemId) {
         if (status == PurchaseOrderStatus.RECEIVED)
             throw new IllegalStateException("이미 입고 처리된 발주입니다. (발주 #" + id + ")");
+        if (status == PurchaseOrderStatus.CANCELLED)
+            throw new IllegalStateException("취소된 발주는 입고할 수 없습니다. (발주 #" + id + ")");
 
         Map<Long, PurchaseOrderItem> byItemId = new LinkedHashMap<>();
         items.forEach(item -> byItemId.put(item.getId(), item));
