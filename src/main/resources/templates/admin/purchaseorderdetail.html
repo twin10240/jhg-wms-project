@@ -21,6 +21,9 @@
     · 입고완료일시: <span th:text="${po.receivedAt != null} ? ${#temporals.format(po.receivedAt,'yyyy-MM-dd HH:mm')} : '—'">—</span>
   </p>
 
+  <!-- 진행 중 발주만 입고·취소 가능(ORDERED·PARTIALLY_RECEIVED) -->
+  <div th:with="receivable=${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}" th:remove="tag">
+
   <form id="poReceive" th:action="@{'/admin/purchase-orders/' + ${po.id} + '/receive'}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
     <table>
@@ -39,8 +42,10 @@
               <input type="hidden" th:name="|items[${stat.index}].quantity|" value="0" />
             </span>
             <span th:unless="${item.fullyReceived}">
-              <input type="number" th:name="|items[${stat.index}].quantity|"
+              <!-- 진행 중(발주됨·부분 입고)일 때만 입력 — 취소·완료 발주엔 제출 수단이 없으므로 표시하지 않는다 -->
+              <input th:if="${receivable}" type="number" th:name="|items[${stat.index}].quantity|"
                      min="0" th:max="${item.remainingQty()}" value="0" style="width:80px" />
+              <span th:unless="${receivable}">—</span>
             </span>
           </td>
         </tr>
@@ -49,8 +54,7 @@
   </form>
 
   <!-- 발주 취소 폼(빈 폼) — 버튼은 아래 액션 행에서 form= 속성으로 제출 -->
-  <form id="poCancel" sec:authorize="hasRole('MANAGER')"
-        th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}"
+  <form id="poCancel" sec:authorize="hasRole('MANAGER')" th:if="${receivable}"
         th:action="@{/admin/purchase-orders/{id}/cancel(id=${po.id})}" method="post"
         onsubmit="return confirm('이 발주를 취소하시겠습니까? 이미 입고된 수량은 유지됩니다.');">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -59,10 +63,10 @@
   <!-- 테이블 아래 우측: 발주 취소 · 입고 처리 나란히 -->
   <div class="detail-actions">
     <button type="submit" form="poCancel" class="btn btn--danger"
-            sec:authorize="hasRole('MANAGER')"
-            th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}">발주 취소</button>
-    <button type="submit" form="poReceive"
-            th:if="${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}">입고 처리</button>
+            sec:authorize="hasRole('MANAGER')" th:if="${receivable}">발주 취소</button>
+    <button type="submit" form="poReceive" th:if="${receivable}">입고 처리</button>
+  </div>
+
   </div>
 
   <p><a th:href="@{/admin/purchase-orders}">← 발주 목록</a></p>

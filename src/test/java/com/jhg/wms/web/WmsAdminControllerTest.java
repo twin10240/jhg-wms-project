@@ -20,6 +20,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -287,6 +288,20 @@ class WmsAdminControllerTest {
     void OPERATOR는_보충요청_승인이_403() throws Exception {
         mockMvc.perform(post("/admin/replenishment-requests/7/approve").with(user("op").roles("OPERATOR")).with(csrf()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 취소된_발주_상세는_입고_입력칸을_보여주지_않는다() throws Exception {
+        PurchaseOrderItem item = PurchaseOrderItem.create(1L, 10);
+        ReflectionTestUtils.setField(item, "id", 42L);
+        PurchaseOrder po = PurchaseOrder.create("취소 대상", item);
+        po.cancel();
+        when(purchaseOrderService.findWithItems(1L)).thenReturn(po);
+
+        mockMvc.perform(get("/admin/purchase-orders/1").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("취소됨")))
+                .andExpect(content().string(not(containsString("type=\"number\""))));   // 입고 입력칸 없음
     }
 
     @Test
