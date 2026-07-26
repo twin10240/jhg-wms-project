@@ -21,9 +21,9 @@
 
 ## 포트폴리오 1차 완료 조건
 
-- [~] OMS 기준 [통합 수동 검증](https://github.com/twin10240/jhg-commerce-project/blob/master/docs/manual-verification-scenarios.md) 실행
-  — WMS 단독분(로그인·API 401·보충요청·부분입고·발주취소·조정·원장·권한·대시보드) 32/32 통과.
-  **OMS 연동분(주문·취소·백오더·FIFO·출고)과 장애 복구는 미실행** — 두 앱을 함께 띄워 수행
+- [x] OMS 기준 [통합 수동 검증](https://github.com/twin10240/jhg-commerce-project/blob/master/docs/manual-verification-scenarios.md) 실행
+  — WMS 단독분(로그인·API 401·보충요청·부분입고·발주취소·조정·원장·권한·대시보드) 32/32 자동 통과,
+  OMS 연동분(주문·예약·취소·백오더·FIFO·출고)과 장애 복구는 기준본 절차로 수행
 - [x] 발주 취소·부분입고·원장·권한 시나리오 증거 기록 (2026-07-26, 캡처 15장)
 - [x] WMS 전체 테스트 재실행 (157개 통과, CI green)
 - [x] 핵심 관리자 화면 375px·1280px 확인 (2026-07-26, 레이아웃 이상 없음)
