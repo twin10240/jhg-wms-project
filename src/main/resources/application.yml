@@ -36,6 +36,10 @@ spring:
 # OMS가 8080이므로 WMS는 8081로 동시 기동 가능. Railway는 PORT 주입(Variables로 8081 고정 권장).
 server:
   port: ${PORT:8081}
+  servlet:
+    session:
+      cookie:
+        name: WMSSESSION
 
 # 재고 보충 콜백(채널3) 대상 — OMS. 운영은 OMS_BASE_URL 주입(Railway private networking).
 # callback.user/password는 OMS가 검증하는 Basic Auth 자격증명 — OMS 쪽에도 동일 값 필수.

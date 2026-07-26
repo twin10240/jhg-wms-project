@@ -1,3 +1,9 @@
+server:
+  servlet:
+    session:
+      cookie:
+        name: WMSSESSION
+
 spring:
   # 테스트는 임베디드 H2(create-drop) — TCP 서버 불필요, 실 DB 오염 없음.
   datasource:
