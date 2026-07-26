@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OMS · WMS 연동 프로젝트 — 포트폴리오</title>
+<style>
+  :root{
+    --ink:#16181d; --muted:#5b6472; --line:#e3e6ea; --bg:#fff; --soft:#f6f8fa;
+    --accent:#2f5bea; --accent-soft:#eef2ff; --warn:#92600a; --warn-soft:#fff4d6;
+    --ok:#166534; --ok-soft:#dcfce7; --danger:#9b1c1c; --danger-soft:#fde8e8;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;
+    line-height:1.75; font-size:16px; letter-spacing:-0.01em;
+  }
+  .wrap{max-width:940px; margin:0 auto; padding:56px 24px 96px}
+
+  /* ── 헤더 ── */
+  header{border-bottom:2px solid var(--ink); padding-bottom:28px; margin-bottom:44px}
+  .eyebrow{font-size:.85rem; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; margin:0 0 10px}
+  h1{font-size:2.1rem; line-height:1.3; margin:0 0 14px; letter-spacing:-0.03em}
+  .lede{font-size:1.12rem; color:#333; margin:0 0 24px}
+  .lede b{color:var(--ink)}
+  .meta{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{
+    display:inline-block; padding:5px 12px; border-radius:999px;
+    background:var(--soft); border:1px solid var(--line); font-size:.85rem; color:var(--muted);
+  }
+  .chip b{color:var(--ink); font-weight:600}
+
+  /* ── 섹션 ── */
+  section{margin:0 0 60px; scroll-margin-top:20px}
+  h2{
+    font-size:1.35rem; margin:0 0 6px; letter-spacing:-0.02em;
+    display:flex; align-items:baseline; gap:12px;
+  }
+  h2 .num{
+    font-size:.8rem; color:var(--accent); background:var(--accent-soft);
+    padding:3px 9px; border-radius:6px; font-weight:700; letter-spacing:0;
+  }
+  h3{font-size:1.02rem; margin:32px 0 8px; letter-spacing:-0.01em}
+  .sub{color:var(--muted); margin:0 0 22px; font-size:.95rem}
+  p{margin:0 0 14px}
+  ul{margin:0 0 14px; padding-left:20px}
+  li{margin:5px 0}
+  code{
+    background:var(--soft); border:1px solid var(--line); border-radius:5px;
+    padding:1px 5px; font-size:.87em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+
+  /* ── 표 ── */
+  .tw{overflow-x:auto; margin:0 0 18px}
+  table{width:100%; border-collapse:collapse; font-size:.93rem; min-width:520px}
+  th,td{text-align:left; padding:11px 13px; border-bottom:1px solid var(--line); vertical-align:top}
+  thead th{background:var(--soft); font-weight:600; white-space:nowrap; border-bottom:2px solid var(--line)}
+  tbody tr:last-child td{border-bottom:none}
+
+  /* ── 강조 박스 ── */
+  .callout{
+    border-left:3px solid var(--accent); background:var(--accent-soft);
+    padding:14px 18px; border-radius:0 var(--radius) var(--radius) 0; margin:0 0 20px;
+  }
+  .callout.warn{border-color:#d4a017; background:var(--warn-soft)}
+  .callout p:last-child{margin-bottom:0}
+  .callout .label{font-size:.78rem; font-weight:700; letter-spacing:.05em; color:var(--muted); display:block; margin-bottom:4px}
+
+  /* ── 이미지 ── */
+  figure{margin:0 0 26px}
+  figure img{
+    width:100%; height:auto; display:block;
+    border:1px solid var(--line); border-radius:var(--radius);
+  }
+  figcaption{font-size:.86rem; color:var(--muted); margin-top:8px; padding-left:2px}
+  figcaption b{color:var(--ink)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media (max-width:720px){ .grid2{grid-template-columns:1fr} }
+
+  /* ── 흐름 스텝 ── */
+  .step{border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; margin:0 0 18px}
+  .step-head{display:flex; align-items:baseline; gap:10px; margin-bottom:6px}
+  .step-num{
+    font-size:.75rem; font-weight:700; color:#fff; background:var(--ink);
+    border-radius:5px; padding:2px 8px; letter-spacing:.03em; flex:none;
+  }
+  .step h4{margin:0; font-size:1rem}
+  .step .why{color:var(--muted); font-size:.92rem; margin:6px 0 16px}
+
+  /* ── 배지 ── */
+  .b{display:inline-block; padding:1px 8px; border-radius:999px; font-size:.8rem; font-weight:600; white-space:nowrap}
+  .b-ok{background:var(--ok-soft); color:var(--ok)}
+  .b-warn{background:var(--warn-soft); color:var(--warn)}
+  .b-off{background:#f1f1f1; color:#6b7280}
+  .b-info{background:var(--accent-soft); color:var(--accent)}
+
+  /* ── 아키텍처 도식 ── */
+  .arch{
+    display:grid; grid-template-columns:1fr 1.15fr 1fr; gap:0; align-items:stretch;
+    border:1px solid var(--line); border-radius:var(--radius);
+    background:linear-gradient(180deg,#fbfcfd,#f6f8fa);
+    padding:26px 22px; margin:0 0 12px;
+  }
+  .actor{
+    text-align:center; font-size:.8rem; color:var(--muted);
+    margin-bottom:10px; line-height:1.5;
+  }
+  .actor b{display:block; color:var(--ink); font-size:.88rem}
+  .actor .down{display:block; color:#c9ced6; font-size:1rem; line-height:1.2; margin-top:2px}
+
+  .node{
+    background:#fff; border:1.5px solid var(--ink); border-radius:var(--radius);
+    padding:16px 18px; display:flex; flex-direction:column; gap:2px;
+  }
+  .node--wms{border-color:var(--accent)}
+  .node-title{font-size:1.05rem; font-weight:700; letter-spacing:-0.01em}
+  .node--wms .node-title{color:var(--accent)}
+  .node-sub{font-size:.76rem; color:var(--muted); margin-bottom:9px}
+  .node-list{list-style:none; margin:0; padding:0; font-size:.87rem}
+  .node-list li{margin:3px 0; color:#333}
+  .node-list li::before{content:"·"; color:var(--muted); margin-right:6px}
+  .node-db{
+    margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);
+    font-size:.78rem; color:var(--muted);
+  }
+  .node-db b{color:var(--ink)}
+
+  /* 채널(화살표) */
+  .channels{display:flex; flex-direction:column; justify-content:center; gap:14px; padding:0 14px}
+  .ch{position:relative}
+  .ch-label{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    font-size:.79rem; color:#333; margin-bottom:5px; text-align:center; line-height:1.35;
+  }
+  .ch-tag{
+    font-size:.7rem; font-weight:700; color:#fff;
+    background:var(--muted); border-radius:4px; padding:1px 6px; flex:none;
+  }
+  .ch-code{
+    font-size:.66rem; font-weight:600; color:var(--muted);
+    background:var(--soft); border:1px solid var(--line); border-radius:3px;
+    padding:0 4px; flex:none;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  .ch--right .ch-tag{background:var(--ink)}
+  .ch--left  .ch-tag{background:var(--accent)}
+  .ch-line{position:relative; height:2px; background:var(--line); border-radius:2px}
+  .ch--right .ch-line{background:var(--ink)}
+  .ch--left  .ch-line{background:var(--accent)}
+  .ch--both  .ch-line{background:repeating-linear-gradient(90deg,var(--muted) 0 6px,transparent 6px 11px); height:2px}
+  .ch-line::after,.ch-line::before{content:""; position:absolute; top:50%; width:0; height:0}
+  .ch--right .ch-line::after{
+    right:-1px; transform:translateY(-50%);
+    border-left:7px solid var(--ink); border-top:5px solid transparent; border-bottom:5px solid transparent;
+  }
+  .ch--left .ch-line::before{
+    left:-1px; transform:translateY(-50%);
+    border-right:7px solid var(--accent); border-top:5px solid transparent; border-bottom:5px solid transparent;
+  }
+  .ch--both .ch-line::after{
+    right:-1px; transform:translateY(-50%);
+    border-left:7px solid var(--muted); border-top:5px solid transparent; border-bottom:5px solid transparent;
+  }
+  .ch--both .ch-line::before{
+    left:-1px; transform:translateY(-50%);
+    border-right:7px solid var(--muted); border-top:5px solid transparent; border-bottom:5px solid transparent;
+  }
+  .arch-note{font-size:.82rem; color:var(--muted); margin:0 0 18px; text-align:center}
+
+  @media (max-width:760px){
+    .arch{grid-template-columns:1fr; gap:16px}
+    .channels{padding:0}
+    .ch-line{display:none}
+    .ch-label{justify-content:flex-start; background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:7px 10px; margin:0}
+    .ch--right .ch-label::after{content:"→ WMS"; color:var(--muted); font-size:.74rem}
+    .ch--left  .ch-label::after{content:"→ OMS"; color:var(--muted); font-size:.74rem}
+  }
+  footer{border-top:1px solid var(--line); padding-top:22px; color:var(--muted); font-size:.88rem}
+  a{color:var(--accent)}
+
+  /* ── 인쇄 / PDF ── */
+  @media print{
+    /* 배경색·배지가 인쇄에서 빠지지 않도록 */
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    body{font-size:10.5pt; line-height:1.6}
+    .wrap{max-width:none; padding:0}
+
+    /* 카드·표·이미지가 페이지 중간에 잘리지 않게 */
+    .step, figure, .callout, .arch, .tw, table, .node{ break-inside:avoid; page-break-inside:avoid; }
+    section{ break-inside:auto; margin-bottom:26px }
+    h2{ break-after:avoid; page-break-after:avoid }
+    h3{ break-after:avoid }
+    figcaption{ break-before:avoid }
+
+    header{ break-after:avoid }
+    section:nth-of-type(1){ break-before:avoid }
+
+    /* 스크린 전용 여백 축소 */
+    figure{margin-bottom:16px}
+    .step{margin-bottom:12px}
+    a{color:var(--ink); text-decoration:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">OMS · WMS Portfolio · 2025.08 – 2026.07</p>
+  <h1>주문과 창고를 두 시스템으로 나누고,<br />그 사이의 재고 정합성을 지키다</h1>
+  <p class="lede">
+    <b>Spring Boot·JPA를 익히려 만든 작은 커머스 앱</b>에서 시작했습니다. 그런데 만들수록
+    ERP 웹 개발로 다뤄온 <b>주문·재고 도메인</b>이 겹쳐 보였고, 기능을 늘리는 대신
+    <b>실무에서 겪던 문제를 처음부터 직접 설계해보는 쪽</b>으로 방향을 바꿨습니다.
+  </p>
+  <p class="lede">
+    방향을 가른 것은 <b>“재고가 없어도 주문을 받는다(백오더)”</b>는 정책이었습니다. 이 하나를 넣자 주문과 재고의 관심사가 충돌했고,
+    결국 <b>주문(OMS)과 창고(WMS)를 별개 애플리케이션·별개 DB로 분리</b>한 뒤 그 사이의 정합성을 어떻게 보장할 것인가가 프로젝트의 본론이 되었습니다.
+  </p>
+  <div class="meta">
+    <span class="chip"><b>2</b>개 서비스 · <b>2</b>개 DB</span>
+    <span class="chip">커밋 <b>285</b></span>
+    <span class="chip">테스트 <b>337</b></span>
+    <span class="chip">Java 17 / 21 · Spring Boot 3.5</span>
+    <span class="chip">JPA · QueryDSL · Thymeleaf</span>
+    <span class="chip">Docker · PostgreSQL · Redis · Nginx</span>
+  </div>
+</header>
+
+<!-- ══════════ 1. 문제 정의 ══════════ -->
+<section>
+  <h2><span class="num">01</span> 문제 정의 — 왜 시스템을 둘로 나눴나</h2>
+  <p class="sub">기능을 더하다 만난 구조적 충돌</p>
+
+  <p>
+    처음 목표는 <b>Spring Boot와 JPA를 손에 익히는 것</b>이었습니다. 그래서 상품·장바구니·주문이 있는 작은 커머스 앱을 만들었고,
+    거기까지는 흔한 학습용 CRUD였습니다.
+  </p>
+  <p>
+    방향이 바뀐 것은 <b>“그럼 재고가 없으면 어떻게 되지?”</b>라는 질문에서였습니다. 실무에서 다루던 도메인이라 답이 먼저 보였습니다 —
+    유통 현장에서는 재고가 없다고 주문을 막지 않습니다. <b>입고 대기(백오더)로 받아둔 뒤 입고 순서대로 충족</b>시키죠.
+    이 정책 하나를 넣자 주문 시스템이 창고의 일을 하기 시작했습니다: 발주를 넣고, 입고를 기록하고, 언제 물건이 들어오는지 관리해야 했으니까요.
+    <b>학습용 CRUD로 끝낼 게 아니라, 도메인 지식을 넣어 제대로 설계해보자</b>고 방향을 정한 지점입니다.
+  </p>
+  <p>
+    ERP에서 <b>주문 모듈과 재고 모듈이 한 DB를 공유할 때 생기는 문제</b>는 실무에서 겪어온 것이었습니다.
+    재고 수량이 여러 화면·여러 트랜잭션에서 수정되면서 “지금 이 숫자를 누가 바꿨는지” 추적이 어려워지고,
+    한쪽 요구사항 변경이 다른 쪽을 건드리는 상황이 반복됩니다.
+    그래서 이번에는 <b>편의를 포기하더라도 경계를 물리적으로 나누고</b>, 그 대가(네트워크 실패·지연)를 설계로 감당해보기로 했습니다.
+  </p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>단계</th><th>한 일</th><th>상태</th></tr></thead>
+    <tbody>
+      <tr><td>Phase 1</td><td>주문 정책 전환 — 예약/백오더 모델 도입(모놀리스 내부)</td><td><span class="b b-ok">완료</span></td></tr>
+      <tr><td>Phase 2</td><td>모듈 경계 분리 — <code>contract</code> 포트로만 통신, 패키지 순환 제거</td><td><span class="b b-ok">완료</span></td></tr>
+      <tr><td>Phase 3</td><td><b>WMS 물리 분리</b> — 별도 앱·별도 DB·REST 통신</td><td><span class="b b-ok">완료</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <span class="label">핵심 질문</span>
+    <p>둘로 나누면 <b>“재고가 몇 개인가”라는 질문에 답이 두 개 생길 위험</b>이 따라옵니다. 이 프로젝트의 모든 설계 결정은 이 위험을 없애는 방향으로 내려졌습니다.</p>
+  </div>
+</section>
+
+<!-- ══════════ 2. 아키텍처 ══════════ -->
+<section>
+  <h2><span class="num">02</span> 아키텍처 — 문제에 대한 답</h2>
+  <p class="sub">경계를 긋고, 그 경계를 계약으로만 넘나들게 했습니다</p>
+
+<div class="arch">
+  <div>
+    <div class="actor"><b>고객</b><span class="down">▼</span></div>
+    <div class="node">
+      <div class="node-title">OMS</div>
+      <div class="node-sub">주문관리시스템 · :8080</div>
+      <ul class="node-list">
+        <li>주문 · 장바구니</li>
+        <li>고객 · 결제 흐름</li>
+        <li>백오더 · FIFO 승격</li>
+      </ul>
+      <div class="node-db"><b>OMS DB</b> — 주문 · 고객<br />재고 수량은 <b>저장하지 않음</b></div>
+    </div>
+  </div>
+
+  <div class="channels">
+    <div class="ch ch--right">
+      <div class="ch-label"><span class="ch-tag">조회</span>가용 재고 <span class="ch-code">S1</span></div>
+      <div class="ch-line"></div>
+    </div>
+    <div class="ch ch--right">
+      <div class="ch-label"><span class="ch-tag">이행</span>예약 · 출고 · 해제 <span class="ch-code">S2</span></div>
+      <div class="ch-line"></div>
+    </div>
+    <div class="ch ch--left">
+      <div class="ch-label"><span class="ch-tag">통지</span>재고 증가 <span class="ch-code">S3</span></div>
+      <div class="ch-line"></div>
+    </div>
+    <div class="ch ch--both">
+      <div class="ch-label"><span class="ch-tag">복원</span>타임아웃 · 보상 스윕 <span class="ch-code">S4</span></div>
+      <div class="ch-line"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="actor"><b>운영자</b>OPERATOR · MANAGER<span class="down">▼</span></div>
+    <div class="node node--wms">
+      <div class="node-title">WMS</div>
+      <div class="node-sub">창고관리시스템 · :8081</div>
+      <ul class="node-list">
+        <li>재고 수량 · 예약</li>
+        <li>발주 · 부분 입고</li>
+        <li>재고 트랜잭션 원장</li>
+      </ul>
+      <div class="node-db"><b>WMS DB</b> — 재고 · 예약 · 발주 · 원장<br />재고의 <b>정본(source of truth)</b></div>
+    </div>
+  </div>
+</div>
+<p class="arch-note">두 서비스는 서로의 DB를 알지 못하고, <b>4개의 REST 채널로만</b> 통신합니다. <span class="ch-code">S1</span>~<span class="ch-code">S4</span>는 저장소 문서에서 쓰는 채널 번호입니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th></th><th>OMS (주문)</th><th>WMS (창고)</th></tr></thead>
+    <tbody>
+      <tr><td><b>소유 도메인</b></td><td>주문·장바구니·고객·판매, 백오더</td><td>재고 수량·예약·발주·입고·재고 원장</td></tr>
+      <tr><td><b>재고에 대해</b></td><td>REST API로 조회 + “보충해줘” 요청</td><td><b>재고 정본.</b> 조정·발주·입고·요청 승인</td></tr>
+      <tr><td><b>관리자 권한</b></td><td>재고 조정·발주·입고 <b>없음</b>(설계상 제거)</td><td>위 전부 소유 (OPERATOR / MANAGER)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <figure>
+    <img src="images/10-oms-admin-inventory-backorder-summary.png" alt="OMS 재고 현황 화면" />
+    <figcaption>
+      <b>경계가 실제로 동작하는 모습.</b> OMS 관리자 화면이지만 재고 수량은 OMS가 저장한 값이 아니라 <b>WMS에 실시간으로 물어본 값</b>입니다.
+      여기에 OMS가 아는 정보(백오더 수요)를 겹쳐 보여줍니다 — <code>백오더 총수량 31 = 입고 필요 1 + 할당 대기 30</code>.
+      OMS 관리자에게 <b>보충 요청 버튼만 있고 재고 조정 버튼이 없는 것</b>도 의도된 설계입니다.
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ══════════ 3. 핵심 설계 결정 ══════════ -->
+<section>
+  <h2><span class="num">03</span> 핵심 설계 결정 3가지</h2>
+  <p class="sub">“왜 그렇게 했는가”가 이 프로젝트에서 가장 중요한 부분입니다</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">결정 1</span><h4>재고의 정본을 WMS 한 곳에 둔다</h4></div>
+    <p class="why">두 DB가 각자 재고를 가지면 동기화가 필요하고, 동기화는 반드시 어긋납니다.</p>
+    <p>
+      OMS는 재고 수량을 <b>저장하지 않습니다.</b> 필요할 때마다 <b>WMS의 REST API를 호출해</b> 조회하고, 예약·출고·해제 같은 차감도 전부 API 호출로만 합니다.
+      사본이 없으므로 <b>“어긋난 재고”라는 버그 자체가 존재할 수 없습니다.</b> 미러링이 아니라 라이브 리드입니다.
+    </p>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">결정 2</span><h4>예약 모델 — 가용 = 실물 − 예약</h4></div>
+    <p class="why">재고 5개에 동시 주문 10건이 들어오면 다 팔아버리는(오버셀) 문제.</p>
+    <p>
+      주문 접수 시점에 <b>예약</b>을 잡고, 실물은 <b>출고 시점</b>에 빠집니다. 그 사이 상태(“팔렸지만 아직 안 나간 물건”)를 시스템이 표현할 수 있게 됩니다.
+      예약은 <code>orderId</code> UNIQUE로 <b>멱등</b>이라 재시도해도 이중 차감되지 않고, 전부-아니면-실패(원자적)로 처리해 부분 예약이 남지 않습니다.
+    </p>
+    <figure style="margin-top:16px">
+      <img src="images/06-wms-reservation-order-1.png" alt="WMS 예약 현황" />
+      <figcaption><b>WMS 관점</b> — OMS 주문 하나가 예약으로 잡힌 모습. 보유 수량은 그대로이고 <b>예약만 늘어 가용이 줄어듭니다.</b></figcaption>
+    </figure>
+    <figure>
+      <img src="images/19-oms-admin-inventory.png" alt="OMS 재고 현황" />
+      <figcaption>
+        <b>OMS 관점</b> — 같은 모델이 관리자 화면에서 <code>가용 = 보유 − 예약</code>으로 드러납니다.
+        상품 2·3은 <b>보유는 있지만 전량 예약</b>돼 가용이 0이라 <span class="b b-warn">품절</span>로 표시됩니다 —
+        “물건은 창고에 있지만 이미 팔린” 상태를 재고 수량 하나로는 표현할 수 없습니다.
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">결정 3</span><h4>모든 재고 이동을 원장에 남긴다</h4></div>
+    <p class="why">“이 수량이 왜 이렇게 됐지?”에 답할 수 없으면 재고 시스템을 신뢰할 수 없습니다.</p>
+    <p>
+      입고·출고·조정·초기 시드가 <b>전부 한 지점(<code>InventoryService.applyDelta</code>)을 통과</b>하도록 만들어, 원장 누락이 구조적으로 불가능하게 했습니다.
+      각 행은 변동량·<b>변경 전/후 수량</b>·참조(<code>발주 #N</code>, <code>주문 #N</code>)를 남깁니다.
+      불변식은 <b>상품별 원장 delta 합 == 현재 보유수량</b>이며, 테스트로 검증합니다.
+    </p>
+    <figure style="margin-top:16px">
+      <img src="images/inventory-ledger.png" alt="재고 트랜잭션 이력" />
+      <figcaption>재고 트랜잭션 이력. 어떤 발주·주문 때문에 수량이 <b>28 → 33</b>으로 바뀌었는지 한 줄로 추적됩니다.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ══════════ 4. 동작 흐름 ══════════ -->
+<section>
+  <h2><span class="num">04</span> 동작 흐름 — 두 시스템이 실제로 맞물리는 과정</h2>
+  <p class="sub">재고 없는 주문이 접수되고, 창고가 채우고, 자동으로 충족되기까지</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">1</span><h4>재고가 있는 주문 — 예약이 잡히고, 취소하면 풀린다</h4></div>
+    <p>고객 화면의 재고 수치는 OMS가 저장한 값이 아니라 <b>화면을 그릴 때마다 WMS의 REST API를 호출해 받아온 가용 수량</b>입니다.
+    가용 범위 안의 주문은 <span class="b b-ok">재고 확보</span> 상태가 되고, 그 순간 WMS에 <b>예약</b>이 걸립니다 — 보유 수량은 그대로인 채 가용만 줄어듭니다.</p>
+    <p>출고 전에 취소하면 예약이 해제되어 <b>가용 수량이 복구</b>됩니다. 실물은 애초에 창고를 떠나지 않았으므로 보유 수량은 변하지 않습니다.
+    이 “예약과 실물의 분리”가 이후 백오더·부분 입고·출고를 모두 지탱하는 토대입니다.</p>
+    <figure style="margin-top:16px">
+      <img src="images/18-oms-main-page.png" alt="고객 상품 목록" />
+      <figcaption>
+        고객 상품 목록 — 카드의 <b>가용 재고</b>는 OMS가 저장한 값이 아니라 <b>WMS의 REST API를 호출해 받아온 값</b>입니다.
+        상품2처럼 가용이 0인 상품은 구매를 막는 대신 <span class="b b-warn">입고 대기</span>로 표시해 <b>주문은 받습니다.</b>
+      </figcaption>
+    </figure>
+    <div class="grid2">
+      <figure><img src="images/05-oms-order-1-reserved.png" alt="주문 재고 확보" /><figcaption>주문 직후 <span class="b b-ok">재고 확보</span> — WMS에 예약 생성</figcaption></figure>
+      <figure><img src="images/07-oms-order-1-cancelled.png" alt="주문 취소" /><figcaption>출고 전 취소 — 예약 해제, <b>가용 복구</b></figcaption></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">2</span><h4>재고가 부족한 주문 → 백오더로 접수</h4></div>
+    <p>가용 수량을 넘는 주문은 거절하지 않고 <span class="b b-warn">입고 대기</span>로 받습니다. 이때 예약은 <b>잡히지 않습니다</b> — 없는 재고를 예약할 수는 없으니까요.</p>
+    <div class="grid2">
+      <figure><img src="images/08-oms-order-2-backordered.png" alt="백오더 주문" /><figcaption>고객 화면 — 주문은 성공하고 상태가 <b>입고 대기</b></figcaption></figure>
+      <figure><img src="images/09-oms-admin-backorder-orders.png" alt="관리자 백오더 목록" /><figcaption>관리자 화면 — 입고가 필요한 주문으로 집계</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">3</span><h4>OMS가 보충을 요청 → WMS가 승인·반려</h4></div>
+    <p>OMS는 <b>요청만</b> 합니다. 발주를 낼지 말지는 창고의 판단이므로 <b>WMS 관리자(MANAGER)</b>가 승인하고, 승인 시 발주가 자동 생성됩니다. 요청은 <code>requestKey</code>로 멱등 처리돼 중복 전송에도 안전합니다.</p>
+    <figure><img src="images/11-wms-replenishment-approved-rejected.png" alt="보충 요청 승인·반려" /><figcaption>승인된 요청은 <span class="b b-warn">발주 진행</span>, 반려된 요청은 <span class="b b-off">반려</span>. 반려에는 사유를 남깁니다.</figcaption></figure>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">4</span><h4>부분 입고 — 현실은 “100개 주문에 60개 도착”</h4></div>
+    <p>한 발주를 <b>여러 번에 나눠</b> 입고합니다. 품목별로 누적 입고량과 잔량을 추적하고, 모든 품목의 잔량이 0이 되어야 <span class="b b-ok">입고 완료</span>로 넘어갑니다.</p>
+    <p><b>연결된 보충 요청은 전량 입고 시점에만 “이행 완료”가 됩니다.</b> 부분 입고에서 이행 신호를 보내면 “요청한 물량을 다 채웠다”는 거짓 신호가 되기 때문입니다.</p>
+    <div class="grid2">
+      <figure><img src="images/12-wms-po-1-partially-received.png" alt="부분 입고" /><figcaption><span class="b b-warn">부분 입고</span> — 잔량이 남아 요청은 아직 진행 중</figcaption></figure>
+      <figure><img src="images/13-wms-po-1-received.png" alt="전량 입고" /><figcaption><span class="b b-ok">입고 완료</span> — 이 시점에 요청이 이행 완료로 전이</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">5</span><h4>재고가 늘면 WMS가 OMS에 알리고 → 백오더가 자동 승격</h4></div>
+    <p>입고로 재고가 증가하면 WMS가 <b>트랜잭션 커밋 후</b> OMS에 통지하고, OMS는 밀려 있던 주문을 <b>먼저 주문한 순서(FIFO)</b>로 승격시킵니다.</p>
+    <div class="grid2">
+      <figure><img src="images/14-oms-order-2-promoted.png" alt="주문 승격" /><figcaption>입고 대기였던 주문이 <span class="b b-ok">재고 확보</span>로 자동 전환</figcaption></figure>
+      <figure><img src="images/15-oms-fifo-first-order-promoted.png" alt="FIFO 승격" /><figcaption>수량이 일부만 들어오면 <b>먼저 접수된 주문부터</b> 충족</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">6</span><h4>영영 안 오는 잔량 — 발주 취소로 생애주기를 닫는다</h4></div>
+    <p>부분 입고는 “공급처가 잔량을 안 보내는” 상태를 만들 수 있습니다. 그대로 두면 발주가 <b>부분 입고에 갇히고</b> 연결된 요청도 종결되지 못합니다. MANAGER가 취소하면 발주와 요청이 <b>한 트랜잭션에서</b> 함께 닫힙니다.</p>
+    <p><b>이미 입고된 수량은 되돌리지 않습니다</b> — 실물이 창고에 들어왔기 때문입니다. 재고와 원장 모두 그대로 유지되고, 취소로 인한 새 원장 행도 생기지 않습니다.</p>
+    <figure><img src="images/16-wms-po-3-partial-cancelled.png" alt="발주 취소" /><figcaption>취소 후에도 <b>입고량 5는 그대로</b>. 취소된 발주에는 입고 수단이 노출되지 않습니다.</figcaption></figure>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">7</span><h4>출고 — 예약과 실물이 함께 빠진다</h4></div>
+    <p>출고 시점에 <b>보유·예약 수량이 동시에</b> 차감됩니다. 그래서 <b>가용 수량은 출고 전후로 변하지 않습니다</b>(이미 예약으로 빠져 있었으므로). 원장에는 <code>주문 #N</code> 참조와 함께 <b>출고</b> 행이 남습니다.</p>
+    <figure><img src="images/17-oms-shipping-three-orders-ready.png" alt="배송 관리" /><figcaption>OMS 배송 관리 — 단건 출고와 <b>선택 일괄 출고</b>. 취소·백오더 주문은 선택 대상에서 제외됩니다.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ══════════ 5. 회복탄력성 ══════════ -->
+<section>
+  <h2><span class="num">05</span> 장애를 가정한 설계</h2>
+  <p class="sub">두 시스템으로 나눈 이상, 상대가 응답하지 않는 순간은 반드시 옵니다</p>
+
+  <div class="callout">
+    <span class="label">원칙</span>
+    <p><b>통신은 실패해도 되지만, 재고 데이터는 틀리면 안 된다.</b> 장애를 예외가 아니라 정상 경로의 일부로 두고 설계했습니다.</p>
+  </div>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>실패 상황</th><th>설계 대응</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr><td>OMS가 죽은 채 입고 발생</td><td>통지는 best-effort — 실패해도 입고·원장은 커밋</td><td>재고 무손실. 복구 후 <b>보상 스윕</b>이 누락 승격 회수</td></tr>
+      <tr><td>WMS가 죽은 채 주문 유입</td><td>OMS가 가용수량을 <b>0으로 폴백</b></td><td>주문은 실패하지 않고 백오더로 접수 — 없는 재고를 팔지 않음</td></tr>
+      <tr><td>상대가 응답 없이 매달림</td><td>타임아웃 (connect 1s / read 2s)</td><td>스레드가 묶이지 않고 수 초 내 복귀</td></tr>
+      <tr><td>타임아웃이 만든 반쪽 상태</td><td>해제된 예약의 출고, 출고된 예약의 해제를 <b>거부</b></td><td>예약 수량 음수 같은 재고 오염 차단</td></tr>
+      <tr><td>중복 요청·재시도</td><td>예약은 <code>orderId</code>, 보충 요청은 <code>requestKey</code>로 멱등</td><td>재시도해도 수량이 두 번 반영되지 않음</td></tr>
+      <tr><td>자격증명 오설정</td><td>운영 프로파일은 기본값 없음 — 누락 시 <b>기동 실패</b></td><td>운영에서 기본 계정으로 조용히 뜨는 사고 차단</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ══════════ 6. 인프라·운영 ══════════ -->
+<section>
+  <h2><span class="num">06</span> 인프라 · 운영</h2>
+  <p class="sub">두 서비스를 실제로 띄우고, 지키고, 늘려본 경험</p>
+
+  <h3>배포</h3>
+  <ul>
+    <li><b>Docker 멀티스테이지 이미지</b>(빌드/실행 분리)로 두 서비스를 각각 컨테이너화</li>
+    <li><b>Railway에 배포·검증</b> — 앱 간 통신은 공개 인터넷이 아닌 <b>private networking</b>으로 연결, 공개 도메인은 인증 뒤에 둠</li>
+    <li>DB는 로컬 H2 / 운영 PostgreSQL 이원화. OMS는 <b>Flyway</b>로 스키마 버전 관리 + <code>ddl-auto: validate</code>로 엔티티-스키마 불일치를 기동 시 감지</li>
+  </ul>
+
+  <h3>CI</h3>
+  <ul>
+    <li>GitHub Actions — master push·PR마다 <b>테스트 337개 + 이미지 빌드</b> 자동 검증</li>
+    <li>실패해도 리포트를 아티팩트로 남겨 원인 추적 가능</li>
+  </ul>
+
+  <h3>수평 확장 실험 — 상태(state)를 어디에 둘 것인가</h3>
+  <p>단일 인스턴스를 3개로 늘리자 <b>애플리케이션이 들고 있던 상태 두 가지</b>가 곧바로 문제가 됐습니다.</p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>병목</th><th>원인</th><th>해결</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>세션 기반 CSRF</td>
+        <td>CSRF 토큰이 인스턴스별 세션 메모리에 저장 → 다른 인스턴스로 라우팅되면 폼 제출 403</td>
+        <td><b>Redis 공유 세션</b> — 보안 설정은 그대로 두고 세션 저장소만 밖으로</td>
+      </tr>
+      <tr>
+        <td>초기화 경합</td>
+        <td>다중 인스턴스 동시 기동 시 시드 데이터가 중복 삽입돼 UNIQUE 충돌</td>
+        <td><b>Redisson 분산 락</b> — 락을 잡은 1개 인스턴스만 시딩</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    Nginx로 3개 인스턴스에 분산하고, 응답 헤더(<code>X-Served-By</code>)로 실제 분산 동작을 확인했습니다.
+    두 기능은 <b>프로파일로 게이팅</b>해 단일 인스턴스 배포에서는 Redis 없이 그대로 동작합니다.
+  </p>
+
+  <h3>검증</h3>
+  <ul>
+    <li><b>자동 테스트 337개</b> — 도메인 단위 / 서비스 통합(<code>@DataJpaTest</code>) / MockMvc 슬라이스 / <b>실서블릿 보안 통합</b></li>
+    <li><b>수동 검증 시나리오 16개 문서화</b> — 자동 테스트가 못 잡는 두 앱 간 실제 HTTP 통신·화면·장애 복구를 절차와 기대 결과로 정리하고 실행 기록을 남김</li>
+  </ul>
+</section>
+
+<!-- ══════════ 7. 겪은 문제 ══════════ -->
+<section>
+  <h2><span class="num">07</span> 겪은 문제와 해결</h2>
+  <p class="sub">설계 문서에 적히지 않는, 실제로 부딪힌 지점들</p>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">문제 1</span><h4>인증 실패가 “성공”으로 오인된 사건</h4></div>
+    <p><b>증상</b> — WMS가 OMS로 보내는 콜백에 인증을 붙였는데, 자격증명이 틀려도 호출이 조용히 넘어갔습니다. 재고는 늘었는데 주문 승격이 안 되는, 원인을 알기 어려운 상태였습니다.</p>
+    <p><b>원인</b> — 인증 실패 시 서버가 401을 내면 서블릿이 이를 <code>/error</code>로 재디스패치하는데, 그 경로가 폼 로그인 체인에 걸려 <b>302(로그인 페이지 리다이렉트)</b>로 응답됐습니다. 302는 4xx/5xx가 아니라 HTTP 클라이언트가 예외를 던지지 않았고, 그래서 <b>실패가 감지되지 않았습니다.</b></p>
+    <p><b>해결</b> — API 체인이 인증 실패 시 401을 직접 응답하도록 진입점을 지정했습니다. 더 중요한 건 <b>테스트가 이 버그를 못 잡고 있었다</b>는 점입니다. MockMvc는 서블릿의 <code>/error</code> 재디스패치를 재현하지 않아 통과하고 있었기에, <b>실제 서블릿 컨테이너를 띄우는 통합 테스트</b>로 “미인증 API는 401이며 리다이렉트가 아니다”를 고정했습니다.</p>
+    <div class="callout warn">
+      <span class="label">이후 적용한 원칙</span>
+      <p>테스트가 초록불이라는 사실보다 <b>그 테스트가 무엇을 재현하지 못하는지</b>가 중요합니다.
+      경계(서블릿·필터·네트워크)를 넘는 동작은 그 경계를 실제로 통과시키는 테스트로만 고정할 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">문제 2</span><h4>취소한 발주에 다시 입고가 되던 버그</h4></div>
+    <p><b>증상</b> — 발주 취소 기능을 TDD로 만들었는데, 취소된 발주에 입고를 실행하면 재고가 늘고 상태가 되돌아가 <b>취소가 무효화</b>됐습니다.</p>
+    <p><b>원인</b> — 입고 가드가 “이미 입고 완료된 발주”만 막고 <b>“취소된 발주”를 빠뜨렸습니다.</b> 취소 기능을 만들 때 “완료된 발주는 취소 불가”는 테스트했지만, <b>역방향인 “취소된 발주는 입고 불가”는 아무도 테스트하지 않았습니다.</b></p>
+    <p><b>발견 경위</b> — 코드 리뷰도 자동 테스트도 잡지 못했고, <b>수동 검증 시나리오를 작성하다가</b> “취소 후에 입고를 시도하면?”이라는 질문에서 드러났습니다.</p>
+    <div class="callout warn">
+      <span class="label">이후 적용한 원칙</span>
+      <p>상태 전이는 <b>양방향으로</b> 막아야 합니다. 그리고 검증 시나리오를 문서로 먼저 적는 절차를 넣었습니다 —
+      코드가 답하지 못하는 질문은 대개 시나리오를 쓰다가 드러납니다.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-num">문제 3</span><h4>부분 입고가 만든 “갇힌 상태”</h4></div>
+    <p><b>증상</b> — 부분 입고를 도입하자 <b>새로운 문제</b>가 생겼습니다. 공급처가 잔량을 보내지 않으면 발주가 “부분 입고”에 영원히 머물고, 연결된 보충 요청도 종결되지 못했습니다.</p>
+    <p><b>해결</b> — 기능을 “동작하게” 만드는 것과 <b>생애주기를 닫는 것</b>은 다르다는 것을 인정하고, 취소 경로를 추가했습니다. 이때도 <b>이미 입고된 실물 수량은 되돌리지 않는다</b>는 도메인 규칙을 지켰습니다 — 물건은 이미 창고에 있으니까요.</p>
+    <div class="callout warn">
+      <span class="label">이후 적용한 원칙</span>
+      <p>새 상태를 도입할 때는 <b>그 상태에서 나가는 길</b>까지 한 묶음으로 설계합니다.
+      ERP에서 “미결 전표”가 몇 년씩 쌓이는 것과 같은 문제로, 뒤늦게 닫으려면 이미 데이터가 쌓여 있습니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 8. 고도화 전략 ══════════ -->
+<section>
+  <h2><span class="num">08</span> 고도화 전략</h2>
+  <p class="sub">지금 만들지 않기로 한 것과, 언제 만들 것인가</p>
+
+  <p>기능을 더 넣는 것보다 <b>지금 필요한 범위를 정하는 것</b>이 더 어려웠습니다. 아래는 의도적으로 미룬 항목과 그 판단 근거입니다.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>항목</th><th>왜 지금 하지 않았나</th><th>착수 조건</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>재고 실사</b><br /><span class="b b-info">Cycle Count</span></td>
+        <td>수동 조정이 이미 같은 역할을 하고, 원장에 근거가 남는다</td>
+        <td>실물과 장부를 주기적으로 맞추는 <b>프로세스</b>가 필요해질 때</td>
+      </tr>
+      <tr>
+        <td><b>반품 / RMA</b></td>
+        <td>현재 예약 해제는 있으나 반품 재입고 경로는 없음 — 판매 흐름 완결이 우선이었다</td>
+        <td>반품이 실제 업무 흐름에 들어올 때 (<code>RETURN</code> 원장으로 확장)</td>
+      </tr>
+      <tr>
+        <td><b>안전재고 · 재주문점</b></td>
+        <td>보충이 OMS 주도로도 충분히 동작하고, 자동 발주는 운영 정책 없이는 위험하다</td>
+        <td>재고 소진 패턴 데이터가 쌓여 임계값을 근거 있게 정할 수 있을 때</td>
+      </tr>
+      <tr>
+        <td><b>위치 / 다중 창고</b><br /><span class="b b-info">대공사</span></td>
+        <td>재고를 <code>(상품, 위치)</code>로 분해하면 <b>모델 재설계</b> — 프로젝트 규모가 2배가 된다</td>
+        <td>“물건이 창고 어디에 있는가”가 실제 요구사항이 될 때</td>
+      </tr>
+      <tr>
+        <td><b>메시지 기반 통신</b></td>
+        <td>best-effort 콜백 + 보상 스윕으로 <b>데이터 정합성은 이미 보장</b>된다. 브로커는 운영 부담을 늘린다</td>
+        <td>승격 지연이 실제 문제가 되거나, 이벤트 소비자가 늘어날 때 (outbox 패턴)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <span class="label">판단 기준</span>
+    <p>“없으면 시스템이 <b>틀린 답</b>을 내는가”를 우선 채웠습니다. 원장·예약·부분 입고·발주 취소가 그랬고, 실사·위치·자동 발주는 <b>없어도 답이 틀리지 않기에</b> 미뤘습니다.</p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    <b>저장소</b> ·
+    OMS <a href="https://github.com/twin10240/jhg-commerce-project">jhg-commerce-project</a> ·
+    WMS <a href="https://github.com/twin10240/jhg-wms-project">jhg-wms-project</a>
+  </p>
+  <p>각 저장소 README에 아키텍처·API·회복탄력성 설계와 실행 방법을 정리했습니다. 설계 문서와 수동 검증 시나리오는 <code>docs/</code>에 있습니다.</p>
+</footer>
+
+</div>
+</body>
+</html>
