@@ -15,6 +15,9 @@
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
 | 테스트 | 156개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
 
+> 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
+> GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
+
 ## 화면
 
 **발주 상세 — 부분 입고와 취소**
@@ -324,6 +327,7 @@ docker compose exec redis redis-cli --scan --pattern "spring:session:*"
 
 ## 문서
 
+- [`docs/portfolio/portfolio.html`](docs/portfolio/portfolio.html) — **프로젝트 포트폴리오**(설계 결정·동작 흐름·회복탄력성·고도화 전략, 화면 캡처 포함). 내려받아 브라우저로 열람
 - [OMS·WMS 통합 수동 검증](https://github.com/twin10240/jhg-commerce-project/blob/master/docs/manual-verification-scenarios.md)
 - [`docs/wms-business-roadmap.md`](docs/wms-business-roadmap.md) — 완료 기능과 1차 이후 선택 로드맵
 - [`docs/wms-admin-ux-followup.md`](docs/wms-admin-ux-followup.md) — 관리자 UX 완료·잔여 항목
