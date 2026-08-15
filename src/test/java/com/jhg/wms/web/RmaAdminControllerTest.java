@@ -95,6 +95,38 @@ class RmaAdminControllerTest {
                 .andExpect(content().string(not(containsString("value=\"0\""))));
     }
 
+    // 서버 인가는 SecurityConfig가 막지만, 눌러야 403을 알게 되는 버튼은 그 자체로 결함이다.
+    @Test
+    void OPERATOR에게는_입고_취소_버튼이_보이지_않는다() throws Exception {
+        RmaReturn rma = RmaReturn.create("RMA-100-1", 100L, "상품 불량");
+        rma.addItem(501L, 1L, 2);
+        ReflectionTestUtils.setField(rma, "id", 7L);
+        when(rmaService.findById(7L)).thenReturn(rma);
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
+
+        mockMvc.perform(get("/admin/returns/7").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("rmaReceive"))))
+                .andExpect(content().string(not(containsString("rmaCancel"))));
+    }
+
+    @Test
+    void OPERATOR에게는_검수_완료_폼이_보이지_않는다() throws Exception {
+        RmaReturn rma = RmaReturn.create("RMA-100-1", 100L, "상품 불량");
+        rma.addItem(501L, 1L, 2);
+        ReflectionTestUtils.setField(rma, "id", 7L);
+        rma.receive();
+        when(rmaService.findById(7L)).thenReturn(rma);
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
+
+        mockMvc.perform(get("/admin/returns/7").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("rmaComplete"))))
+                .andExpect(content().string(not(containsString("선택하세요"))));
+    }
+
     // required는 브라우저만 막는다 — curl·자동화가 그대로 통과하면 안 된다.
     @Test
     void 승인수량이_비어_있으면_검수를_확정하지_않는다() throws Exception {

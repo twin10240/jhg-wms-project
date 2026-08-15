@@ -25,7 +25,7 @@
   </p>
 
   <!-- RECEIVED 상태: 검수 완료 폼 -->
-  <form id="rmaComplete" th:if="${rma.status.name() == 'RECEIVED'}"
+  <form id="rmaComplete" sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'RECEIVED'}"
         th:action="@{/admin/returns/{id}/complete(id=${rma.id})}" method="post"
         onsubmit="return confirm('검수를 완료하면 되돌릴 수 없습니다. 진행하시겠습니까?');">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -79,13 +79,13 @@
   </table>
 
   <!-- 입고 처리 폼(REQUESTED → RECEIVED) -->
-  <form id="rmaReceive" th:if="${rma.status.name() == 'REQUESTED'}"
+  <form id="rmaReceive" sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'REQUESTED'}"
         th:action="@{/admin/returns/{id}/receive(id=${rma.id})}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
   </form>
 
   <!-- 취소 폼(REQUESTED → CANCELLED) -->
-  <form id="rmaCancel" th:if="${rma.status.name() == 'REQUESTED'}"
+  <form id="rmaCancel" sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'REQUESTED'}"
         th:action="@{/admin/returns/{id}/cancel(id=${rma.id})}" method="post"
         onsubmit="return confirm('이 RMA를 취소하시겠습니까?');">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -93,11 +93,11 @@
 
   <div class="detail-actions">
     <button type="submit" form="rmaCancel" class="btn btn--danger"
-            th:if="${rma.status.name() == 'REQUESTED'}">취소</button>
+            sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'REQUESTED'}">취소</button>
     <button type="submit" form="rmaReceive"
-            th:if="${rma.status.name() == 'REQUESTED'}">입고 처리</button>
+            sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'REQUESTED'}">입고 처리</button>
     <button type="submit" form="rmaComplete"
-            th:if="${rma.status.name() == 'RECEIVED'}">검수 완료</button>
+            sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'RECEIVED'}">검수 완료</button>
   </div>
 
   <p><a th:href="@{/admin/returns}">← 반품 목록</a></p>
