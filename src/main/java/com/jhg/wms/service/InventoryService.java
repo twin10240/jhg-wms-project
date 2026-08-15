@@ -14,9 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -156,10 +156,64 @@ public class InventoryService {
         return reservationRepository.findAllByOrderByIdDesc();   // qtyByProductId 즉시 페치(EntityGraph)
     }
 
+    /** 수불대장: 기간별 상품당 기초·기초설정·입고·반품·출고·조정·기말 집계. */
+    public List<LedgerRow> buildLedger(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) throw new IllegalArgumentException("시작일이 종료일보다 뒤입니다.");
+        LocalDateTime fromDt = from.atStartOfDay();
+        LocalDateTime toDt = to.plusDays(1).atStartOfDay();
+
+        Map<Long, Integer> openings = new HashMap<>();
+        for (Object[] row : transactionRepository.sumDeltaByProductBefore(fromDt))
+            openings.put((Long) row[0], ((Number) row[1]).intValue());
+
+        Map<Long, Map<InventoryTransactionType, Integer>> periodDeltas = new HashMap<>();
+        for (Object[] row : transactionRepository.sumDeltaByProductAndTypeInPeriod(fromDt, toDt)) {
+            periodDeltas.computeIfAbsent((Long) row[0], k -> new EnumMap<>(InventoryTransactionType.class))
+                    .put((InventoryTransactionType) row[1], ((Number) row[2]).intValue());
+        }
+
+        Set<Long> allProducts = new TreeSet<>();
+        allProducts.addAll(openings.keySet());
+        allProducts.addAll(periodDeltas.keySet());
+        if (allProducts.isEmpty()) return List.of();
+
+        // 원장에 등장한 상품만 조회 — 전건 로드는 카탈로그가 커질수록 그대로 낭비다.
+        Map<Long, String> names = inventoryRepository.findByProductIdIn(allProducts).stream()
+                .collect(Collectors.toMap(Inventory::getProductId,
+                        inv -> inv.getProductName() != null ? inv.getProductName() : "상품#" + inv.getProductId()));
+
+        List<LedgerRow> rows = new ArrayList<>();
+        for (Long pid : allProducts) {
+            int opening = openings.getOrDefault(pid, 0);
+            Map<InventoryTransactionType, Integer> d = periodDeltas.getOrDefault(pid, Map.of());
+            // 기간 내 OPENING(시드·소급)은 수동조정과 성격이 달라 별도 열로 분리한다.
+            int initial = d.getOrDefault(InventoryTransactionType.OPENING, 0);
+            int receive = d.getOrDefault(InventoryTransactionType.RECEIVE, 0);
+            int returnQty = d.getOrDefault(InventoryTransactionType.RETURN, 0);
+            int ship = d.getOrDefault(InventoryTransactionType.SHIP, 0);
+            int adjust = d.getOrDefault(InventoryTransactionType.ADJUST, 0);
+            rows.add(new LedgerRow(pid, names.getOrDefault(pid, "상품#" + pid), opening, initial,
+                    receive, returnQty, ship, adjust,
+                    opening + initial + receive + returnQty + ship + adjust));
+        }
+        return rows;
+    }
+
+    public record LedgerRow(Long productId, String productName, int opening, int initial,
+                             int receive, int returnQty, int ship, int adjust, int closing) {}
+
     /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */
     public List<InventoryTransaction> findTransactions(InventoryTransactionType type) {
         return type == null
                 ? transactionRepository.findTop200ByOrderByIdDesc()
                 : transactionRepository.findTop200ByTypeOrderByIdDesc(type);
+    }
+
+    /** 페이징 이력 조회. */
+    public org.springframework.data.domain.Page<InventoryTransaction> findTransactions(
+            InventoryTransactionType type, org.springframework.data.domain.Pageable pageable) {
+        return type == null
+                ? transactionRepository.findByOrderByIdDesc(pageable)
+                : transactionRepository.findByTypeOrderByIdDesc(type, pageable);
     }
 }

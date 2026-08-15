@@ -10,7 +10,10 @@ import java.time.LocalDateTime;
 /** 재고 트랜잭션 원장(insert-only). onHand를 바꾸는 모든 경로가 한 줄씩 남긴다.
  *  ponytail: 테이블명은 inventory_adjustment 유지 — prod 크로스테이블 마이그레이션 회피(클래스만 승격). */
 @Entity
-@Table(name = "inventory_adjustment")
+// 수불대장은 created_at 범위로 스캔해 product_id로 집계한다 — 원장이 자라면 범위 스캔이 유일한 방어선.
+// ddl-auto=update라 기동 시 인덱스가 생성된다(Flyway 미도입).
+@Table(name = "inventory_adjustment",
+       indexes = @Index(name = "idx_inv_txn_created_product", columnList = "created_at, product_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class InventoryTransaction {

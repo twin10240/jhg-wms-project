@@ -185,6 +185,31 @@ button.ghost:hover, a.ghost:hover { background: #f0f0f0; }
 }
 .tabs a.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
+/* ---------- Paging ---------- */
+
+.paging {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 16px;
+  font-size: .9em;
+}
+.paging a, .paging strong {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+.paging a:hover { background: #f0f4ff; }
+.paging strong {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.paging span { padding: 6px 4px; color: var(--color-text-muted); }
+
 /* ---------- Status badges ---------- */
 
 .badge {
