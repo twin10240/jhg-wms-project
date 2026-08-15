@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('WMS 실사')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('cycle-counts')}"></nav>
+<main>
+  <h2>재고 실사</h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <div class="tabs">
+    <a th:href="@{/admin/cycle-counts}" th:classappend="${activeStatus == null} ? 'active'">전체</a>
+    <a th:href="@{/admin/cycle-counts(status='OPEN')}" th:classappend="${activeStatus?.name() == 'OPEN'} ? 'active'">작성 중</a>
+    <a th:href="@{/admin/cycle-counts(status='SUBMITTED')}" th:classappend="${activeStatus?.name() == 'SUBMITTED'} ? 'active'">승인 대기</a>
+    <a th:href="@{/admin/cycle-counts(status='APPROVED')}" th:classappend="${activeStatus?.name() == 'APPROVED'} ? 'active'">승인</a>
+    <a th:href="@{/admin/cycle-counts(status='REJECTED')}" th:classappend="${activeStatus?.name() == 'REJECTED'} ? 'active'">반려</a>
+  </div>
+
+  <p><a class="btn" th:href="@{/admin/cycle-counts/new}">실사 시작</a></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>번호</th><th>상태</th><th>메모</th><th>대상</th><th>진행</th><th>계수자</th><th>승인자</th><th>시작</th></tr>
+      </thead>
+      <tbody>
+        <tr th:each="s : ${sessions}" th:data-href="@{/admin/cycle-counts/{id}(id=${s.id})}">
+          <td><a th:href="@{/admin/cycle-counts/{id}(id=${s.id})}" th:text="${s.id}">1</a></td>
+          <td>
+            <span class="badge" th:classappend="'badge-cc-' + ${#strings.toLowerCase(s.status.name())}"
+                  th:switch="${s.status.name()}">
+              <span th:case="'OPEN'">작성 중</span>
+              <span th:case="'SUBMITTED'">승인 대기</span>
+              <span th:case="'APPROVED'">승인</span>
+              <span th:case="'REJECTED'">반려</span>
+            </span>
+          </td>
+          <td th:text="${s.memo}">8월 순환 실사</td>
+          <td th:text="${#lists.size(s.items)} + '개'">3개</td>
+          <td th:text="${#lists.size(s.items.?[countedQty != null])} + ' / ' + ${#lists.size(s.items)}">1 / 3</td>
+          <td th:text="${s.createdBy}">operator</td>
+          <td th:text="${s.approvedBy != null ? s.approvedBy : (s.rejectedBy != null ? s.rejectedBy : '—')}">—</td>
+          <td th:text="${#temporals.format(s.createdAt, 'yyyy-MM-dd HH:mm')}">—</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(sessions)}"><td colspan="8">실사 내역이 없습니다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>

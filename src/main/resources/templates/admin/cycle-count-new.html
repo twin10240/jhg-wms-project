@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 실사 시작')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('cycle-counts')}"></nav>
+<main>
+  <h2>실사 시작</h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <form th:action="@{/admin/cycle-counts}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <p>
+      <label for="memo">메모</label>
+      <input type="text" id="memo" name="memo" placeholder="예: 8월 순환 실사" style="width:320px" />
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>선택</th><th>상품 ID</th><th>상품명</th><th>장부 수량</th></tr></thead>
+        <tbody>
+          <tr th:each="row : ${rows}">
+            <td><input type="checkbox" name="productIds" th:value="${row.productId}" /></td>
+            <td th:text="${row.productId}">1</td>
+            <td th:text="${row.productName}">상품 1</td>
+            <td th:text="${row.onHandQty}">15</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="detail-actions">
+      <button type="submit">선택한 상품으로 실사 시작</button>
+    </div>
+  </form>
+
+  <p><a th:href="@{/admin/cycle-counts}">← 실사 목록</a></p>
+</main>
+</body>
+</html>
