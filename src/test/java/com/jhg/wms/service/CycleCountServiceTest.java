@@ -34,13 +34,18 @@ class CycleCountServiceTest {
     InventoryService inventoryService;
     CycleCountService service;
     OmsReplenishmentNotifier notifier;
+    // 제출과 승인은 서로 다른 사람이어야 하는 통제를 검증해야 하므로, 고정 문자열 대신
+    // 테스트가 호출 시점마다 바꿔 낄 수 있는 행위자를 쓴다. 기본값은 계수자(operator).
+    final java.util.concurrent.atomic.AtomicReference<String> ccActor =
+            new java.util.concurrent.atomic.AtomicReference<>("operator");
 
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
         inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
                 notifier, () -> "manager");
-        service = new CycleCountService(cycleCountRepo, inventoryRepo, txnRepo, inventoryService, () -> "operator");
+        ccActor.set("operator");
+        service = new CycleCountService(cycleCountRepo, inventoryRepo, txnRepo, inventoryService, ccActor::get);
     }
 
     private void seed(long pid, int qty) {
@@ -169,6 +174,7 @@ class CycleCountServiceTest {
                 "ORDER#99", null);                                   // 실사 중 출고 → 장부 13
         flush();
 
+        ccActor.set("manager");   // 제출자(operator)와 승인자는 달라야 한다
         service.approve(c.getId());
         flush();
 
@@ -195,6 +201,7 @@ class CycleCountServiceTest {
         service.submit(c.getId());
         flush();
 
+        ccActor.set("manager");   // 제출자(operator)와 승인자는 달라야 한다
         service.approve(c.getId());
         flush();
 
@@ -239,6 +246,7 @@ class CycleCountServiceTest {
         service.submit(c.getId());
         flush();
 
+        ccActor.set("manager");   // 제출자(operator)와 승인자는 달라야 한다 — 반영 불가 검증이 먼저 걸리는지 본다
         assertThatThrownBy(() -> service.approve(c.getId()))
                 .isInstanceOf(IllegalArgumentException.class);
         flush();
@@ -267,10 +275,32 @@ class CycleCountServiceTest {
         service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 14, itemId(c, 2L), 30));
         service.submit(c.getId());
         flush();
+        ccActor.set("manager");   // 제출자(operator)와 승인자는 달라야 한다
         service.approve(c.getId());
         flush();
 
         assertThat(service.appliedDeltas(c.getId())).containsExactly(entry(1L, -1));  // 상품2는 일치라 없음
+    }
+
+    // I-3: 승인자 == 제출자면 "센 사람이 스스로 장부를 고치지 못한다"는 통제가 없어진다.
+    @Test
+    void 제출자와_같은_사람이_승인하면_거부되고_장부가_그대로다() {
+        seed(1L, 15);
+        CycleCount c = service.open(List.of(1L), "실사");
+        flush();
+        service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 14));
+        service.submit(c.getId());   // ccActor는 기본값 "operator"
+        flush();
+
+        assertThatThrownBy(() -> service.approve(c.getId()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("제출자");
+
+        assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(15);
+        assertThat(txnRepo.findAll())
+                .filteredOn(t -> t.getType() == com.jhg.wms.domain.InventoryTransactionType.COUNT)
+                .isEmpty();
+        assertThat(service.findById(c.getId()).getStatus()).isEqualTo(CycleCountStatus.SUBMITTED);
     }
 
     /** 화면은 itemId로 값을 보내므로 테스트도 productId → itemId로 변환해 쓴다. */

@@ -72,8 +72,10 @@ public class Inventory {
     public void validateDelta(int delta) {
         int after = onHandQty + delta;
         if (after < 0)
-            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + onHandQty + "개)");
+            throw new IllegalArgumentException(
+                    "재고는 0 미만이 될 수 없습니다. productId=" + productId + " (현재 " + onHandQty + "개)");
         if (after < reservedQty)
-            throw new IllegalArgumentException("예약된 수량(" + reservedQty + "개) 미만으로 줄일 수 없습니다.");
+            throw new IllegalArgumentException(
+                    "예약된 수량(" + reservedQty + "개) 미만으로 줄일 수 없습니다. productId=" + productId);
     }
 }

@@ -59,7 +59,7 @@ Railway는 **public proxy 주소**여야 한다. `PGHOST`(`*.railway.internal`)�
 
 ## 다음에 enum 값을 추가할 때
 
-로드맵의 실사(`COUNT` 원장)가 바로 다음 후보다. 순서:
+순서:
 
 1. enum 상수 추가
 2. prod에 위 `DROP/ADD CONSTRAINT` 실행 (신규 값 포함)

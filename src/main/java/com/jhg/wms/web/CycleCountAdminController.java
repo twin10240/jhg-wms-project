@@ -56,36 +56,36 @@ public class CycleCountAdminController {
         CycleCount session = cycleCountService.findById(id);
         // 모델 속성명 "session"은 쓰지 않는다 — Thymeleaf WebEngineContext가 그 이름을
         // HttpSession 속성 맵으로 예약해 모델 속성을 가려버린다(널 조인으로 500).
+        // 같은 요청 안에서 재고 스냅샷을 두 번 뜨지 않는다 — 두 번 부르면 그 사이 재고가 바뀔 경우
+        // productNames와 bookQtyNow가 서로 다른 시점의 스냅샷이 될 수 있다.
+        List<InventoryRowResponse> rows = inventoryService.findAllRows();
         model.addAttribute("cc", session);
-        model.addAttribute("productNames", inventoryService.findAllRows().stream()
+        model.addAttribute("productNames", rows.stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
-        model.addAttribute("bookQtyNow", inventoryService.findAllRows().stream()
+        model.addAttribute("bookQtyNow", rows.stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::onHandQty)));
         // 반영된 차이는 원장에서 읽는다 — 세션에 복사해두지 않는다
         model.addAttribute("appliedDeltas", cycleCountService.appliedDeltas(id));
         return "admin/cycle-count-detail";
     }
 
+    // 화면에는 "저장"과 "저장 후 제출"(action=submit) 두 버튼만 있고, 둘 다 이 한 폼(ccCounts)을 낸다.
+    // 그래서 제출이 화면에 남은 미저장 값을 건너뛰고 예전 값으로 확정되는 경로가 애초에 없다.
     @PostMapping("/admin/cycle-counts/{id}/counts")
-    public String saveCounts(@PathVariable Long id, @ModelAttribute CountForm form, RedirectAttributes ra) {
+    public String saveCounts(@PathVariable Long id, @ModelAttribute CountForm form,
+                             @RequestParam(required = false) String action, RedirectAttributes ra) {
         try {
             Map<Long, Integer> counts = new LinkedHashMap<>();
             for (var item : form.getItems())
                 if (item.getCountedQty() != null)   // 미입력은 건너뛴다 — 부분 저장을 허용한다
                     counts.put(item.getItemId(), item.getCountedQty());
             cycleCountService.saveCounts(id, counts);
-            ra.addFlashAttribute("successMessage", "실물 수량을 저장했습니다.");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            ra.addFlashAttribute("errorMessage", e.getMessage());
-        }
-        return "redirect:/admin/cycle-counts/" + id;
-    }
-
-    @PostMapping("/admin/cycle-counts/{id}/submit")
-    public String submit(@PathVariable Long id, RedirectAttributes ra) {
-        try {
-            cycleCountService.submit(id);
-            ra.addFlashAttribute("successMessage", "실사를 제출했습니다. 승인 대기 상태입니다.");
+            if ("submit".equals(action)) {
+                cycleCountService.submit(id);
+                ra.addFlashAttribute("successMessage", "실물 수량을 저장하고 제출했습니다. 승인 대기 상태입니다.");
+            } else {
+                ra.addFlashAttribute("successMessage", "실물 수량을 저장했습니다.");
+            }
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }

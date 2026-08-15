@@ -10,7 +10,7 @@
 |---|---|
 | 재고 | `onHand / reserved / available`, 상품별 낙관적 락 |
 | 예약 | `orderId` 멱등 원장, `RESERVED / SHIPPED / RELEASED` |
-| 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST`, 참조와 전후 수량 |
+| 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT`, 참조와 전후 수량 |
 | 보충 요청 | OMS 요청, WMS 승인·반려, 연결 발주, 이행·취소 종결 |
 | 발주 | 다품목 생성, 품목별 누적·잔여수량, 부분입고·전량입고·취소 |
 | 출고 | 예약 원장 수량 기반 실물·예약 동시 차감 |
@@ -35,7 +35,8 @@
 
 ### ~~1. 재고 실사~~ ✅ 완료 (2026-08-15)
 
-V2.1로 구현 완료. 설계: `docs/superpowers/specs/v2/2026-08-15-cycle-count-actor-design.md`.
+V2.1로 구현 완료. 설계: `docs/superpowers/specs/v2/2026-08-15-cycle-count-actor-design.md`,
+구현: `docs/superpowers/plans/v2/2026-08-15-cycle-count-actor.md`.
 계수·승인 분리, 승인 시점 재계산, `COUNT` 원장. 원장 행위자 기록도 함께 들어갔다.
 
 ### ~~2. 반품·RMA~~ ✅ 완료 (2026-08-12)

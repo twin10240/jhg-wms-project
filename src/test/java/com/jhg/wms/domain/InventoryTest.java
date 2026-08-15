@@ -2,6 +2,7 @@ package com.jhg.wms.domain;
 
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InventoryTest {
 
@@ -48,5 +49,24 @@ class InventoryTest {
         inv.release(6);
         assertThat(inv.getReservedQty()).isEqualTo(0);
         assertThat(inv.getOnHandQty()).isEqualTo(10);
+    }
+
+    // 다품목 실사 승인처럼 여러 상품을 한꺼번에 검증할 때, 메시지에 productId가 없으면
+    // 어느 상품이 걸렸는지 알 수 없다.
+    @Test
+    void validateDelta_0미만_거부_메시지에_productId가_있다() {
+        Inventory inv = Inventory.create(42L, 3);
+        assertThatThrownBy(() -> inv.validateDelta(-4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("productId=42");
+    }
+
+    @Test
+    void validateDelta_예약수량_미만_거부_메시지에_productId가_있다() {
+        Inventory inv = Inventory.create(42L, 10);
+        inv.setReservedQty(8);
+        assertThatThrownBy(() -> inv.validateDelta(-5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("productId=42");
     }
 }

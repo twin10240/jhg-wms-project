@@ -84,6 +84,13 @@ public class CycleCountService {
         if (session.getStatus() != CycleCountStatus.SUBMITTED)
             throw new IllegalStateException("승인 대기 상태에서만 승인할 수 있습니다.");
 
+        // "센 사람이 스스로 장부를 고치지 못한다" — 제출자와 승인자가 같으면 통제가 없는 것과 같다.
+        // 반려는 이 검사를 두지 않는다: 자기 계수를 스스로 물리는 건 막을 이유가 없다.
+        String approver = actorProvider.current();
+        if (approver.equals(session.getSubmittedBy()))
+            throw new IllegalStateException(
+                    "제출자는 스스로 승인할 수 없습니다. 다른 담당자가 승인해야 합니다. (제출자=" + session.getSubmittedBy() + ")");
+
         Map<Long, Inventory> current = inventoryRepository.findByProductIdIn(
                         session.getItems().stream().map(CycleCountItem::getProductId).toList())
                 .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));

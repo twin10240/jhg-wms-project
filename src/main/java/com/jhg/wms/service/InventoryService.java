@@ -157,7 +157,7 @@ public class InventoryService {
         return reservationRepository.findAllByOrderByIdDesc();   // qtyByProductId 즉시 페치(EntityGraph)
     }
 
-    /** 수불대장: 기간별 상품당 기초·기초설정·입고·반품·출고·조정·기말 집계. */
+    /** 수불대장: 기간별 상품당 기초·기초설정·입고·반품·출고·조정·실사·기말 집계. */
     public List<LedgerRow> buildLedger(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new IllegalArgumentException("시작일이 종료일보다 뒤입니다.");
         LocalDateTime fromDt = from.atStartOfDay();
