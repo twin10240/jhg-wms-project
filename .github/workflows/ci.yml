@@ -32,7 +32,7 @@ jobs:
       # 실패해도 리포트는 남겨 원인 확인 가능하게.
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: wms-test-report
           path: build/reports/tests/test
