@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -390,10 +392,16 @@ class WmsAdminControllerTest {
         when(inventoryService.findTransactions(eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(withActor, legacy)));
 
-        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
+        String html = mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("행위자")))
-                .andExpect(content().string(containsString("manager")))
-                .andExpect(content().string(containsString("—")));
+                .andReturn().getResponse().getContentAsString();
+
+        // 상품/참조 컬럼도 "—"를 쓰므로 존재 여부만으로는 행위자 컬럼을 못 잡는다.
+        // 사유 컬럼(각 행마다 고유한 텍스트) 바로 다음 셀이 행위자 컬럼이므로, 그 위치의 값을 직접 확인한다.
+        assertTrue(Pattern.compile("파손 정정</td>\\s*<td>manager</td>").matcher(html).find(),
+                "행위자가 있는 행은 사유 컬럼 다음 셀에 사용자명을 표시해야 한다");
+        assertTrue(Pattern.compile("구 데이터</td>\\s*<td>—</td>").matcher(html).find(),
+                "행위자가 없는 행은 사유 컬럼 다음 셀에 —를 표시해야 한다");
     }
 }
