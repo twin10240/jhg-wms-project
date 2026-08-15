@@ -11,10 +11,12 @@ import java.util.List;
 public class InspectionForm {
     private List<Item> items = new ArrayList<>();
 
+    // 승인 수량은 Integer — primitive면 미입력이 0(전량 거절)으로 조용히 바뀐다.
+    // 되돌릴 수 없는 전이라서 "입력하지 않음"과 "0을 입력함"은 서버에서 구분해야 한다.
     @Getter @Setter
     public static class Item {
         private Long itemId;
-        private int acceptedQuantity;
+        private Integer acceptedQuantity;
         private RmaDisposition disposition;
     }
 }

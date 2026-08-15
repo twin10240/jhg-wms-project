@@ -55,9 +55,13 @@ public class RmaAdminController {
                            RedirectAttributes ra) {
         try {
             Map<Long, RmaService.InspectionResult> results = new LinkedHashMap<>();
-            for (var item : form.getItems())
+            for (var item : form.getItems()) {
+                // 화면의 required는 브라우저만 막는다 — 확정 전이의 마지막 방어선은 여기다.
+                if (item.getAcceptedQuantity() == null || item.getDisposition() == null)
+                    throw new IllegalArgumentException("모든 품목의 승인 수량과 처분을 입력해야 합니다.");
                 results.put(item.getItemId(),
                         new RmaService.InspectionResult(item.getAcceptedQuantity(), item.getDisposition()));
+            }
             rmaService.complete(id, results);
             ra.addFlashAttribute("successMessage", "검수 완료. (RMA #" + id + ")");
         } catch (IllegalArgumentException | IllegalStateException e) {

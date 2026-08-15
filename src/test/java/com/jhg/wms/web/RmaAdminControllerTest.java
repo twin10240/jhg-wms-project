@@ -23,6 +23,8 @@ import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -74,6 +76,50 @@ class RmaAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("재입고")))
                 .andExpect(content().string(not(containsString("RESTOCKED"))));
+    }
+
+    // 검수 완료는 되돌릴 수 없다 — 손대지 않고 제출하면 전량 거절로 확정되던 기본값이 다시 생기지 않게 고정한다.
+    @Test
+    void 검수폼은_승인수량과_처분에_기본값을_두지_않는다() throws Exception {
+        RmaReturn rma = RmaReturn.create("RMA-100-1", 100L, "상품 불량");
+        rma.addItem(501L, 1L, 2);
+        ReflectionTestUtils.setField(rma, "id", 7L);
+        rma.receive();
+        when(rmaService.findById(7L)).thenReturn(rma);
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
+
+        mockMvc.perform(get("/admin/returns/7").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("선택하세요")))
+                .andExpect(content().string(not(containsString("value=\"0\""))));
+    }
+
+    // required는 브라우저만 막는다 — curl·자동화가 그대로 통과하면 안 된다.
+    @Test
+    void 승인수량이_비어_있으면_검수를_확정하지_않는다() throws Exception {
+        mockMvc.perform(post("/admin/returns/7/complete")
+                        .with(user("mgr").roles("MANAGER")).with(csrf())
+                        .param("items[0].itemId", "1")
+                        .param("items[0].disposition", "RESTOCKED"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attributeExists("errorMessage"));
+
+        verify(rmaService, never()).complete(any(), anyMap());
+    }
+
+    @Test
+    void 승인수량과_처분이_모두_있으면_검수가_확정된다() throws Exception {
+        mockMvc.perform(post("/admin/returns/7/complete")
+                        .with(user("mgr").roles("MANAGER")).with(csrf())
+                        .param("items[0].itemId", "1")
+                        .param("items[0].acceptedQuantity", "2")
+                        .param("items[0].disposition", "RESTOCKED"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/returns/7"))
+                .andExpect(flash().attributeExists("successMessage"));
+
+        verify(rmaService).complete(eq(7L), anyMap());
     }
 
     // DB 계층 예외는 업무 예외가 아니라 컨트롤러 catch에 안 걸린다 — 흰 500 대신 목록으로 돌려보내는지 검증.
