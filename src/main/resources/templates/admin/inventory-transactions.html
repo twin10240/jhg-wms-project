@@ -17,7 +17,7 @@
   <div class="table-wrap">
   <table>
     <thead>
-      <tr><th>일시</th><th>상품</th><th>유형</th><th>변동</th><th>변경 전 → 후</th><th>참조</th><th>사유</th></tr>
+      <tr><th>일시</th><th>상품</th><th>유형</th><th>변동</th><th>변경 전 → 후</th><th>참조</th><th>사유</th><th>행위자</th></tr>
     </thead>
     <tbody>
       <tr th:each="t : ${transactions}">
@@ -39,9 +39,10 @@
                        : (t.reference.startsWith('RMA#') ? 'RMA #' + t.reference.substring(4)
                        : t.reference)))}">—</td>
         <td th:text="${t.reason}"></td>
+        <td th:text="${t.actor != null ? t.actor : '—'}">—</td>
       </tr>
       <tr th:if="${#lists.isEmpty(transactions)}">
-        <td colspan="7">트랜잭션 없음</td>
+        <td colspan="8">트랜잭션 없음</td>
       </tr>
     </tbody>
   </table>

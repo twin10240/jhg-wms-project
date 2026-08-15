@@ -379,4 +379,21 @@ class WmsAdminControllerTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(view().name("error"));
     }
+
+    // 원장에 행위자를 남겨도 화면에 없으면 감사에 쓸 수 없다. 값이 없는 과거 행은 "—"로 구분해 보인다.
+    @Test
+    void 이력화면은_행위자를_보여주고_없으면_대시로_표시한다() throws Exception {
+        InventoryTransaction withActor = InventoryTransaction.of(
+                1L, InventoryTransactionType.ADJUST, 3, 10, 13, null, "파손 정정", "manager");
+        InventoryTransaction legacy = InventoryTransaction.of(
+                1L, InventoryTransactionType.ADJUST, 1, 13, 14, null, "구 데이터", null);
+        when(inventoryService.findTransactions(eq(null), any()))
+                .thenReturn(new PageImpl<>(List.of(withActor, legacy)));
+
+        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("행위자")))
+                .andExpect(content().string(containsString("manager")))
+                .andExpect(content().string(containsString("—")));
+    }
 }
