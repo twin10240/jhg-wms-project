@@ -19,7 +19,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -93,6 +92,28 @@ class CycleCountAdminControllerTest {
     }
 
     @Test
+    void OPERATOR가_반려를_직접_POST하면_403() throws Exception {
+        mockMvc.perform(post("/admin/cycle-counts/7/reject")
+                        .with(user("op").roles("OPERATOR")).with(csrf())
+                        .param("reason", "계수 오류"))
+                .andExpect(status().isForbidden());
+
+        verify(cycleCountService, never()).reject(anyLong(), any());
+    }
+
+    @Test
+    void MANAGER는_반려할_수_있다() throws Exception {
+        mockMvc.perform(post("/admin/cycle-counts/7/reject")
+                        .with(user("mgr").roles("MANAGER")).with(csrf())
+                        .param("reason", "계수 오류"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/cycle-counts/7"))
+                .andExpect(flash().attributeExists("successMessage"));
+
+        verify(cycleCountService).reject(7L, "계수 오류");
+    }
+
+    @Test
     void 승인된_세션은_품목별_반영_결과를_보여준다() throws Exception {
         CycleCount approved = submitted();
         approved.approve("manager");
@@ -105,6 +126,16 @@ class CycleCountAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("반영 결과")))
                 .andExpect(content().string(containsString("-1")));
+    }
+
+    @Test
+    void 없는_실사_상세는_500이_아니라_404_화면이다() throws Exception {
+        when(cycleCountService.findById(999L))
+                .thenThrow(new CycleCountService.CycleCountNotFoundException(999L));
+
+        mockMvc.perform(get("/admin/cycle-counts/999").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("error"));
     }
 
     @Test

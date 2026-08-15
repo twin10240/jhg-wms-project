@@ -111,7 +111,7 @@ public class CycleCountService {
 
     public CycleCount findById(Long sessionId) {
         return cycleCountRepository.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("실사가 없습니다. id=" + sessionId));
+                .orElseThrow(() -> new CycleCountNotFoundException(sessionId));
     }
 
     public List<CycleCount> findAll(CycleCountStatus status) {
@@ -126,5 +126,14 @@ public class CycleCountService {
         return transactionRepository.findByReference("COUNT#" + sessionId).stream()
                 .collect(Collectors.toMap(InventoryTransaction::getProductId,
                         InventoryTransaction::getDelta, Integer::sum));
+    }
+
+    /** 없는 실사 세션. IllegalArgumentException의 하위로 두어, 상태 전이 핸들러들이 이미
+     *  업무 오류를 flash로 처리하는 catch(IllegalArgumentException | IllegalStateException) 경로를
+     *  그대로 유지한다 — RmaService.RmaNotFoundException과 같은 방식이다. */
+    public static class CycleCountNotFoundException extends IllegalArgumentException {
+        public CycleCountNotFoundException(Long sessionId) {
+            super("실사가 없습니다. id=" + sessionId);
+        }
     }
 }
