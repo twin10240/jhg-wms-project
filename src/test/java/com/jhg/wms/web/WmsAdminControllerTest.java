@@ -6,6 +6,7 @@ import com.jhg.wms.domain.*;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.ReplenishmentRequestService;
+import com.jhg.wms.service.RmaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -40,6 +41,7 @@ class WmsAdminControllerTest {
     @MockitoBean InventoryService inventoryService;
     @MockitoBean PurchaseOrderService purchaseOrderService;
     @MockitoBean ReplenishmentRequestService replenishmentRequestService;
+    @MockitoBean RmaService rmaService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test

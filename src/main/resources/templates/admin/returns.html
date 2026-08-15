@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 반품(RMA)')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('returns')}"></nav>
+<main>
+  <h2>반품(RMA)</h2>
+
+  <div class="tabs">
+    <a th:href="@{/admin/returns}" th:classappend="${activeStatus == null} ? 'active'">전체</a>
+    <a th:href="@{/admin/returns(status='REQUESTED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'REQUESTED'} ? 'active'">접수</a>
+    <a th:href="@{/admin/returns(status='RECEIVED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'RECEIVED'} ? 'active'">입고</a>
+    <a th:href="@{/admin/returns(status='COMPLETED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'COMPLETED'} ? 'active'">완료</a>
+    <a th:href="@{/admin/returns(status='CANCELLED')}" th:classappend="${activeStatus != null and activeStatus.name() == 'CANCELLED'} ? 'active'">취소</a>
+  </div>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>RMA ID</th><th>주문 ID</th><th>상태</th><th>사유</th><th>상품</th><th>수량</th><th>접수일시</th></tr></thead>
+    <tbody>
+      <tr th:each="r : ${returns}" th:attr="data-href=@{/admin/returns/{id}(id=${r.id})}">
+        <td><a th:href="@{/admin/returns/{id}(id=${r.id})}" th:text="${r.id}">1</a></td>
+        <td th:text="${r.orderId}">100</td>
+        <td>
+          <span th:switch="${r.status.name()}" class="badge" th:classappend="'badge-' + ${#strings.toLowerCase(r.status.name())}">
+            <span th:case="'REQUESTED'">접수</span>
+            <span th:case="'RECEIVED'">입고</span>
+            <span th:case="'COMPLETED'">완료</span>
+            <span th:case="'CANCELLED'">취소</span>
+          </span>
+        </td>
+        <td th:text="${r.reason}">상품 불량</td>
+        <td>
+          <div th:each="item : ${r.items}" th:text="|${productNames.getOrDefault(item.productId, '상품#' + item.productId)}|"></div>
+        </td>
+        <td>
+          <div th:each="item : ${r.items}" th:text="|${item.requestedQuantity}개|"></div>
+        </td>
+        <td th:text="${#temporals.format(r.requestedAt,'yyyy-MM-dd HH:mm')}">2026-08-01 10:00</td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(returns)}">
+        <td colspan="7">반품 내역이 없습니다.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- 행 전체 클릭 → 상세. ID 링크는 그대로 둔다(키보드·스크린리더 경로). -->
+  <script>
+    document.querySelector('.table-wrap').addEventListener('click', function (e) {
+      var tr = e.target.closest('tr[data-href]');
+      if (!tr || e.target.closest('a')) return;
+      if (window.getSelection().toString()) return;   // 텍스트 드래그 복사 중이면 이동하지 않는다
+      location.href = tr.dataset.href;
+    });
+  </script>
+</main>
+</body>
+</html>

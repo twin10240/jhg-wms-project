@@ -5,6 +5,7 @@ import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import com.jhg.wms.service.ReplenishmentRequestService;
+import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -23,6 +24,7 @@ public class WmsAdminController {
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
     private final ReplenishmentRequestService replenishmentRequestService;
+    private final RmaService rmaService;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -45,6 +47,11 @@ public class WmsAdminController {
         model.addAttribute("reservedCount", resCounts.getOrDefault(ReservationStatus.RESERVED, 0L));
         model.addAttribute("shippedCount", resCounts.getOrDefault(ReservationStatus.SHIPPED, 0L));
         model.addAttribute("releasedCount", resCounts.getOrDefault(ReservationStatus.RELEASED, 0L));
+        Map<RmaStatus, Long> rmaCounts = rmaService.findAll(null).stream()
+                .collect(Collectors.groupingBy(RmaReturn::getStatus, Collectors.counting()));
+        model.addAttribute("rmaRequestedCount", rmaCounts.getOrDefault(RmaStatus.REQUESTED, 0L));
+        model.addAttribute("rmaReceivedCount", rmaCounts.getOrDefault(RmaStatus.RECEIVED, 0L));
+        model.addAttribute("rmaCompletedCount", rmaCounts.getOrDefault(RmaStatus.COMPLETED, 0L));
         return "admin/dashboard";
     }
 

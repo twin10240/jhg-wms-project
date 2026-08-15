@@ -65,6 +65,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/purchase-orders/*/cancel").hasRole("MANAGER")
                 .requestMatchers(HttpMethod.POST, "/admin/replenishment-requests/*/approve").hasRole("MANAGER")
                 .requestMatchers(HttpMethod.POST, "/admin/replenishment-requests/*/reject").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/admin/returns/*/receive").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/admin/returns/*/complete").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/admin/returns/*/cancel").hasRole("MANAGER")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

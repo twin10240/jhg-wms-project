@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('WMS RMA 상세')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('returns')}"></nav>
+<main>
+  <h2>RMA #<span th:text="${rma.id}">1</span></h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <p>
+    상태:
+    <span th:switch="${rma.status.name()}" class="badge"
+          th:classappend="'badge-' + ${#strings.toLowerCase(rma.status.name())}">
+      <span th:case="'REQUESTED'">접수</span>
+      <span th:case="'RECEIVED'">입고</span>
+      <span th:case="'COMPLETED'">완료</span>
+      <span th:case="'CANCELLED'">취소</span>
+    </span>
+    · 주문 ID: <b th:text="${rma.orderId}">100</b>
+    · 사유: <span th:text="${rma.reason}">상품 불량</span>
+    · 접수: <span th:text="${#temporals.format(rma.requestedAt,'yyyy-MM-dd HH:mm')}">—</span>
+    <span th:if="${rma.receivedAt != null}"> · 입고: <span th:text="${#temporals.format(rma.receivedAt,'yyyy-MM-dd HH:mm')}">—</span></span>
+    <span th:if="${rma.completedAt != null}"> · 완료: <span th:text="${#temporals.format(rma.completedAt,'yyyy-MM-dd HH:mm')}">—</span></span>
+    <span th:if="${rma.cancelledAt != null}"> · 취소: <span th:text="${#temporals.format(rma.cancelledAt,'yyyy-MM-dd HH:mm')}">—</span></span>
+  </p>
+
+  <!-- RECEIVED 상태: 검수 완료 폼 -->
+  <form id="rmaComplete" th:if="${rma.status.name() == 'RECEIVED'}"
+        th:action="@{/admin/returns/{id}/complete(id=${rma.id})}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <table>
+      <thead>
+        <tr><th>주문품목 ID</th><th>상품</th><th>요청 수량</th><th>승인 수량</th><th>처분</th></tr>
+      </thead>
+      <tbody>
+        <tr th:each="item, stat : ${rma.items}">
+          <td th:text="${item.orderItemId}">501</td>
+          <td th:text="${productNames.getOrDefault(item.productId, '상품#' + item.productId)}">상품 1</td>
+          <td th:text="${item.requestedQuantity}">2</td>
+          <td>
+            <input type="hidden" th:name="|items[${stat.index}].itemId|" th:value="${item.id}" />
+            <input type="number" th:name="|items[${stat.index}].acceptedQuantity|"
+                   min="0" th:max="${item.requestedQuantity}" value="0" style="width:80px" />
+          </td>
+          <td>
+            <select th:name="|items[${stat.index}].disposition|" style="width:130px">
+              <option value="REJECTED">거절</option>
+              <option value="RESTOCKED">재입고</option>
+              <option value="DISPOSED">폐기</option>
+            </select>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </form>
+
+  <!-- COMPLETED / CANCELLED: 읽기 전용 테이블 -->
+  <table th:if="${rma.status.name() == 'COMPLETED' or rma.status.name() == 'CANCELLED' or rma.status.name() == 'REQUESTED'}">
+    <thead>
+      <tr><th>주문품목 ID</th><th>상품</th><th>요청 수량</th><th>승인 수량</th><th>처분</th></tr>
+    </thead>
+    <tbody>
+      <tr th:each="item : ${rma.items}">
+        <td th:text="${item.orderItemId}">501</td>
+        <td th:text="${productNames.getOrDefault(item.productId, '상품#' + item.productId)}">상품 1</td>
+        <td th:text="${item.requestedQuantity}">2</td>
+        <td th:text="${item.acceptedQuantity != null ? item.acceptedQuantity : '—'}">—</td>
+        <td th:switch="${item.disposition?.name()}">
+          <span th:case="'RESTOCKED'">재입고</span>
+          <span th:case="'DISPOSED'">폐기</span>
+          <span th:case="'REJECTED'">거절</span>
+          <span th:case="*">—</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 입고 처리 폼(REQUESTED → RECEIVED) -->
+  <form id="rmaReceive" th:if="${rma.status.name() == 'REQUESTED'}"
+        th:action="@{/admin/returns/{id}/receive(id=${rma.id})}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+  </form>
+
+  <!-- 취소 폼(REQUESTED → CANCELLED) -->
+  <form id="rmaCancel" th:if="${rma.status.name() == 'REQUESTED'}"
+        th:action="@{/admin/returns/{id}/cancel(id=${rma.id})}" method="post"
+        onsubmit="return confirm('이 RMA를 취소하시겠습니까?');">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+  </form>
+
+  <div class="detail-actions">
+    <button type="submit" form="rmaCancel" class="btn btn--danger"
+            th:if="${rma.status.name() == 'REQUESTED'}">취소</button>
+    <button type="submit" form="rmaReceive"
+            th:if="${rma.status.name() == 'REQUESTED'}">입고 처리</button>
+    <button type="submit" form="rmaComplete"
+            th:if="${rma.status.name() == 'RECEIVED'}">검수 완료</button>
+  </div>
+
+  <p><a th:href="@{/admin/returns}">← 반품 목록</a></p>
+</main>
+</body>
+</html>
