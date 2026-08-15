@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @DataJpaTest
 class CycleCountServiceTest {
@@ -32,11 +33,13 @@ class CycleCountServiceTest {
 
     InventoryService inventoryService;
     CycleCountService service;
+    OmsReplenishmentNotifier notifier;
 
     @BeforeEach
     void setUp() {
+        notifier = mock(OmsReplenishmentNotifier.class);
         inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
-                mock(OmsReplenishmentNotifier.class), () -> "manager");
+                notifier, () -> "manager");
         service = new CycleCountService(cycleCountRepo, inventoryRepo, txnRepo, inventoryService, () -> "operator");
     }
 
@@ -180,6 +183,7 @@ class CycleCountServiceTest {
                     assertThat(t.getReference()).isEqualTo("COUNT#" + c.getId());
                     assertThat(t.getActor()).isEqualTo("manager");
                 });
+        verify(notifier).notifyAfterCommit(1L);   // 실사로 재고가 늘었으니 OMS 백오더 승격 통지가 따라온다
     }
 
     @Test
@@ -217,9 +221,14 @@ class CycleCountServiceTest {
         assertThat(service.findById(c.getId()).getStatus()).isEqualTo(CycleCountStatus.REJECTED);
     }
 
-    // 앞 품목만 반영되면 "절반만 승인된 실사"라는 설명할 수 없는 상태가 남는다.
+    // 반영 전에 전 품목의 반영 가능 여부를 검증하므로, 한 품목이라도 반영 불가면 애초에
+    // 아무 품목도 applyDelta를 타지 않는다 — 부분 반영이 없다(2패스: 전량 검증 후 전량 반영).
+    // ponytail: 이 테스트는 프로덕션 트랜잭션 롤백 자체를 검증하지 않는다. 이 하네스는
+    // CycleCountService/InventoryService를 new로 직접 생성해 Spring AOP 프록시가 없으므로
+    // @Transactional 롤백이 애초에 작동하지 않는 환경이다 — 여기서 통과해도 "롤백이 된다"는
+    // 증거는 아니다. 프로덕션 롤백 경로는 별도 커버리지가 없다.
     @Test
-    void 한_품목이라도_실패하면_세션_전체가_롤백된다() {
+    void 한_품목이라도_반영_불가면_아무것도_반영하지_않는다() {
         seed(1L, 15);
         seed(2L, 10);
         inventoryService.reserveAll(77L, Map.of(2L, 8));   // 상품2는 8개가 예약된 상태

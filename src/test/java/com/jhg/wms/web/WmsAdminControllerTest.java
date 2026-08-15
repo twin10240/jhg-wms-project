@@ -333,8 +333,8 @@ class WmsAdminControllerTest {
     @Test
     void 수불대장은_합계행에_컬럼별_총계를_렌더링한다() throws Exception {
         when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
-                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, -2, 106),
-                new InventoryService.LedgerRow(2L, "상품 2", 50, 0, 10, 0, -5, 0, 55)));
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, -2, 7, 113),
+                new InventoryService.LedgerRow(2L, "상품 2", 50, 0, 10, 0, -5, 0, 5, 60)));
 
         mockMvc.perform(get("/admin/inventory/ledger").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
@@ -344,7 +344,8 @@ class WmsAdminControllerTest {
                         containsString(">150<"),    // 기초 100+50
                         containsString(">30<"),     // 입고 20+10
                         containsString(">-20<"),    // 출고 -15+-5
-                        containsString(">161<"))));  // 기말 106+55
+                        containsString(">12<"),     // 실사 7+5
+                        containsString(">173<"))));  // 기말 113+60
     }
 
     @Test

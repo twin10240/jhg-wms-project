@@ -399,6 +399,7 @@ class InventoryServiceTest {
         service.applyDelta(1L, 5, InventoryTransactionType.RETURN, "RMA#1", null);
         service.applyDelta(1L, -20, InventoryTransactionType.SHIP, "ORDER#1", null);
         service.applyDelta(1L, -3, InventoryTransactionType.ADJUST, null, "파손");
+        service.applyDelta(1L, 2, InventoryTransactionType.COUNT, "COUNT#1", null);   // 실사 차이 반영
 
         var rows = service.buildLedger(java.time.LocalDate.now(), java.time.LocalDate.now());
 
@@ -410,9 +411,10 @@ class InventoryServiceTest {
         assertThat(r.returnQty()).isEqualTo(5);
         assertThat(r.ship()).isEqualTo(-20);       // 기간 이전 -10은 제외
         assertThat(r.adjust()).isEqualTo(-3);
-        assertThat(r.closing()).isEqualTo(
-                r.opening() + r.initial() + r.receive() + r.returnQty() + r.ship() + r.adjust());
-        assertThat(r.closing()).isEqualTo(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()); // 122
+        assertThat(r.countQty()).isEqualTo(2);
+        assertThat(r.closing()).isEqualTo(r.opening() + r.initial() + r.receive() + r.returnQty()
+                + r.ship() + r.adjust() + r.countQty());
+        assertThat(r.closing()).isEqualTo(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()); // 124
     }
 
     @Test

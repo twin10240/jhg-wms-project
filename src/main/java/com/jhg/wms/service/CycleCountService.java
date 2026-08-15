@@ -73,10 +73,10 @@ public class CycleCountService {
     /**
      * 승인. 차이 = 실물 − <b>승인 시점</b> 장부. 세는 동안 재고가 움직여도 원장 불변식이 유지된다.
      * 차이가 있는 품목만 applyDelta를 타므로, 재고가 늘면 OMS 백오더 승격 통지도 그대로 따라온다.
-     * <p>먼저 전 품목의 반영 가능 여부를 검증하고, 전부 통과한 뒤에야 반영한다 — 앞 품목을 반영한
-     * 뒤 다음 품목에서 실패하는 순서라면(applyDelta의 음수·예약 미만 가드), {@code @Transactional}의
-     * 롤백만으로는 앞 품목의 변경이 호출 시점에 이미 보인 상태가 되어 "절반만 반영된 실사"가 관찰될
-     * 여지가 남는다. 반영 전에 전량 검증해 애초에 부분 반영이 발생하지 않게 한다.
+     * <p>먼저 전 품목의 반영 가능 여부를 검증하고, 전부 통과한 뒤에야 반영한다 — 반영을 시작하기
+     * 전에 전 품목을 검증하므로, 트랜잭션 롤백에 의존하지 않고도 부분 반영 자체가 애초에 발생하지
+     * 않는다. 이 판정은 {@link Inventory#validateDelta}로, onHand를 실제로 변경하는
+     * {@link InventoryService#applyDelta}의 가드와 같은 규칙을 공유한다.
      */
     @Transactional
     public void approve(Long sessionId) {
@@ -95,10 +95,7 @@ public class CycleCountService {
                 throw new IllegalArgumentException("재고에 없는 상품입니다. productId=" + item.getProductId());
             int diff = item.getCountedQty() - inv.getOnHandQty();
             if (diff == 0) continue;   // 센 사실은 세션이 기록한다 — delta 0 원장 행은 노이즈다
-            int after = inv.getOnHandQty() + diff;
-            if (after < 0 || after < inv.getReservedQty())
-                throw new IllegalArgumentException(
-                        "재고 반영이 불가능한 품목입니다. productId=" + item.getProductId());
+            inv.validateDelta(diff);
             diffs.put(item.getProductId(), diff);
         }
 

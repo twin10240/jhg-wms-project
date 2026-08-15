@@ -66,4 +66,14 @@ public class Inventory {
     public void release(int qty) {
         reservedQty -= qty;
     }
+
+    /** onHand에 delta를 적용해도 되는지 판정한다 — 결과가 음수이거나 예약 수량 미만이면 거부.
+     *  onHand 변경의 유일 지점(applyDelta)과 그 사전 검증(실사 승인 등)이 공유하는 정본 규칙. */
+    public void validateDelta(int delta) {
+        int after = onHandQty + delta;
+        if (after < 0)
+            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + onHandQty + "개)");
+        if (after < reservedQty)
+            throw new IllegalArgumentException("예약된 수량(" + reservedQty + "개) 미만으로 줄일 수 없습니다.");
+    }
 }

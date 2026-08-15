@@ -39,7 +39,8 @@
                        : (t.reference.startsWith('PO#') ? '발주 #' + t.reference.substring(3)
                        : (t.reference.startsWith('ORDER#') ? '주문 #' + t.reference.substring(6)
                        : (t.reference.startsWith('RMA#') ? 'RMA #' + t.reference.substring(4)
-                       : t.reference)))}">—</td>
+                       : (t.reference.startsWith('COUNT#') ? '실사 #' + t.reference.substring(6)
+                       : t.reference))))}">—</td>
         <td th:text="${t.reason}"></td>
         <td th:text="${t.actor != null ? t.actor : '—'}">—</td>
       </tr>

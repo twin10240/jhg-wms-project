@@ -39,10 +39,7 @@ public class InventoryService {
                 .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId));
         int before = inv.getOnHandQty();
         int after = before + delta;
-        if (after < 0)
-            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + before + "개)");
-        if (after < inv.getReservedQty())
-            throw new IllegalArgumentException("예약된 수량(" + inv.getReservedQty() + "개) 미만으로 줄일 수 없습니다.");
+        inv.validateDelta(delta);
         inv.setOnHandQty(after);
         transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after,
                 reference, reason, actorProvider.current()));
@@ -196,15 +193,16 @@ public class InventoryService {
             int returnQty = d.getOrDefault(InventoryTransactionType.RETURN, 0);
             int ship = d.getOrDefault(InventoryTransactionType.SHIP, 0);
             int adjust = d.getOrDefault(InventoryTransactionType.ADJUST, 0);
+            int countQty = d.getOrDefault(InventoryTransactionType.COUNT, 0);
             rows.add(new LedgerRow(pid, names.getOrDefault(pid, "상품#" + pid), opening, initial,
-                    receive, returnQty, ship, adjust,
-                    opening + initial + receive + returnQty + ship + adjust));
+                    receive, returnQty, ship, adjust, countQty,
+                    opening + initial + receive + returnQty + ship + adjust + countQty));
         }
         return rows;
     }
 
     public record LedgerRow(Long productId, String productName, int opening, int initial,
-                             int receive, int returnQty, int ship, int adjust, int closing) {}
+                             int receive, int returnQty, int ship, int adjust, int countQty, int closing) {}
 
     /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */
     public List<InventoryTransaction> findTransactions(InventoryTransactionType type) {
