@@ -11,9 +11,9 @@
 | | |
 |---|---|
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
-| 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN` — 불변식 Σdelta == onHand |
+| 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 206개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
+| 테스트 | 247개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -160,8 +160,29 @@ adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 ```
 
 발주 입고·수동 조정·반품 재입고·초기 시드는 `InventoryService.applyDelta` 한 곳을 통과하며, 출고는 예약분 동시 차감 때문에
-별도 경로로 SHIP 트랜잭션을 기록한다 — 모든 경로가 `InventoryTransaction` 원장에 한 행씩 남긴다(OPENING/RECEIVE/SHIP/ADJUST/RETURN).
+별도 경로로 SHIP 트랜잭션을 기록한다 — 모든 경로가 `InventoryTransaction` 원장에 한 행씩 남긴다(OPENING/RECEIVE/SHIP/ADJUST/RETURN/COUNT).
 불변식: 상품별 원장 delta 합 == 현재 onHandQty.
+
+### 재고 실사
+
+장부와 실물이 어긋났을 때 **누가 무엇을 근거로 맞췄는지**에 답하기 위한 절차입니다.
+계수(OPERATOR)와 승인(MANAGER)을 분리해, 센 사람이 스스로 장부를 고치지 못하게 합니다.
+
+```
+OPEN ──(실물 입력, 전 품목 필수)──▶ SUBMITTED ──(승인)──▶ APPROVED  차이만 COUNT 원장
+                                              └─(반려)──▶ REJECTED  장부 불변
+```
+
+- **차이 = 실물 − 승인 시점 장부.** 실사는 세는 동안 시간이 흐르고 그 사이 입출고가 계속됩니다.
+  승인 시점으로 재계산하면 원장 불변식이 저절로 유지되고, 실사 때문에 주문 출고를 막을 필요도 없습니다.
+  대신 세는 동안 움직인 수량은 차이에 섞입니다 — 이를 구분하려면 대상 동결이 필요한데,
+  재고 정본을 한 곳에 둔 구조에서 동결은 OMS 주문까지 막으므로 택하지 않았습니다.
+- 차이가 있는 품목만 기존 `applyDelta`를 타므로, 실사로 재고가 늘면 **OMS 백오더 승격 통지가 자동으로 따라옵니다.**
+- 한 품목이라도 실패하면 세션 전체가 롤백됩니다 — 절반만 승인된 실사를 만들지 않습니다.
+- 같은 상품이 진행 중인 다른 세션에 있으면 새 세션 생성을 거부합니다.
+
+모든 원장 행에는 **행위자**가 남습니다 — 사람은 사용자명, OMS 서버간 호출은 서비스 계정명,
+기동 시드는 `system`. 이 필드가 생기기 전 행은 알 수 없는 정보라 백필하지 않고 `—`로 표시합니다.
 
 ### 보충 요청과 발주
 
@@ -249,6 +270,10 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
 | `/admin/returns` | 반품 목록 — 상태 필터(접수/입고/완료/취소) | 인증 |
 | `/admin/returns/{id}` | 반품 상세 — 품목별 요청·승인 수량과 처분 | 인증 |
 | `/admin/returns/{id}/receive`·`/complete`·`/cancel` (POST) | 반품 입고 처리 · 검수 완료 · 취소 | **MANAGER** |
+| `/admin/cycle-counts` | 재고 실사 — 세션 목록·진행률, 상태 필터 | 인증 |
+| `/admin/cycle-counts/new` | 대상 상품 선택 후 실사 시작 | 인증 |
+| `/admin/cycle-counts/{id}` | 실사 상세 — 실물 수량 입력·제출 | 인증 |
+| `/admin/cycle-counts/{id}/approve`·`/reject` (POST) | 실사 승인 · 반려 | **MANAGER** |
 
 상태는 화면에 **한글로 표시**합니다(발주됨/부분 입고/입고 완료/취소됨, 검토 대기/발주 진행/반려/입고 완료, 예약/출고 완료/예약 해제, 접수/입고/완료/취소) — enum 원문은 노출하지 않습니다.
 

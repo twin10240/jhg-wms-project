@@ -7,6 +7,7 @@ import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.ReplenishmentRequestService;
 import com.jhg.wms.service.RmaService;
+import com.jhg.wms.service.CycleCountService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -48,6 +49,7 @@ class WmsAdminControllerTest {
     @MockitoBean PurchaseOrderService purchaseOrderService;
     @MockitoBean ReplenishmentRequestService replenishmentRequestService;
     @MockitoBean RmaService rmaService;
+    @MockitoBean CycleCountService cycleCountService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
@@ -404,5 +406,20 @@ class WmsAdminControllerTest {
                 "행위자가 있는 행은 사유 컬럼 다음 셀에 사용자명을 표시해야 한다");
         assertTrue(Pattern.compile("구 데이터</td>\\s*<td>—</td>").matcher(html).find(),
                 "행위자가 없는 행은 사유 컬럼 다음 셀에 —를 표시해야 한다");
+    }
+
+    @Test
+    void 대시보드는_승인대기_실사_건수를_보여준다() throws Exception {
+        when(inventoryService.findAllRows()).thenReturn(List.of());
+        when(purchaseOrderService.findAllWithItems()).thenReturn(List.of());
+        when(replenishmentRequestService.findAll()).thenReturn(List.of());
+        when(inventoryService.findAllReservations()).thenReturn(List.of());
+        when(rmaService.findAll(null)).thenReturn(List.of());
+        when(cycleCountService.countPendingApproval()).thenReturn(2L);
+
+        mockMvc.perform(get("/").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("pendingCycleCountCount", 2L))
+                .andExpect(content().string(containsString("실사 승인 대기")));
     }
 }

@@ -120,6 +120,11 @@ public class CycleCountService {
                 : cycleCountRepository.findByStatusOrderByIdDesc(status);
     }
 
+    /** 대시보드 "처리 대기" 집계 — 세션을 전부 로드하지 않고 개수만 센다. */
+    public long countPendingApproval() {
+        return cycleCountRepository.countByStatus(CycleCountStatus.SUBMITTED);
+    }
+
     /** 이 세션이 실제로 반영한 품목별 차이. 원장이 정본이므로 세션에 복사해두지 않고 여기서 읽는다.
      *  결과에 없는 품목은 차이가 0이었다는 뜻이다(= 일치). */
     public Map<Long, Integer> appliedDeltas(Long sessionId) {
