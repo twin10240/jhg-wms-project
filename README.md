@@ -10,10 +10,10 @@
 
 | | |
 |---|---|
-| 통신 채널 | 4개 (조회 · 이행 · 통지 · 보상) |
-| 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST` — 불변식 Σdelta == onHand |
+| 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
+| 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN` — 불변식 Σdelta == onHand |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 156개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
+| 테스트 | 206개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -67,6 +67,7 @@
 | S2 | OMS → WMS | 주문 이행 `reserve` / `ship` / `release` |
 | S3 | WMS → OMS | 재고 증가(입고·조정) 통지 → OMS 백오더 FIFO 승격 |
 | S4 | 양방향 | 회복탄력성 — 타임아웃 · best-effort · 보상 스윕 |
+| S5 | 양방향 | 반품(RMA) — OMS가 접수 `POST /api/returns`, WMS가 검수 결과 통지 `POST /api/return-status-events` |
 
 보충 흐름: OMS가 백오더로 부족을 감지 → WMS에 **보충 요청** → WMS 관리자가 **승인 → 발주 생성 → 입고** → 재고 증가 → S3로 OMS에 통지 → OMS가 백오더 승격. (상세: 아래 [보충 요청과 발주](#보충-요청과-발주) · [OMS 재고보충 통지](#oms-재고보충-통지-s3-채널3) 절)
 
@@ -104,7 +105,7 @@ JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 
 | 구분 | 계정 | 용도 |
 |------|------|------|
-| 관리자(MANAGER) | `manager` / `manager` | 폼 로그인 — 발주 생성·취소, 보충요청 승인·반려 포함 전 기능 |
+| 관리자(MANAGER) | `manager` / `manager` | 폼 로그인 — 발주 생성·취소, 보충요청 승인·반려, 반품 입고·검수·취소 포함 전 기능 |
 | 운영자(OPERATOR) | `operator` / `operator` | 폼 로그인 — 조회·재고 조정·발주 입고 |
 | 서비스 계정 | `wms` / `wms` | `/api/**` HTTP Basic — OMS 서버간 호출 전용(사람 로그인 아님) |
 
@@ -158,8 +159,8 @@ release  → reservedQty -qty
 adjust   → onHandQty ±delta (예약분 미만·음수 방어)
 ```
 
-발주 입고·수동 조정·초기 시드는 `InventoryService.applyDelta` 한 곳을 통과하며, 출고는 예약분 동시 차감 때문에
-별도 경로로 SHIP 트랜잭션을 기록한다 — 모든 경로가 `InventoryTransaction` 원장에 한 행씩 남긴다(OPENING/RECEIVE/SHIP/ADJUST).
+발주 입고·수동 조정·반품 재입고·초기 시드는 `InventoryService.applyDelta` 한 곳을 통과하며, 출고는 예약분 동시 차감 때문에
+별도 경로로 SHIP 트랜잭션을 기록한다 — 모든 경로가 `InventoryTransaction` 원장에 한 행씩 남긴다(OPENING/RECEIVE/SHIP/ADJUST/RETURN).
 불변식: 상품별 원장 delta 합 == 현재 onHandQty.
 
 ### 보충 요청과 발주
@@ -189,6 +190,35 @@ CANCELLED ── 재입고 불가
 - 취소된 발주에는 입고 버튼이 노출되지 않고, 직접 요청해도 도메인이 거부합니다.
 - 연결된 보충 요청은 같은 트랜잭션에서 `CANCELLED`로 종결됩니다 — 필요하면 OMS가 새로 요청합니다.
 
+### 반품 (RMA, S5)
+
+출고된 주문의 반품을 WMS가 소유합니다. OMS는 고객 신청을 받아 접수만 요청하고, 입고·검수·재입고 판단과 재고 반영은 WMS 관리자가 합니다.
+
+| Method | URL | Body | 설명 |
+|--------|-----|------|------|
+| POST | `/api/returns` | `{"requestKey":"UUID","orderId":100,"reason":"...","items":[{"orderItemId":501,"productId":1,"quantity":1}]}` | 반품 접수 |
+| GET | `/api/returns/{rmaId}` | | 단건 조회 — 상태·품목별 승인 수량·처분 |
+
+| 응답 | 조건 |
+|------|------|
+| `201` | 신규 접수 |
+| `200` | 같은 `requestKey` + 같은 내용 (멱등 재요청 — 기존 `rmaId` 반환) |
+| `409` | 같은 `requestKey` + 다른 내용 |
+| `400` | 검증 실패 — 미출고 주문, 출고 내역에 없는 상품, 누적 반품량 초과, 수량 0 이하 |
+| `404` | 없는 `rmaId` 조회 — OMS 보상 스윕이 "요청이 잘못됨"과 구분해 처리하므로 400과 나눕니다 |
+
+```
+REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
+    └────────────────────▶ CANCELLED    (미입고 취소)
+```
+
+- **접수 직렬화**: `Reservation`을 `FOR UPDATE`로 잠급니다. RMA를 만드는 모든 경로가 이 잠금을 먼저 얻어야 누적 반품량 검증이 경합에서 깨지지 않습니다.
+- **누적 반품량**: `CANCELLED` 제외, `COMPLETED`는 승인 수량, 나머지는 요청 수량으로 합산해 출고량을 넘지 못하게 막습니다. 거절된 수량은 다시 신청할 수 있습니다.
+- **품목별 처분**: `RESTOCKED`(재입고 — 재고 증가) / `DISPOSED`(폐기) / `REJECTED`(거절). 승인 수량 0이면 반드시 `REJECTED`, 0보다 크면 `REJECTED`일 수 없습니다.
+- **재입고**는 `applyDelta(RETURN)`을 그대로 탑니다 — 재고 증가 경로가 하나뿐이라 S3(OMS 백오더 승격) 통지가 자동으로 따라옵니다.
+- **검수 결과 통지**(WMS → OMS `POST /api/return-status-events`): `COMPLETED`·`CANCELLED` 커밋 후 best-effort. 실패해도 재고와 완료 상태를 되돌리지 않고, OMS가 `GET /api/returns/{rmaId}`로 회수합니다. 인증은 `OMS_CALLBACK_USER`/`OMS_CALLBACK_PASSWORD`를 S3와 공유합니다.
+- **검수 완료는 되돌릴 수 없습니다.** 그래서 검수 폼은 승인 수량·처분에 기본값을 두지 않고, 미입력 제출은 서버가 거부합니다.
+
 ### OMS 재고보충 통지 (S3, 채널3)
 
 재고가 늘어나면(발주 입고, +조정) `OmsReplenishmentNotifier`가 트랜잭션 커밋 후 OMS `POST /api/replenishments` 에 `{"productIds":[...]}` 를 보냅니다 — OMS가 백오더를 FIFO 승격.
@@ -207,7 +237,8 @@ CANCELLED ── 재입고 불가
 | `/login` | 폼 로그인 (로그아웃·오류 안내) | 공개 |
 | `/` | 대시보드 — **처리 대기**(검토 대기 요청·부분입고 발주·가용 0 SKU)·재고·발주·예약 요약, 각 항목이 해당 목록으로 이동 | 인증 |
 | `/admin/inventory` | 재고 조회(보유·예약·가용)·수동 조정 | 인증 |
-| `/admin/inventory/transactions` | 재고 트랜잭션 이력 — 유형 필터(기초/입고/출고/조정), 상품명·변경 전→후·참조(`발주 #N`/`주문 #N`)·사유 표시, 최신 200건 | 인증 |
+| `/admin/inventory/transactions` | 재고 트랜잭션 이력 — 유형 필터(기초/입고/출고/조정/반품), 상품명·변경 전→후·참조(`발주 #N`/`주문 #N`/`RMA #N`)·사유 표시, 20건씩 페이징 | 인증 |
+| `/admin/inventory/ledger` | 수불대장 — 기간별 상품당 기초·기초설정·입고·반품·출고·조정·기말 집계(원장에서 유도) | 인증 |
 | `/admin/reservations` | 예약 현황 조회 — 상태 필터, 주문별 상품·수량 표시 (조회 전용) | 인증 |
 | `/admin/purchase-orders` | 발주 목록(`ORDERED`/`PARTIALLY_RECEIVED`/`RECEIVED`/`CANCELLED` 필터) — 미완료를 발주일시 오래된 순으로, 종료된 건은 뒤로 | 인증 |
 | `/admin/purchase-orders` (POST) | 발주 생성(다품목) | **MANAGER** |
@@ -215,8 +246,13 @@ CANCELLED ── 재입고 불가
 | `/admin/purchase-orders/{poId}/cancel` | 발주 취소 | **MANAGER** |
 | `/admin/replenishment-requests` | OMS 보충 요청 검토·이력 조회 | 인증 |
 | 승인·반려 (POST) | 보충 요청 승인·반려 | **MANAGER** |
+| `/admin/returns` | 반품 목록 — 상태 필터(접수/입고/완료/취소) | 인증 |
+| `/admin/returns/{id}` | 반품 상세 — 품목별 요청·승인 수량과 처분 | 인증 |
+| `/admin/returns/{id}/receive`·`/complete`·`/cancel` (POST) | 반품 입고 처리 · 검수 완료 · 취소 | **MANAGER** |
 
-상태는 화면에 **한글로 표시**합니다(발주됨/부분 입고/입고 완료/취소됨, 검토 대기/발주 진행/반려/입고 완료, 예약/출고 완료/예약 해제) — enum 원문은 노출하지 않습니다.
+상태는 화면에 **한글로 표시**합니다(발주됨/부분 입고/입고 완료/취소됨, 검토 대기/발주 진행/반려/입고 완료, 예약/출고 완료/예약 해제, 접수/입고/완료/취소) — enum 원문은 노출하지 않습니다.
+
+DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은 목록으로 되돌리고, 조회(GET)는 503 화면을 그립니다. 목록·대시보드는 그 화면 자신이 DB를 타므로 되돌려 보내면 리다이렉트 루프가 됩니다.
 
 ### 인증·인가 — 보안 체인 2분할
 
@@ -244,6 +280,8 @@ CANCELLED ── 재입고 불가
 |-----------|-----------|------|
 | **OMS가 죽은 채로 입고 발생** | 통지는 best-effort — 실패해도 입고·원장은 커밋(`OmsReplenishmentNotifier`가 예외를 삼킴) | 재고 무손실. 승격만 지연되고, OMS 복구 후 **보상 스윕**이 누락분 회수 |
 | **WMS가 죽은 채로 주문 유입** | OMS 어댑터가 가용수량을 **0으로 폴백** | 주문은 실패하지 않고 백오더로 접수. 없는 재고를 팔지 않음 |
+| **반품 검수 결과 통지 실패** | 통지는 best-effort — 실패해도 재입고·완료 상태는 커밋 | 재고 무손실. OMS가 `GET /api/returns/{rmaId}`로 결과를 회수 |
+| **DB 장애 중 관리자 화면 접근** | 조회는 503 화면을 직접 렌더 — 목록으로 되돌리지 않음 | 목록·대시보드가 자기 자신으로 리다이렉트하는 무한 루프 차단 |
 | **상대가 응답 없이 매달림(hang)** | RestClient 타임아웃 (connect 1s / read 2s) | 스레드가 묶이지 않고 수 초 내 복귀 |
 | **타임아웃으로 생긴 반쪽 상태** | `shipAll`은 RELEASED 예약 출고를, `releaseAll`은 SHIPPED 예약 해제를 **거부** | `reservedQty` 음수 같은 재고 오염 차단 |
 | **중복 요청 · 재시도** | 예약은 `orderId` UNIQUE로 멱등, 보충 요청은 `requestKey`로 멱등, 통지는 사실 전달이라 자연 멱등 | 재시도해도 수량이 두 번 반영되지 않음 |
@@ -267,10 +305,12 @@ CANCELLED ── 재입고 불가
 
 - **도메인 단위** — `InventoryTest` / `ReservationTest` / `PurchaseOrderTest` / `ReplenishmentRequestTest` / `WmsUserTest`
   - 발주 상태 전이(부분 입고·취소), 취소된 발주의 입고 거부 포함
-- **서비스 통합**(`@DataJpaTest`) — `InventoryServiceTest` / `PurchaseOrderServiceTest` / `ReplenishmentRequestServiceTest`
+- **서비스 통합**(`@DataJpaTest`) — `InventoryServiceTest` / `PurchaseOrderServiceTest` / `ReplenishmentRequestServiceTest` / `RmaServiceTest`
   - 원장 재구성 불변식(Σ delta == onHand), 발주 취소 시 연결 요청 종결·재고 불변, 목록 정렬 검증
-- **MockMvc 슬라이스** — `InventoryControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest`
+  - 수불대장 기말 항등식, 반품 접수 검증·멱등·누적 반품량·처분별 재고 반영(RESTOCKED만 증가)
+- **MockMvc 슬라이스** — `InventoryControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest` / `RmaControllerTest` / `RmaAdminControllerTest`
   - 롤 경계(OPERATOR가 MANAGER 액션 호출 시 403), 화면 렌더링(한글 상태·상품명·참조) 포함
+  - 반품 API 상태 코드 계약(201/200/409/400/404/401), 검수 폼 기본값 부재, DB 장애 시 503(리다이렉트 루프 아님)
 - **보안 통합**(`@SpringBootTest(RANDOM_PORT)`) — `SecurityChainIntegrationTest`
   - `/api/**` 미인증 **401 유지**(302 아님), Basic 200, 폼 로그인 왕복. MockMvc가 재현 못 하는 실서블릿 `/error` 재디스패치를 검증
 - **설정·기동** — `WmsUserSeederTest`(멱등·BCrypt·공백 자격증명 기동 실패) / `DbUserDetailsServiceTest`(롤→`ROLE_` 권한)
@@ -331,4 +371,5 @@ docker compose exec redis redis-cli --scan --pattern "spring:session:*"
 - [OMS·WMS 통합 수동 검증](https://github.com/twin10240/jhg-commerce-project/blob/master/docs/manual-verification-scenarios.md)
 - [`docs/wms-business-roadmap.md`](docs/wms-business-roadmap.md) — 완료 기능과 1차 이후 선택 로드맵
 - [`docs/wms-admin-ux-followup.md`](docs/wms-admin-ux-followup.md) — 관리자 UX 완료·잔여 항목
+- [`docs/wms-enum-schema-migration.md`](docs/wms-enum-schema-migration.md) — enum 값 추가 시 prod 스키마 마이그레이션 절차(`ddl-auto: update`가 갱신하지 않는 부분)
 - [`docs/superpowers/`](docs/superpowers/) — 날짜별 설계·구현 계획 기록

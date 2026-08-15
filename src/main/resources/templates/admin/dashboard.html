@@ -39,6 +39,16 @@
       </p>
       <p><a th:href="@{/admin/reservations}">예약 현황 →</a></p>
     </div>
+    <div class="card" th:if="${rmaRequestedCount != null}">
+      <h3>반품(RMA)</h3>
+      <p class="big" th:text="${rmaRequestedCount}">0</p>
+      <p class="label">입고 대기</p>
+      <p>
+        <span class="badge badge-received">입고</span> <b th:text="${rmaReceivedCount}">0</b> ·
+        <span class="badge badge-completed">완료</span> <b th:text="${rmaCompletedCount}">0</b>
+      </p>
+      <p><a th:href="@{/admin/returns(status='REQUESTED')}">입고 대기 →</a></p>
+    </div>
   </div>
 </main>
 </body>

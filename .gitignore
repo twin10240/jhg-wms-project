@@ -40,3 +40,6 @@ out/
 .worktrees/
 
 Microsoft/
+
+# macOS
+.DS_Store

@@ -1,6 +1,8 @@
 package com.jhg.wms.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,6 +21,8 @@ public class PurchaseOrder {
     @Id @GeneratedValue
     @Column(name = "purchase_order_id")
     private Long id;
+
+    @JdbcTypeCode(SqlTypes.VARCHAR)   // H2 네이티브 ENUM 회피 — 값 추가 시 기존 컬럼이 거부하는 사고 방지
 
     @Enumerated(EnumType.STRING)
     private PurchaseOrderStatus status;

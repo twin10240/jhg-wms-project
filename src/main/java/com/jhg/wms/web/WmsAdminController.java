@@ -5,12 +5,14 @@ import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import com.jhg.wms.service.ReplenishmentRequestService;
+import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,7 @@ public class WmsAdminController {
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
     private final ReplenishmentRequestService replenishmentRequestService;
+    private final RmaService rmaService;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -45,6 +48,11 @@ public class WmsAdminController {
         model.addAttribute("reservedCount", resCounts.getOrDefault(ReservationStatus.RESERVED, 0L));
         model.addAttribute("shippedCount", resCounts.getOrDefault(ReservationStatus.SHIPPED, 0L));
         model.addAttribute("releasedCount", resCounts.getOrDefault(ReservationStatus.RELEASED, 0L));
+        Map<RmaStatus, Long> rmaCounts = rmaService.findAll(null).stream()
+                .collect(Collectors.groupingBy(RmaReturn::getStatus, Collectors.counting()));
+        model.addAttribute("rmaRequestedCount", rmaCounts.getOrDefault(RmaStatus.REQUESTED, 0L));
+        model.addAttribute("rmaReceivedCount", rmaCounts.getOrDefault(RmaStatus.RECEIVED, 0L));
+        model.addAttribute("rmaCompletedCount", rmaCounts.getOrDefault(RmaStatus.COMPLETED, 0L));
         return "admin/dashboard";
     }
 
@@ -67,10 +75,16 @@ public class WmsAdminController {
     }
 
     @GetMapping("/admin/inventory/transactions")
-    public String inventoryTransactions(@RequestParam(required = false) InventoryTransactionType type, Model model) {
+    public String inventoryTransactions(@RequestParam(required = false) InventoryTransactionType type,
+                                        @RequestParam(defaultValue = "0") int page,
+                                        Model model) {
+        var pageable = org.springframework.data.domain.PageRequest.of(page, 20);
+        var txnPage = inventoryService.findTransactions(type, pageable);
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
-        model.addAttribute("transactions", inventoryService.findTransactions(type));
+        model.addAttribute("transactions", txnPage.getContent());
+        model.addAttribute("currentPage", txnPage.getNumber());
+        model.addAttribute("totalPages", txnPage.getTotalPages());
         model.addAttribute("filterType", type);
         return "admin/inventory-transactions";
     }
@@ -86,6 +100,23 @@ public class WmsAdminController {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
         return "redirect:/admin/inventory";
+    }
+
+    @GetMapping("/admin/inventory/ledger")
+    public String ledger(@RequestParam(required = false) LocalDate from,
+                         @RequestParam(required = false) LocalDate to,
+                         Model model) {
+        if (from == null) from = LocalDate.now().withDayOfMonth(1);
+        if (to == null) to = LocalDate.now();
+        try {
+            model.addAttribute("ledger", inventoryService.buildLedger(from, to));
+        } catch (IllegalArgumentException e) {
+            model.addAttribute("ledger", List.of());
+            model.addAttribute("errorMessage", e.getMessage());
+        }
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        return "admin/inventory-ledger";
     }
 
     @GetMapping("/admin/purchase-orders")

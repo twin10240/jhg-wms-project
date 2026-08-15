@@ -26,6 +26,7 @@ class InventoryServiceTest {
     @Autowired InventoryRepository repo;
     @Autowired ReservationRepository reservationRepo;
     @Autowired InventoryTransactionRepository adjustmentRepo;
+    @Autowired jakarta.persistence.EntityManager em;
     InventoryService service;
     OmsReplenishmentNotifier notifier;
 
@@ -375,5 +376,81 @@ class InventoryServiceTest {
         int onHand = repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty();
         assertThat(deltaSum).isEqualTo(onHand);   // 115
         assertThat(onHand).isEqualTo(115);
+    }
+
+    // ── 수불대장 ──────────────────────────────────────────────
+
+    /** 이미 쌓인 원장을 통째로 과거로 민다 — createdAt이 now() 고정이라 기간 경계를 이렇게만 만들 수 있다. */
+    private void 기존원장을_과거로(java.time.LocalDateTime when) {
+        em.flush();
+        em.createQuery("update InventoryTransaction t set t.createdAt = :when")
+                .setParameter("when", when).executeUpdate();
+        em.clear();
+    }
+
+    @Test
+    void buildLedger_기초는_기간이전_누적이고_기말은_항등식을_만족한다() {
+        seed(1L, 0);
+        service.applyDelta(1L, 100, InventoryTransactionType.OPENING, null, null);
+        service.applyDelta(1L, -10, InventoryTransactionType.SHIP, "ORDER#0", null);
+        기존원장을_과거로(java.time.LocalDateTime.now().minusDays(10));   // 여기까지가 기초 90
+
+        service.applyDelta(1L, 50, InventoryTransactionType.RECEIVE, "PO#1", null);
+        service.applyDelta(1L, 5, InventoryTransactionType.RETURN, "RMA#1", null);
+        service.applyDelta(1L, -20, InventoryTransactionType.SHIP, "ORDER#1", null);
+        service.applyDelta(1L, -3, InventoryTransactionType.ADJUST, null, "파손");
+
+        var rows = service.buildLedger(java.time.LocalDate.now(), java.time.LocalDate.now());
+
+        assertThat(rows).hasSize(1);
+        var r = rows.get(0);
+        assertThat(r.opening()).isEqualTo(90);     // 기간 이전분만
+        assertThat(r.initial()).isZero();
+        assertThat(r.receive()).isEqualTo(50);
+        assertThat(r.returnQty()).isEqualTo(5);
+        assertThat(r.ship()).isEqualTo(-20);       // 기간 이전 -10은 제외
+        assertThat(r.adjust()).isEqualTo(-3);
+        assertThat(r.closing()).isEqualTo(
+                r.opening() + r.initial() + r.receive() + r.returnQty() + r.ship() + r.adjust());
+        assertThat(r.closing()).isEqualTo(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()); // 122
+    }
+
+    @Test
+    void buildLedger_기간내_OPENING은_조정이_아니라_기초설정_열로_간다() {
+        seed(1L, 0);
+        service.applyDelta(1L, 100, InventoryTransactionType.OPENING, null, null);
+        service.applyDelta(1L, -3, InventoryTransactionType.ADJUST, null, "파손");
+
+        var r = service.buildLedger(java.time.LocalDate.now(), java.time.LocalDate.now()).get(0);
+
+        assertThat(r.opening()).isZero();
+        assertThat(r.initial()).isEqualTo(100);
+        assertThat(r.adjust()).isEqualTo(-3);
+        assertThat(r.closing()).isEqualTo(97);
+    }
+
+    @Test
+    void buildLedger_원장에_없는_상품은_행으로_나오지_않는다() {
+        seed(1L, 0);
+        seed(2L, 0);   // 변동 없음 — 재고 행만 존재
+        service.applyDelta(1L, 10, InventoryTransactionType.RECEIVE, "PO#1", null);
+
+        var rows = service.buildLedger(java.time.LocalDate.now(), java.time.LocalDate.now());
+
+        assertThat(rows).extracting(InventoryService.LedgerRow::productId).containsExactly(1L);
+    }
+
+    @Test
+    void buildLedger_원장이_비면_빈_목록() {
+        seed(1L, 0);
+        assertThat(service.buildLedger(java.time.LocalDate.now(), java.time.LocalDate.now())).isEmpty();
+    }
+
+    @Test
+    void buildLedger_시작일이_종료일보다_뒤면_예외() {
+        assertThatThrownBy(() -> service.buildLedger(
+                java.time.LocalDate.now(), java.time.LocalDate.now().minusDays(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("시작일");
     }
 }
