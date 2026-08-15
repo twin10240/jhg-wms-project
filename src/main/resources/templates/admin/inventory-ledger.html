@@ -25,6 +25,7 @@
         <th style="text-align:right">반품입고</th>
         <th style="text-align:right">출고</th>
         <th style="text-align:right">조정</th>
+        <th style="text-align:right">실사</th>
         <th style="text-align:right">기말재고</th>
       </tr>
     </thead>
@@ -38,10 +39,11 @@
         <td style="text-align:right" th:text="${row.returnQty}">3</td>
         <td style="text-align:right" th:text="${row.ship}">-15</td>
         <td style="text-align:right" th:text="${row.adjust}">-2</td>
+        <td style="text-align:right" th:text="${row.countQty}">1</td>
         <td style="text-align:right"><b th:text="${row.closing}">106</b></td>
       </tr>
       <tr th:if="${#lists.isEmpty(ledger)}">
-        <td colspan="9">해당 기간에 재고 변동이 없습니다.</td>
+        <td colspan="10">해당 기간에 재고 변동이 없습니다.</td>
       </tr>
     </tbody>
     <tfoot th:if="${!#lists.isEmpty(ledger)}">
@@ -53,6 +55,7 @@
         <td style="text-align:right" th:text="${#aggregates.sum(ledger.![returnQty])}">0</td>
         <td style="text-align:right" th:text="${#aggregates.sum(ledger.![ship])}">0</td>
         <td style="text-align:right" th:text="${#aggregates.sum(ledger.![adjust])}">0</td>
+        <td style="text-align:right" th:text="${#aggregates.sum(ledger.![countQty])}">0</td>
         <td style="text-align:right" th:text="${#aggregates.sum(ledger.![closing])}">0</td>
       </tr>
     </tfoot>

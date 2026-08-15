@@ -5,5 +5,6 @@ public enum InventoryTransactionType {
     RECEIVE, // 발주 입고
     SHIP,    // 출고
     ADJUST,  // 수동 조정
-    RETURN   // 반품 재입고
+    RETURN,  // 반품 재입고
+    COUNT    // 실사 차이 반영
 }

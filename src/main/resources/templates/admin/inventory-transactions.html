@@ -13,11 +13,12 @@
     | <a th:href="@{/admin/inventory/transactions(type='SHIP')}">출고</a>
     | <a th:href="@{/admin/inventory/transactions(type='ADJUST')}">조정</a>
     | <a th:href="@{/admin/inventory/transactions(type='RETURN')}">반품</a>
+    | <a th:href="@{/admin/inventory/transactions(type='COUNT')}">실사</a>
   </p>
   <div class="table-wrap">
   <table>
     <thead>
-      <tr><th>일시</th><th>상품</th><th>유형</th><th>변동</th><th>변경 전 → 후</th><th>참조</th><th>사유</th></tr>
+      <tr><th>일시</th><th>상품</th><th>유형</th><th>변동</th><th>변경 전 → 후</th><th>참조</th><th>사유</th><th>행위자</th></tr>
     </thead>
     <tbody>
       <tr th:each="t : ${transactions}">
@@ -29,6 +30,7 @@
           <span th:case="'SHIP'">출고</span>
           <span th:case="'ADJUST'">조정</span>
           <span th:case="'RETURN'">반품</span>
+          <span th:case="'COUNT'">실사</span>
           <span th:case="*" th:text="${t.type}">유형</span>
         </td>
         <td th:text="${(t.delta > 0 ? '+' : '') + t.delta}">+10</td>
@@ -37,11 +39,13 @@
                        : (t.reference.startsWith('PO#') ? '발주 #' + t.reference.substring(3)
                        : (t.reference.startsWith('ORDER#') ? '주문 #' + t.reference.substring(6)
                        : (t.reference.startsWith('RMA#') ? 'RMA #' + t.reference.substring(4)
-                       : t.reference)))}">—</td>
+                       : (t.reference.startsWith('COUNT#') ? '실사 #' + t.reference.substring(6)
+                       : t.reference))))}">—</td>
         <td th:text="${t.reason}"></td>
+        <td th:text="${t.actor != null ? t.actor : '—'}">—</td>
       </tr>
       <tr th:if="${#lists.isEmpty(transactions)}">
-        <td colspan="7">트랜잭션 없음</td>
+        <td colspan="8">트랜잭션 없음</td>
       </tr>
     </tbody>
   </table>

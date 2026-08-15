@@ -35,7 +35,7 @@ class RmaServiceTest {
     void setUp() {
         var replenishNotifier = mock(com.jhg.wms.client.OmsReplenishmentNotifier.class);
         returnNotifier = mock(OmsReturnStatusNotifier.class);
-        inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo, replenishNotifier);
+        inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo, replenishNotifier, () -> "system");
         rmaService = new RmaService(rmaRepo, reservationRepo, inventoryService, returnNotifier);
     }
 

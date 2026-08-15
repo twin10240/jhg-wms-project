@@ -14,6 +14,7 @@ import java.util.List;
 
 public interface InventoryTransactionRepository extends JpaRepository<InventoryTransaction, Long> {
     List<InventoryTransaction> findAllByOrderByIdDesc();
+    List<InventoryTransaction> findByReference(String reference);
 
     // 관리자 화면용 — 원장이 계속 자라므로(입고·출고 라인마다 1행) 전건이 아닌 최신 200건만.
     List<InventoryTransaction> findTop200ByOrderByIdDesc();

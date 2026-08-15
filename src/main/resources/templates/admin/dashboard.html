@@ -49,6 +49,12 @@
       </p>
       <p><a th:href="@{/admin/returns(status='REQUESTED')}">입고 대기 →</a></p>
     </div>
+    <div class="card" th:if="${pendingCycleCountCount != null}">
+      <h3>실사 승인 대기</h3>
+      <p class="big" th:text="${pendingCycleCountCount}">0</p>
+      <p class="label">계수 완료, 승인 필요</p>
+      <p><a th:href="@{/admin/cycle-counts(status='SUBMITTED')}">승인 대기 →</a></p>
+    </div>
   </div>
 </main>
 </body>

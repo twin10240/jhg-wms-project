@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('WMS 실사 상세')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('cycle-counts')}"></nav>
+<main>
+  <h2>실사 #<span th:text="${cc.id}">1</span></h2>
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <p>
+    상태:
+    <span class="badge" th:classappend="'badge-cc-' + ${#strings.toLowerCase(cc.status.name())}"
+          th:switch="${cc.status.name()}">
+      <span th:case="'OPEN'">작성 중</span>
+      <span th:case="'SUBMITTED'">승인 대기</span>
+      <span th:case="'APPROVED'">승인</span>
+      <span th:case="'REJECTED'">반려</span>
+    </span>
+    · 메모: <span th:text="${cc.memo}">—</span>
+    · 계수자: <b th:text="${cc.createdBy}">operator</b>
+    <span th:if="${cc.approvedBy != null}"> · 승인자: <b th:text="${cc.approvedBy}">manager</b></span>
+    <span th:if="${cc.rejectedBy != null}"> · 반려자: <b th:text="${cc.rejectedBy}">manager</b>
+      (사유: <span th:text="${cc.rejectReason}">—</span>)</span>
+  </p>
+
+  <!-- 작성 중: 실물 수량 입력 -->
+  <form id="ccCounts" th:if="${cc.status.name() == 'OPEN'}"
+        th:action="@{/admin/cycle-counts/{id}/counts(id=${cc.id})}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>상품</th><th>세션 시작 장부</th><th>현재 장부</th><th>실물 수량</th></tr>
+        </thead>
+        <tbody>
+          <tr th:each="item, stat : ${cc.items}">
+            <td th:text="${productNames.getOrDefault(item.productId, '상품#' + item.productId)}">상품 1</td>
+            <td th:text="${item.bookQtyAtOpen}">15</td>
+            <td th:text="${bookQtyNow.getOrDefault(item.productId, 0)}">13</td>
+            <td>
+              <input type="hidden" th:name="|items[${stat.index}].itemId|" th:value="${item.id}" />
+              <!-- 기본값을 두지 않는다 — 미입력과 0("세어보니 없었다")을 구분해야 한다. -->
+              <input type="number" th:name="|items[${stat.index}].countedQty|" min="0"
+                     th:value="${item.countedQty}" style="width:90px" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  <!-- 제출 이후: 읽기 전용 + 차이 -->
+  <div class="table-wrap" th:if="${cc.status.name() != 'OPEN'}">
+    <table>
+      <thead>
+        <tr><th>상품</th><th>세션 시작 장부</th><th>실물 수량</th><th>현재 장부</th><th>반영 결과</th></tr>
+      </thead>
+      <tbody>
+        <tr th:each="item : ${cc.items}">
+          <td th:text="${productNames.getOrDefault(item.productId, '상품#' + item.productId)}">상품 1</td>
+          <td th:text="${item.bookQtyAtOpen}">15</td>
+          <td th:text="${item.countedQty != null ? item.countedQty : '—'}">14</td>
+          <td th:text="${bookQtyNow.getOrDefault(item.productId, 0)}">14</td>
+          <!-- 원장에 행이 없으면 차이가 0이었다는 뜻 = 일치. 승인 전에는 아직 판정할 수 없다. -->
+          <td th:if="${cc.status.name() != 'APPROVED'}">—</td>
+          <td th:if="${cc.status.name() == 'APPROVED'}"
+              th:text="${appliedDeltas.containsKey(item.productId)
+                         ? (appliedDeltas.get(item.productId) > 0 ? '+' + appliedDeltas.get(item.productId)
+                                                                 : appliedDeltas.get(item.productId))
+                         : '일치'}">일치</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <form id="ccApprove" sec:authorize="hasRole('MANAGER')" th:if="${cc.status.name() == 'SUBMITTED'}"
+        th:action="@{/admin/cycle-counts/{id}/approve(id=${cc.id})}" method="post"
+        onsubmit="return confirm('승인하면 차이가 재고에 반영되고 되돌릴 수 없습니다. 진행하시겠습니까?');">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+  </form>
+
+  <form id="ccReject" sec:authorize="hasRole('MANAGER')" th:if="${cc.status.name() == 'SUBMITTED'}"
+        th:action="@{/admin/cycle-counts/{id}/reject(id=${cc.id})}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <input type="text" name="reason" placeholder="반려 사유" style="width:260px" />
+  </form>
+
+  <div class="detail-actions">
+    <button type="submit" form="ccCounts" th:if="${cc.status.name() == 'OPEN'}">실물 수량 저장</button>
+    <!-- 같은 폼(ccCounts)을 제출한다 — 화면의 값이 항상 먼저 저장된 뒤 제출로 이어진다.
+         action=submit을 서버가 보고 저장 후 이어서 제출까지 처리한다(saveCounts에 저장을 건너뛰는 경로가 없다). -->
+    <button type="submit" form="ccCounts" name="action" value="submit" th:if="${cc.status.name() == 'OPEN'}"
+            onclick="return confirm('제출하면 승인 대기 상태로 넘어가며, 이후에는 실물 수량을 고칠 수 없습니다. 진행하시겠습니까?');">제출</button>
+    <button type="submit" form="ccApprove" sec:authorize="hasRole('MANAGER')"
+            th:if="${cc.status.name() == 'SUBMITTED'}">승인</button>
+    <button type="submit" form="ccReject" class="btn btn--danger" sec:authorize="hasRole('MANAGER')"
+            th:if="${cc.status.name() == 'SUBMITTED'}">반려</button>
+  </div>
+
+  <p><a th:href="@{/admin/cycle-counts}">← 실사 목록</a></p>
+</main>
+</body>
+</html>

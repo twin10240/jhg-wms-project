@@ -1,6 +1,7 @@
 package com.jhg.wms.web;
 
 import com.jhg.wms.domain.*;
+import com.jhg.wms.service.CycleCountService;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
@@ -26,6 +27,7 @@ public class WmsAdminController {
     private final PurchaseOrderService purchaseOrderService;
     private final ReplenishmentRequestService replenishmentRequestService;
     private final RmaService rmaService;
+    private final CycleCountService cycleCountService;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -53,6 +55,7 @@ public class WmsAdminController {
         model.addAttribute("rmaRequestedCount", rmaCounts.getOrDefault(RmaStatus.REQUESTED, 0L));
         model.addAttribute("rmaReceivedCount", rmaCounts.getOrDefault(RmaStatus.RECEIVED, 0L));
         model.addAttribute("rmaCompletedCount", rmaCounts.getOrDefault(RmaStatus.COMPLETED, 0L));
+        model.addAttribute("pendingCycleCountCount", cycleCountService.countPendingApproval());
         return "admin/dashboard";
     }
 

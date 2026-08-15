@@ -19,13 +19,14 @@ DECLARE
 BEGIN
     FOR target IN
         SELECT * FROM (VALUES
-            ('inventory_adjustment',  'type',        ARRAY['OPENING','RECEIVE','SHIP','ADJUST','RETURN']),
+            ('inventory_adjustment',  'type',        ARRAY['OPENING','RECEIVE','SHIP','ADJUST','RETURN','COUNT']),
             ('purchase_order',        'status',      ARRAY['ORDERED','PARTIALLY_RECEIVED','RECEIVED','CANCELLED']),
             ('replenishment_request', 'status',      ARRAY['REQUESTED','APPROVED','REJECTED','FULFILLED','CANCELLED']),
             ('reservation',           'status',      ARRAY['RESERVED','SHIPPED','RELEASED']),
             ('wms_user',              'role',        ARRAY['OPERATOR','MANAGER']),
             ('rma_return',            'status',      ARRAY['REQUESTED','RECEIVED','COMPLETED','CANCELLED']),
-            ('rma_return_item',       'disposition', ARRAY['RESTOCKED','DISPOSED','REJECTED'])
+            ('rma_return_item',       'disposition', ARRAY['RESTOCKED','DISPOSED','REJECTED']),
+            ('cycle_count',           'status',      ARRAY['OPEN','SUBMITTED','APPROVED','REJECTED'])
         ) AS t(tbl, col, vals)
     LOOP
         CONTINUE WHEN to_regclass(target.tbl) IS NULL;
@@ -62,5 +63,5 @@ FROM   pg_constraint c
 WHERE  c.contype = 'c'
   AND  c.conrelid::regclass::text IN
        ('inventory_adjustment','purchase_order','replenishment_request',
-        'reservation','wms_user','rma_return','rma_return_item')
+        'reservation','wms_user','rma_return','rma_return_item','cycle_count')
 ORDER  BY tbl, c.conname;

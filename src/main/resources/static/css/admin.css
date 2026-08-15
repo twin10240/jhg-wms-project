@@ -236,3 +236,9 @@ button.ghost:hover, a.ghost:hover { background: #f0f0f0; }
 .badge-received  { background: #e5edff; color: #1e40af; }
 .badge-completed { background: #dcfce7; color: #166534; }
 .badge-cancelled { background: #f1f1f1; color: #6b7280; text-decoration: line-through; }
+
+/* 실사 상태 */
+.badge-cc-open      { background: #e5edff; color: #1e40af; }
+.badge-cc-submitted { background: #fff4d6; color: #92600a; }
+.badge-cc-approved  { background: #dcfce7; color: #166534; }
+.badge-cc-rejected  { background: #f1f1f1; color: #6b7280; text-decoration: line-through; }

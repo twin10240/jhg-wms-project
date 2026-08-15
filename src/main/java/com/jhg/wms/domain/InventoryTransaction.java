@@ -46,11 +46,16 @@ public class InventoryTransaction {
 
     private String reason;
 
+    /** 이 행을 만든 주체. 사람이면 사용자명, OMS 서버간 호출이면 서비스 계정명, 기동 시드는 "system".
+     *  nullable: 이 필드가 생기기 전 행은 알 수 없는 정보라 백필하지 않는다. */
+    private String actor;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
     public static InventoryTransaction of(Long productId, InventoryTransactionType type, int delta,
-                                          int beforeQty, int afterQty, String reference, String reason) {
+                                          int beforeQty, int afterQty, String reference, String reason,
+                                          String actor) {
         InventoryTransaction t = new InventoryTransaction();
         t.productId = productId;
         t.type = type;
@@ -59,6 +64,7 @@ public class InventoryTransaction {
         t.afterQty = afterQty;
         t.reference = reference;
         t.reason = reason;
+        t.actor = actor;
         t.createdAt = LocalDateTime.now();
         return t;
     }

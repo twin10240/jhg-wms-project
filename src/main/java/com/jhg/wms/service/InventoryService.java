@@ -1,6 +1,7 @@
 package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
+import com.jhg.wms.config.ActorProvider;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
@@ -28,6 +29,7 @@ public class InventoryService {
     private final ReservationRepository reservationRepository;
     private final InventoryTransactionRepository transactionRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
+    private final ActorProvider actorProvider;
 
     /** onHand 변경 + 원장 기록의 유일 지점. 모든 실물 변동 경로가 통과한다. */
     @Transactional
@@ -37,12 +39,10 @@ public class InventoryService {
                 .orElseThrow(() -> new IllegalArgumentException("재고 없음: productId=" + productId));
         int before = inv.getOnHandQty();
         int after = before + delta;
-        if (after < 0)
-            throw new IllegalArgumentException("재고는 0 미만이 될 수 없습니다. (현재 " + before + "개)");
-        if (after < inv.getReservedQty())
-            throw new IllegalArgumentException("예약된 수량(" + inv.getReservedQty() + "개) 미만으로 줄일 수 없습니다.");
+        inv.validateDelta(delta);
         inv.setOnHandQty(after);
-        transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after, reference, reason));
+        transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after,
+                reference, reason, actorProvider.current()));
         if (delta > 0) {
             // 모든 재고 증가가 통과 — OMS 백오더 승격 트리거(트랜잭션 커밋 후).
             // ponytail: adjust 호출당 HTTP 1발(3품목 입고=3발). 자연 멱등이라 무해 — 배치 필요 시 트랜잭션 스코프 Set으로 모을 것.
@@ -121,7 +121,8 @@ public class InventoryService {
             int before = inv.getOnHandQty();
             inv.ship(qty);
             transactionRepository.save(InventoryTransaction.of(
-                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(), "ORDER#" + orderId, null));
+                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(),
+                "ORDER#" + orderId, null, actorProvider.current()));
         });
         reservation.ship();
     }
@@ -156,7 +157,7 @@ public class InventoryService {
         return reservationRepository.findAllByOrderByIdDesc();   // qtyByProductId 즉시 페치(EntityGraph)
     }
 
-    /** 수불대장: 기간별 상품당 기초·기초설정·입고·반품·출고·조정·기말 집계. */
+    /** 수불대장: 기간별 상품당 기초·기초설정·입고·반품·출고·조정·실사·기말 집계. */
     public List<LedgerRow> buildLedger(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new IllegalArgumentException("시작일이 종료일보다 뒤입니다.");
         LocalDateTime fromDt = from.atStartOfDay();
@@ -192,15 +193,16 @@ public class InventoryService {
             int returnQty = d.getOrDefault(InventoryTransactionType.RETURN, 0);
             int ship = d.getOrDefault(InventoryTransactionType.SHIP, 0);
             int adjust = d.getOrDefault(InventoryTransactionType.ADJUST, 0);
+            int countQty = d.getOrDefault(InventoryTransactionType.COUNT, 0);
             rows.add(new LedgerRow(pid, names.getOrDefault(pid, "상품#" + pid), opening, initial,
-                    receive, returnQty, ship, adjust,
-                    opening + initial + receive + returnQty + ship + adjust));
+                    receive, returnQty, ship, adjust, countQty,
+                    opening + initial + receive + returnQty + ship + adjust + countQty));
         }
         return rows;
     }
 
     public record LedgerRow(Long productId, String productName, int opening, int initial,
-                             int receive, int returnQty, int ship, int adjust, int closing) {}
+                             int receive, int returnQty, int ship, int adjust, int countQty, int closing) {}
 
     /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */
     public List<InventoryTransaction> findTransactions(InventoryTransactionType type) {

@@ -43,7 +43,7 @@ class PurchaseOrderServiceTest {
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
-        inventoryService = new InventoryService(inventoryRepo, reservationRepo, adjustmentRepo, notifier);
+        inventoryService = new InventoryService(inventoryRepo, reservationRepo, adjustmentRepo, notifier, () -> "system");
         service = new PurchaseOrderService(poRepo, inventoryService, requestRepo);
     }
 

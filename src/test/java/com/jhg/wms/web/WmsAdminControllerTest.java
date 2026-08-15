@@ -7,6 +7,7 @@ import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.ReplenishmentRequestService;
 import com.jhg.wms.service.RmaService;
+import com.jhg.wms.service.CycleCountService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -26,6 +28,7 @@ import org.springframework.data.domain.PageRequest;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -46,6 +49,7 @@ class WmsAdminControllerTest {
     @MockitoBean PurchaseOrderService purchaseOrderService;
     @MockitoBean ReplenishmentRequestService replenishmentRequestService;
     @MockitoBean RmaService rmaService;
+    @MockitoBean CycleCountService cycleCountService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
@@ -72,7 +76,7 @@ class WmsAdminControllerTest {
 
     @Test
     void 이력화면_트랜잭션_유형_필터가_동작한다() throws Exception {
-        InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null);
+        InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null, null);
         when(inventoryService.findTransactions(eq(InventoryTransactionType.RECEIVE), any()))
                 .thenReturn(new PageImpl<>(List.of(receive)));
 
@@ -86,8 +90,8 @@ class WmsAdminControllerTest {
     void 이력화면은_상품명_한글유형_한글참조를_표시한다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
         when(inventoryService.findTransactions(eq(null), any())).thenReturn(new PageImpl<>(List.of(
-                InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null),
-                InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null))));
+                InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null, null),
+                InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null, null))));
 
         mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
@@ -331,8 +335,8 @@ class WmsAdminControllerTest {
     @Test
     void 수불대장은_합계행에_컬럼별_총계를_렌더링한다() throws Exception {
         when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
-                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, -2, 106),
-                new InventoryService.LedgerRow(2L, "상품 2", 50, 0, 10, 0, -5, 0, 55)));
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, -2, 7, 113),
+                new InventoryService.LedgerRow(2L, "상품 2", 50, 0, 10, 0, -5, 0, 5, 60)));
 
         mockMvc.perform(get("/admin/inventory/ledger").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
@@ -342,7 +346,8 @@ class WmsAdminControllerTest {
                         containsString(">150<"),    // 기초 100+50
                         containsString(">30<"),     // 입고 20+10
                         containsString(">-20<"),    // 출고 -15+-5
-                        containsString(">161<"))));  // 기말 106+55
+                        containsString(">12<"),     // 실사 7+5
+                        containsString(">173<"))));  // 기말 113+60
     }
 
     @Test
@@ -378,5 +383,43 @@ class WmsAdminControllerTest {
         mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(view().name("error"));
+    }
+
+    // 원장에 행위자를 남겨도 화면에 없으면 감사에 쓸 수 없다. 값이 없는 과거 행은 "—"로 구분해 보인다.
+    @Test
+    void 이력화면은_행위자를_보여주고_없으면_대시로_표시한다() throws Exception {
+        InventoryTransaction withActor = InventoryTransaction.of(
+                1L, InventoryTransactionType.ADJUST, 3, 10, 13, null, "파손 정정", "manager");
+        InventoryTransaction legacy = InventoryTransaction.of(
+                1L, InventoryTransactionType.ADJUST, 1, 13, 14, null, "구 데이터", null);
+        when(inventoryService.findTransactions(eq(null), any()))
+                .thenReturn(new PageImpl<>(List.of(withActor, legacy)));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("행위자")))
+                .andReturn().getResponse().getContentAsString();
+
+        // 상품/참조 컬럼도 "—"를 쓰므로 존재 여부만으로는 행위자 컬럼을 못 잡는다.
+        // 사유 컬럼(각 행마다 고유한 텍스트) 바로 다음 셀이 행위자 컬럼이므로, 그 위치의 값을 직접 확인한다.
+        assertTrue(Pattern.compile("파손 정정</td>\\s*<td>manager</td>").matcher(html).find(),
+                "행위자가 있는 행은 사유 컬럼 다음 셀에 사용자명을 표시해야 한다");
+        assertTrue(Pattern.compile("구 데이터</td>\\s*<td>—</td>").matcher(html).find(),
+                "행위자가 없는 행은 사유 컬럼 다음 셀에 —를 표시해야 한다");
+    }
+
+    @Test
+    void 대시보드는_승인대기_실사_건수를_보여준다() throws Exception {
+        when(inventoryService.findAllRows()).thenReturn(List.of());
+        when(purchaseOrderService.findAllWithItems()).thenReturn(List.of());
+        when(replenishmentRequestService.findAll()).thenReturn(List.of());
+        when(inventoryService.findAllReservations()).thenReturn(List.of());
+        when(rmaService.findAll(null)).thenReturn(List.of());
+        when(cycleCountService.countPendingApproval()).thenReturn(2L);
+
+        mockMvc.perform(get("/").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("pendingCycleCountCount", 2L))
+                .andExpect(content().string(containsString("실사 승인 대기")));
     }
 }

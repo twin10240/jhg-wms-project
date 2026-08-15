@@ -18,7 +18,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * DB를 타므로 되돌려 보내면 같은 예외가 반복돼 리다이렉트 루프가 된다.
  */
 @Slf4j
-@ControllerAdvice(assignableTypes = {WmsAdminController.class, RmaAdminController.class})
+@ControllerAdvice(assignableTypes = {WmsAdminController.class, RmaAdminController.class,
+                                     CycleCountAdminController.class})
 public class AdminDataAccessAdvice {
 
     @ExceptionHandler(DataAccessException.class)
