@@ -66,3 +66,13 @@ Railway는 **public proxy 주소**여야 한다. `PGHOST`(`*.railway.internal`)�
 3. 배포
 
 이 절차가 반복해서 부담되면 그때 Flyway를 도입한다. 지금은 enum 추가 빈도가 낮아 수동으로 충분하다.
+
+## 실제 적용 이력
+
+| 날짜 | 추가한 값 | 대상 컬럼 |
+|------|-----------|-----------|
+| 2026-08-12 | `RETURN` | `inventory_adjustment.type` |
+| 2026-08-15 | `COUNT` | `inventory_adjustment.type` |
+
+`COUNT`는 이 문서가 예고한 절차를 처음으로 그대로 따른 사례다 — 상수 추가 → 스크립트 갱신 → 배포.
+prod 반영은 재배포 시점에 한다(Railway 중단 상태).

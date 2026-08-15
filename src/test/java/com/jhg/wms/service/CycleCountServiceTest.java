@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.mock;
 
 @DataJpaTest
@@ -36,7 +37,7 @@ class CycleCountServiceTest {
     void setUp() {
         inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
                 mock(OmsReplenishmentNotifier.class), () -> "manager");
-        service = new CycleCountService(cycleCountRepo, inventoryRepo, inventoryService, () -> "operator");
+        service = new CycleCountService(cycleCountRepo, inventoryRepo, txnRepo, inventoryService, () -> "operator");
     }
 
     private void seed(long pid, int qty) {
@@ -150,6 +151,117 @@ class CycleCountServiceTest {
         flush();
 
         assertThat(service.findById(c.getId()).getStatus()).isEqualTo(CycleCountStatus.SUBMITTED);
+    }
+
+    /** 실사는 세는 동안 재고가 움직인다. 차이는 승인 시점 장부로 다시 계산해야 원장 불변식이 유지된다. */
+    @Test
+    void 승인은_실사중_이동을_반영해_승인시점_장부로_차이를_계산한다() {
+        seed(1L, 15);
+        CycleCount c = service.open(List.of(1L), "실사");
+        flush();
+        service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 14));   // 실물 14
+        service.submit(c.getId());
+        flush();
+        inventoryService.applyDelta(1L, -2, com.jhg.wms.domain.InventoryTransactionType.SHIP,
+                "ORDER#99", null);                                   // 실사 중 출고 → 장부 13
+        flush();
+
+        service.approve(c.getId());
+        flush();
+
+        assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(14);
+        assertThat(txnRepo.findAll())
+                .filteredOn(t -> t.getType() == com.jhg.wms.domain.InventoryTransactionType.COUNT)
+                .singleElement()
+                .satisfies(t -> {
+                    assertThat(t.getDelta()).isEqualTo(1);       // 14 − 13
+                    assertThat(t.getBeforeQty()).isEqualTo(13);
+                    assertThat(t.getAfterQty()).isEqualTo(14);
+                    assertThat(t.getReference()).isEqualTo("COUNT#" + c.getId());
+                    assertThat(t.getActor()).isEqualTo("manager");
+                });
+    }
+
+    @Test
+    void 차이가_없는_품목은_원장에_남기지_않는다() {
+        seed(1L, 15);
+        CycleCount c = service.open(List.of(1L), "실사");
+        flush();
+        service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 15));
+        service.submit(c.getId());
+        flush();
+
+        service.approve(c.getId());
+        flush();
+
+        assertThat(txnRepo.findAll())
+                .filteredOn(t -> t.getType() == com.jhg.wms.domain.InventoryTransactionType.COUNT)
+                .isEmpty();
+        assertThat(service.findById(c.getId()).getStatus()).isEqualTo(CycleCountStatus.APPROVED);
+    }
+
+    @Test
+    void 반려하면_장부와_원장이_그대로다() {
+        seed(1L, 15);
+        CycleCount c = service.open(List.of(1L), "실사");
+        flush();
+        service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 3));
+        service.submit(c.getId());
+        flush();
+
+        service.reject(c.getId(), "계수 오류");
+        flush();
+
+        assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(15);
+        assertThat(txnRepo.findAll()).isEmpty();
+        assertThat(service.findById(c.getId()).getStatus()).isEqualTo(CycleCountStatus.REJECTED);
+    }
+
+    // 앞 품목만 반영되면 "절반만 승인된 실사"라는 설명할 수 없는 상태가 남는다.
+    @Test
+    void 한_품목이라도_실패하면_세션_전체가_롤백된다() {
+        seed(1L, 15);
+        seed(2L, 10);
+        inventoryService.reserveAll(77L, Map.of(2L, 8));   // 상품2는 8개가 예약된 상태
+        flush();
+        CycleCount c = service.open(List.of(1L, 2L), "실사");
+        flush();
+        service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 16, itemId(c, 2L), 3));  // 상품2는 예약 8 미만
+        service.submit(c.getId());
+        flush();
+
+        assertThatThrownBy(() -> service.approve(c.getId()))
+                .isInstanceOf(IllegalArgumentException.class);
+        flush();
+
+        assertThat(inventoryRepo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(15);
+        assertThat(txnRepo.findAll()).isEmpty();
+        assertThat(service.findById(c.getId()).getStatus()).isEqualTo(CycleCountStatus.SUBMITTED);
+    }
+
+    @Test
+    void 승인대기가_아니면_승인할_수_없다() {
+        seed(1L, 15);
+        CycleCount c = service.open(List.of(1L), "실사");
+        flush();
+
+        assertThatThrownBy(() -> service.approve(c.getId()))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void 반영된_차이는_원장에서_읽는다() {
+        seed(1L, 15);
+        seed(2L, 30);
+        CycleCount c = service.open(List.of(1L, 2L), "실사");
+        flush();
+        service.saveCounts(c.getId(), Map.of(itemId(c, 1L), 14, itemId(c, 2L), 30));
+        service.submit(c.getId());
+        flush();
+        service.approve(c.getId());
+        flush();
+
+        assertThat(service.appliedDeltas(c.getId())).containsExactly(entry(1L, -1));  // 상품2는 일치라 없음
     }
 
     /** 화면은 itemId로 값을 보내므로 테스트도 productId → itemId로 변환해 쓴다. */

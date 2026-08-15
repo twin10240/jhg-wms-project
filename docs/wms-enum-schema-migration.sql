@@ -19,7 +19,7 @@ DECLARE
 BEGIN
     FOR target IN
         SELECT * FROM (VALUES
-            ('inventory_adjustment',  'type',        ARRAY['OPENING','RECEIVE','SHIP','ADJUST','RETURN']),
+            ('inventory_adjustment',  'type',        ARRAY['OPENING','RECEIVE','SHIP','ADJUST','RETURN','COUNT']),
             ('purchase_order',        'status',      ARRAY['ORDERED','PARTIALLY_RECEIVED','RECEIVED','CANCELLED']),
             ('replenishment_request', 'status',      ARRAY['REQUESTED','APPROVED','REJECTED','FULFILLED','CANCELLED']),
             ('reservation',           'status',      ARRAY['RESERVED','SHIPPED','RELEASED']),
