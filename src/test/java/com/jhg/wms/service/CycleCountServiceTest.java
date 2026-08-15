@@ -93,6 +93,23 @@ class CycleCountServiceTest {
                 .hasMessageContaining("진행 중인 실사");
     }
 
+    // findOpenProductIds()는 OPEN뿐 아니라 SUBMITTED도 잡아야 한다 — 승인 대기 중인 세션의
+    // 실물 수량은 아직 장부에 반영되지 않았으니, 그 상품을 다른 세션이 또 세면 두 세션의 조정이 충돌한다.
+    @Test
+    void 승인대기_세션에_있는_상품도_새_세션에_담을_수_없다() {
+        seed(1L, 15);
+        seed(2L, 30);
+        CycleCount first = service.open(List.of(1L), "먼저 연 세션");
+        flush();
+        service.saveCounts(first.getId(), Map.of(itemId(first, 1L), 15));
+        service.submit(first.getId());
+        flush();
+
+        assertThatThrownBy(() -> service.open(List.of(1L, 2L), "겹치는 세션"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("진행 중인 실사");
+    }
+
     @Test
     void 종결된_세션의_상품은_다시_담을_수_있다() {
         seed(1L, 15);
