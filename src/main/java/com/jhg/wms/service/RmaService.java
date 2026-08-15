@@ -71,7 +71,7 @@ public class RmaService {
 
     public RmaReturn findById(Long rmaId) {
         return rmaReturnRepository.findById(rmaId)
-                .orElseThrow(() -> new IllegalArgumentException("RMA가 없습니다. rmaId=" + rmaId));
+                .orElseThrow(() -> new RmaNotFoundException(rmaId));
     }
 
     public List<RmaReturn> findAll(RmaStatus status) {
@@ -182,6 +182,15 @@ public class RmaService {
     public static class DuplicateKeyConflictException extends RuntimeException {
         public DuplicateKeyConflictException(String requestKey) {
             super("같은 requestKey에 다른 내용의 요청입니다. requestKey=" + requestKey);
+        }
+    }
+
+    /** 없는 RMA. OMS 보상 스윕이 404를 "이 rmaId는 없다"로 해석하므로 400과 구분해야 한다.
+     *  IllegalArgumentException의 하위로 두어, 이미 업무 오류를 flash로 처리하는 관리자 화면의
+     *  catch 경로를 그대로 유지한다. */
+    public static class RmaNotFoundException extends IllegalArgumentException {
+        public RmaNotFoundException(Long rmaId) {
+            super("RMA가 없습니다. rmaId=" + rmaId);
         }
     }
 }

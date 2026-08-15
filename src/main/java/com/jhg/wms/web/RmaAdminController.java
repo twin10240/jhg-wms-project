@@ -5,9 +5,11 @@ import com.jhg.wms.domain.RmaStatus;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.LinkedHashMap;
@@ -79,5 +81,14 @@ public class RmaAdminController {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
         return "redirect:/admin/returns/" + id;
+    }
+
+    // 없는 RMA를 열면 흰 500이 나던 자리 — 상태 전이 핸들러는 각자 flash로 처리하므로 여기 오지 않는다.
+    @ExceptionHandler(RmaService.RmaNotFoundException.class)
+    public ModelAndView notFound(RmaService.RmaNotFoundException e) {
+        ModelAndView mav = new ModelAndView("error", HttpStatus.NOT_FOUND);
+        mav.addObject("status", HttpStatus.NOT_FOUND.value());
+        mav.addObject("error", e.getMessage());
+        return mav;
     }
 }

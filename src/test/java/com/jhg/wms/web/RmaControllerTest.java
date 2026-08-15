@@ -107,6 +107,15 @@ class RmaControllerTest {
                 .andExpect(jsonPath("$.items[0].disposition").doesNotExist());
     }
 
+    // OMS 보상 스윕은 "요청이 잘못됨(400)"과 "그 rmaId가 없음(404)"을 다르게 처리한다 — 뭉치면 분기할 수 없다.
+    @Test
+    void 없는_RMA_조회는_404를_반환한다() throws Exception {
+        when(rmaService.findById(any())).thenThrow(new RmaService.RmaNotFoundException(999L));
+
+        mockMvc.perform(get("/api/returns/999").with(httpBasic("wms", "wms")))
+                .andExpect(status().isNotFound());
+    }
+
     @Test
     void 인증없으면_401() throws Exception {
         mockMvc.perform(post("/api/returns")

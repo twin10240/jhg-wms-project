@@ -170,6 +170,15 @@ class RmaAdminControllerTest {
                 .andExpect(flash().attributeExists("errorMessage"));
     }
 
+    @Test
+    void 없는_RMA_상세는_500이_아니라_404_화면이다() throws Exception {
+        when(rmaService.findById(999L)).thenThrow(new RmaService.RmaNotFoundException(999L));
+
+        mockMvc.perform(get("/admin/returns/999").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("error"));
+    }
+
     // 조회는 되돌릴 곳이 자기 자신이라 리다이렉트하면 무한 루프다 — 화면을 직접 그리는지 고정한다.
     @Test
     void 반품목록_DB오류는_자기자신으로_리다이렉트하지_않는다() throws Exception {
