@@ -1,6 +1,8 @@
 package com.jhg.wms.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,6 +28,7 @@ public class InventoryTransaction {
     private Long productId;
 
     // nullable: 기존 행(구 조정) 수용 — 기동 백필이 ADJUST로 채운다.
+    @JdbcTypeCode(SqlTypes.VARCHAR)   // H2 네이티브 ENUM 회피 — 값 추가 시 기존 컬럼이 거부하는 사고 방지
     @Enumerated(EnumType.STRING)
     private InventoryTransactionType type;
 
