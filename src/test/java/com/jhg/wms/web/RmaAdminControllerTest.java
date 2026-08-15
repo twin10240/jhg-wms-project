@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,13 +20,18 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RmaAdminController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, AdminDataAccessAdvice.class})
 class RmaAdminControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -69,4 +75,19 @@ class RmaAdminControllerTest {
                 .andExpect(content().string(not(containsString("RESTOCKED"))));
     }
 
+    // DB 계층 예외는 업무 예외가 아니라 컨트롤러 catch에 안 걸린다 — 흰 500 대신 목록으로 돌려보내는지 검증.
+    @Test
+    void 검수완료중_DB오류가_나면_500대신_목록으로_돌아간다() throws Exception {
+        doThrow(new DataIntegrityViolationException("Value not permitted for column"))
+                .when(rmaService).complete(eq(1L), anyMap());
+
+        mockMvc.perform(post("/admin/returns/1/complete")
+                        .with(user("mgr").roles("MANAGER")).with(csrf())
+                        .param("items[0].itemId", "1")
+                        .param("items[0].acceptedQuantity", "1")
+                        .param("items[0].disposition", "RESTOCKED"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/returns"))
+                .andExpect(flash().attributeExists("errorMessage"));
+    }
 }
