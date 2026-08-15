@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -89,5 +90,16 @@ class RmaAdminControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/returns"))
                 .andExpect(flash().attributeExists("errorMessage"));
+    }
+
+    // 조회는 되돌릴 곳이 자기 자신이라 리다이렉트하면 무한 루프다 — 화면을 직접 그리는지 고정한다.
+    @Test
+    void 반품목록_DB오류는_자기자신으로_리다이렉트하지_않는다() throws Exception {
+        when(rmaService.findAll(any()))
+                .thenThrow(new DataAccessResourceFailureException("connection refused"));
+
+        mockMvc.perform(get("/admin/returns").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(view().name("error"));
     }
 }

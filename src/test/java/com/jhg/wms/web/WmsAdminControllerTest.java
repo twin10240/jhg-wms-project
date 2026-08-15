@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // 관리자 화면은 폼 로그인 + 롤 인가(SecurityConfig webChain) — 조회/입고는 OPERATOR, 발주 생성·보충요청 승인/거절은 MANAGER.
 // webChain은 DbUserDetailsService에 의존하므로 슬라이스 컨텍스트 로딩을 위해 목빈이 필요(직접 호출되지는 않음 — .with(user(...))로 principal 주입).
 @WebMvcTest(WmsAdminController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, AdminDataAccessAdvice.class})
 class WmsAdminControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -355,5 +356,27 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/inventory-ledger"))
                 .andExpect(content().string(containsString("시작일이 종료일보다 뒤입니다.")));
+    }
+
+    // 대시보드로 되돌리면 대시보드가 다시 같은 예외를 던진다 — 리다이렉트 루프가 되지 않는지 고정한다.
+    @Test
+    void 대시보드_DB오류는_리다이렉트하지_않고_503을_그린다() throws Exception {
+        when(inventoryService.findAllRows())
+                .thenThrow(new DataAccessResourceFailureException("connection refused"));
+
+        mockMvc.perform(get("/").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(view().name("error"));
+    }
+
+    // 목록도 자기 자신이 DB를 타므로 같은 함정에 빠진다.
+    @Test
+    void 재고목록_DB오류도_리다이렉트하지_않는다() throws Exception {
+        when(inventoryService.findAllRows())
+                .thenThrow(new DataAccessResourceFailureException("connection refused"));
+
+        mockMvc.perform(get("/admin/inventory").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(view().name("error"));
     }
 }
