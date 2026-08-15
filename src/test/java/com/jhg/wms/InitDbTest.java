@@ -55,7 +55,7 @@ class InitDbTest {
     void legacy_백필_후_OPENING이_상품당_하나만_생긴다() {
         inventoryRepository.save(Inventory.create(1L, 30));
         // 기존 조정 이력(type null) 흉내
-        transactionRepository.save(InventoryTransaction.of(1L, null, -1, 31, 30, null, "구데이터"));
+        transactionRepository.save(InventoryTransaction.of(1L, null, -1, 31, 30, null, "구데이터", null));
 
         initService.migrateLegacy();
         initService.migrateLegacy(); // 재실행해도 결과가 같아야 함(멱등)

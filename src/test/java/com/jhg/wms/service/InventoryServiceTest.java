@@ -33,7 +33,7 @@ class InventoryServiceTest {
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
-        service = new InventoryService(repo, reservationRepo, adjustmentRepo, notifier);
+        service = new InventoryService(repo, reservationRepo, adjustmentRepo, notifier, () -> "manager");
     }
 
     private void seed(long pid, int qty) {
@@ -452,5 +452,29 @@ class InventoryServiceTest {
                 java.time.LocalDate.now(), java.time.LocalDate.now().minusDays(1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("시작일");
+    }
+
+    // 접근제어를 롤로 나눠뒀는데 원장에 누가 했는지가 없으면 감사 질문에 답할 수 없다.
+    @Test
+    void applyDelta는_행위자를_원장에_남긴다() {
+        seed(1L, 10);
+
+        service.applyDelta(1L, 5, InventoryTransactionType.RECEIVE, "PO#1", null);
+
+        assertThat(adjustmentRepo.findAll())
+                .extracting(com.jhg.wms.domain.InventoryTransaction::getActor)
+                .containsExactly("manager");
+    }
+
+    @Test
+    void 출고도_행위자를_남긴다() {
+        seed(1L, 10);
+        service.reserveAll(1L, Map.of(1L, 3));
+        service.shipAll(1L, Map.of(1L, 3));
+
+        assertThat(adjustmentRepo.findAll())
+                .filteredOn(t -> t.getType() == InventoryTransactionType.SHIP)
+                .extracting(com.jhg.wms.domain.InventoryTransaction::getActor)
+                .containsExactly("manager");
     }
 }

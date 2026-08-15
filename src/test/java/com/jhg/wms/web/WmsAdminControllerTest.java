@@ -72,7 +72,7 @@ class WmsAdminControllerTest {
 
     @Test
     void 이력화면_트랜잭션_유형_필터가_동작한다() throws Exception {
-        InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null);
+        InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null, null);
         when(inventoryService.findTransactions(eq(InventoryTransactionType.RECEIVE), any()))
                 .thenReturn(new PageImpl<>(List.of(receive)));
 
@@ -86,8 +86,8 @@ class WmsAdminControllerTest {
     void 이력화면은_상품명_한글유형_한글참조를_표시한다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
         when(inventoryService.findTransactions(eq(null), any())).thenReturn(new PageImpl<>(List.of(
-                InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null),
-                InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null))));
+                InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null, null),
+                InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null, null))));
 
         mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())

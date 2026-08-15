@@ -1,6 +1,7 @@
 package com.jhg.wms.service;
 
 import com.jhg.wms.client.OmsReplenishmentNotifier;
+import com.jhg.wms.config.ActorProvider;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
@@ -28,6 +29,7 @@ public class InventoryService {
     private final ReservationRepository reservationRepository;
     private final InventoryTransactionRepository transactionRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
+    private final ActorProvider actorProvider;
 
     /** onHand 변경 + 원장 기록의 유일 지점. 모든 실물 변동 경로가 통과한다. */
     @Transactional
@@ -42,7 +44,8 @@ public class InventoryService {
         if (after < inv.getReservedQty())
             throw new IllegalArgumentException("예약된 수량(" + inv.getReservedQty() + "개) 미만으로 줄일 수 없습니다.");
         inv.setOnHandQty(after);
-        transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after, reference, reason));
+        transactionRepository.save(InventoryTransaction.of(productId, type, delta, before, after,
+                reference, reason, actorProvider.current()));
         if (delta > 0) {
             // 모든 재고 증가가 통과 — OMS 백오더 승격 트리거(트랜잭션 커밋 후).
             // ponytail: adjust 호출당 HTTP 1발(3품목 입고=3발). 자연 멱등이라 무해 — 배치 필요 시 트랜잭션 스코프 Set으로 모을 것.
@@ -121,7 +124,8 @@ public class InventoryService {
             int before = inv.getOnHandQty();
             inv.ship(qty);
             transactionRepository.save(InventoryTransaction.of(
-                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(), "ORDER#" + orderId, null));
+                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(),
+                "ORDER#" + orderId, null, actorProvider.current()));
         });
         reservation.ship();
     }

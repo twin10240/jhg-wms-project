@@ -93,7 +93,7 @@ public class InitDb {
                 String productName = "상품 " + productId; // ponytail: OMS 실제 상품명 확보 시 교체
                 inventoryRepository.save(Inventory.create(productId, productName, onHandQty));
                 transactionRepository.save(InventoryTransaction.of(
-                        productId, InventoryTransactionType.OPENING, onHandQty, 0, onHandQty, null, null));
+                        productId, InventoryTransactionType.OPENING, onHandQty, 0, onHandQty, null, null, "system"));
             }
         }
 
@@ -107,7 +107,7 @@ public class InitDb {
                     int prior = transactionRepository.sumDeltaByProductId(inv.getProductId());
                     int opening = inv.getOnHandQty() - prior;
                     transactionRepository.save(InventoryTransaction.of(
-                            inv.getProductId(), InventoryTransactionType.OPENING, opening, 0, opening, null, null));
+                            inv.getProductId(), InventoryTransactionType.OPENING, opening, 0, opening, null, null, "system"));
                 }
             });
         }
