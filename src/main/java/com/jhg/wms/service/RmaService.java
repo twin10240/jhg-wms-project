@@ -80,10 +80,17 @@ public class RmaService {
                 : rmaReturnRepository.findByStatusOrderByIdDesc(status);
     }
 
+    /**
+     * 입고 처리. OMS 고객 화면이 "창고 도착"을 보여주므로 결과뿐 아니라 이 전이도 통지한다.
+     * 통지가 없으면 OMS는 60초 보상 스윕으로만 RECEIVED를 발견하는데, 그 안에 검수가 끝나면
+     * 고객은 접수에서 완료로 건너뛰는 화면을 보게 된다.
+     * 통지는 커밋 후 best-effort — 실패해도 입고를 되돌리지 않고 스윕이 회수한다.
+     */
     @Transactional
     public void receive(Long rmaId) {
         RmaReturn rma = findById(rmaId);
         rma.receive();
+        omsReturnStatusNotifier.notifyAfterCommit(rma);
     }
 
     @Transactional

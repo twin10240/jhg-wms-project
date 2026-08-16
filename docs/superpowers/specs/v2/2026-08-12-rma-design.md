@@ -98,7 +98,12 @@ RMA를 생성하는 모든 코드 경로가 반드시 Reservation을 먼저 잠�
 
 POST /api/return-status-events (best-effort, 커밋 후)
 
-- 통지 대상: COMPLETED, CANCELLED
+- 통지 대상: RECEIVED, COMPLETED, CANCELLED
+
+> **2026-08-15 변경**: 처음에는 COMPLETED·CANCELLED만 통지했다. 입고는 창고 내부 사건이고
+> OMS가 알아야 할 것은 결과라고 봤기 때문이다. 그런데 OMS 고객 화면이 "창고 도착"을 별도 상태로
+> 보여주게 되면서 전제가 바뀌었다. 통지가 없으면 OMS는 60초 보상 스윕으로만 RECEIVED를 발견하는데,
+> 그 안에 검수가 끝나면 고객은 접수에서 완료로 건너뛰는 화면을 본다. 그래서 입고도 통지 대상에 넣었다.
 - 인증: 기존 oms.callback.user/password 재사용
 - 실패해도 RMA 완료/재고 트랜잭션 롤백하지 않음
 - OMS가 GET /api/returns/{rmaId}로 유실 결과 회수
