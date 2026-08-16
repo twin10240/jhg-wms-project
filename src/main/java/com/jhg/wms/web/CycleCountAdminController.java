@@ -75,12 +75,21 @@ public class CycleCountAdminController {
     public String saveCounts(@PathVariable Long id, @ModelAttribute CountForm form,
                              @RequestParam(required = false) String action, RedirectAttributes ra) {
         try {
+            boolean submitting = "submit".equals(action);
             Map<Long, Integer> counts = new LinkedHashMap<>();
-            for (var item : form.getItems())
-                if (item.getCountedQty() != null)   // 미입력은 건너뛴다 — 부분 저장을 허용한다
-                    counts.put(item.getItemId(), item.getCountedQty());
+            for (var item : form.getItems()) {
+                if (item.getCountedQty() == null) {
+                    // 저장만 할 때는 빈 칸을 건너뛴다 — 나눠 세는 것을 허용하기 위해서다.
+                    // 제출은 다르다. 이미 저장된 값이 있는 칸을 비우고 제출하면 화면은 비어 있는데
+                    // 예전 값으로 확정되고, 제출은 되돌릴 수 없다.
+                    if (submitting)
+                        throw new IllegalArgumentException("모든 품목의 실물 수량을 입력해야 합니다.");
+                    continue;
+                }
+                counts.put(item.getItemId(), item.getCountedQty());
+            }
             cycleCountService.saveCounts(id, counts);
-            if ("submit".equals(action)) {
+            if (submitting) {
                 cycleCountService.submit(id);
                 ra.addFlashAttribute("successMessage", "실물 수량을 저장하고 제출했습니다. 승인 대기 상태입니다.");
             } else {
