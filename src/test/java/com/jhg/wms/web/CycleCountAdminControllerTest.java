@@ -41,6 +41,77 @@ class CycleCountAdminControllerTest {
     @MockitoBean InventoryService inventoryService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
+    /** OPEN 상태 세션 — 실물 수량 입력 화면을 렌더한다. */
+    private CycleCount open() {
+        CycleCount c = CycleCount.open("operator", "8월 순환 실사");
+        c.addItem(1L, 15);
+        ReflectionTestUtils.setField(c, "id", 7L);
+        ReflectionTestUtils.setField(c.getItems().get(0), "id", 101L);
+        return c;
+    }
+
+    /** 제출자를 지정한 SUBMITTED 세션 — 자기승인 노출 여부를 보려면 제출자가 누구인지가 중요하다. */
+    private CycleCount submittedBy(String actor) {
+        CycleCount c = open();
+        c.recordCount(101L, 14);
+        c.submit(actor);
+        return c;
+    }
+
+    // 이미 저장된 값이 있는 칸을 비우고 제출하면, 화면은 비어 있는데 예전 값으로 확정된다.
+    // 제출은 되돌릴 수 없으므로 빈 칸을 건너뛰지 않고 거부해야 한다.
+    @Test
+    void 빈_칸을_남기고_제출하면_거부된다() throws Exception {
+        mockMvc.perform(post("/admin/cycle-counts/7/counts")
+                        .with(user("op").roles("OPERATOR")).with(csrf())
+                        .param("action", "submit")
+                        .param("items[0].itemId", "101"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attributeExists("errorMessage"));
+
+        verify(cycleCountService, never()).saveCounts(anyLong(), any());
+        verify(cycleCountService, never()).submit(anyLong());
+    }
+
+    // 저장만 할 때는 나눠 세는 것을 허용한다 — 빈 칸은 건너뛰고 입력된 것만 저장한다.
+    @Test
+    void 저장만_할_때는_빈_칸을_건너뛴다() throws Exception {
+        mockMvc.perform(post("/admin/cycle-counts/7/counts")
+                        .with(user("op").roles("OPERATOR")).with(csrf())
+                        .param("items[0].itemId", "101"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attributeExists("successMessage"));
+
+        verify(cycleCountService).saveCounts(7L, Map.of());
+        verify(cycleCountService, never()).submit(anyLong());
+    }
+
+    // 서비스가 자기승인을 거부하므로, 제출자에게 승인 버튼이 보이면 눌러야 알게 된다.
+    @Test
+    void 제출자_본인에게는_승인_버튼이_보이지_않는다() throws Exception {
+        when(cycleCountService.findById(7L)).thenReturn(submittedBy("mgr"));
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 15, 0, 15)));
+
+        mockMvc.perform(get("/admin/cycle-counts/7").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("ccApprove"))))
+                .andExpect(content().string(containsString("직접 제출한 실사는 승인할 수 없습니다")))
+                .andExpect(content().string(containsString("ccReject")));   // 반려는 그대로 가능
+    }
+
+    @Test
+    void 다른_관리자에게는_승인_버튼이_보인다() throws Exception {
+        when(cycleCountService.findById(7L)).thenReturn(submittedBy("operator"));
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 15, 0, 15)));
+
+        mockMvc.perform(get("/admin/cycle-counts/7").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("ccApprove")))
+                .andExpect(content().string(not(containsString("직접 제출한 실사는"))));
+    }
+
     private CycleCount submitted() {
         CycleCount c = CycleCount.open("operator", "8월 순환 실사");
         c.addItem(1L, 15);

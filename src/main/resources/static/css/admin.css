@@ -242,3 +242,13 @@ button.ghost:hover, a.ghost:hover { background: #f0f0f0; }
 .badge-cc-submitted { background: #fff4d6; color: #92600a; }
 .badge-cc-approved  { background: #dcfce7; color: #166534; }
 .badge-cc-rejected  { background: #f1f1f1; color: #6b7280; text-decoration: line-through; }
+
+/* 동작이 없는 이유를 알려주는 안내문 */
+.hint {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--color-border);
+  background: #f7f8fa;
+  color: var(--color-text-muted);
+  font-size: .92em;
+}
