@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 255개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
+| 테스트 | 258개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -67,7 +67,7 @@
 | S2 | OMS → WMS | 주문 이행 `reserve` / `ship` / `release` |
 | S3 | WMS → OMS | 재고 증가(입고·조정) 통지 → OMS 백오더 FIFO 승격 |
 | S4 | 양방향 | 회복탄력성 — 타임아웃 · best-effort · 보상 스윕 |
-| S5 | 양방향 | 반품(RMA) — OMS가 접수 `POST /api/returns`, WMS가 검수 결과 통지 `POST /api/return-status-events` |
+| S5 | 양방향 | 반품(RMA) — OMS가 접수 `POST /api/returns`, WMS가 입고·검수 결과 통지 `POST /api/return-status-events` |
 
 보충 흐름: OMS가 백오더로 부족을 감지 → WMS에 **보충 요청** → WMS 관리자가 **승인 → 발주 생성 → 입고** → 재고 증가 → S3로 OMS에 통지 → OMS가 백오더 승격. (상세: 아래 [보충 요청과 발주](#보충-요청과-발주) · [OMS 재고보충 통지](#oms-재고보충-통지-s3-채널3) 절)
 
@@ -237,7 +237,9 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
 - **누적 반품량**: `CANCELLED` 제외, `COMPLETED`는 승인 수량, 나머지는 요청 수량으로 합산해 출고량을 넘지 못하게 막습니다. 거절된 수량은 다시 신청할 수 있습니다.
 - **품목별 처분**: `RESTOCKED`(재입고 — 재고 증가) / `DISPOSED`(폐기) / `REJECTED`(거절). 승인 수량 0이면 반드시 `REJECTED`, 0보다 크면 `REJECTED`일 수 없습니다.
 - **재입고**는 `applyDelta(RETURN)`을 그대로 탑니다 — 재고 증가 경로가 하나뿐이라 S3(OMS 백오더 승격) 통지가 자동으로 따라옵니다.
-- **검수 결과 통지**(WMS → OMS `POST /api/return-status-events`): `COMPLETED`·`CANCELLED` 커밋 후 best-effort. 실패해도 재고와 완료 상태를 되돌리지 않고, OMS가 `GET /api/returns/{rmaId}`로 회수합니다. 인증은 `OMS_CALLBACK_USER`/`OMS_CALLBACK_PASSWORD`를 S3와 공유합니다.
+- **상태 통지**(WMS → OMS `POST /api/return-status-events`): `RECEIVED`·`COMPLETED`·`CANCELLED` 커밋 후 best-effort. 실패해도 재고와 상태를 되돌리지 않고, OMS가 `GET /api/returns/{rmaId}`로 회수합니다. 인증은 `OMS_CALLBACK_USER`/`OMS_CALLBACK_PASSWORD`를 S3와 공유합니다.
+  - 입고(`RECEIVED`)를 통지하는 이유는 OMS 고객 화면이 "창고 도착"을 별도 상태로 보여주기 때문입니다. 통지가 없으면 OMS는 60초 보상 스윕으로만 이 전이를 발견하는데, 그 안에 검수가 끝나면 고객은 접수에서 완료로 건너뛰는 화면을 봅니다.
+  - `RECEIVED` 통지의 품목은 `acceptedQuantity=0`, `disposition=null`입니다 — 아직 검수 전이라 결과가 없습니다.
 - **검수 완료는 되돌릴 수 없습니다.** 그래서 검수 폼은 승인 수량·처분에 기본값을 두지 않고, 미입력 제출은 서버가 거부합니다.
 
 ### OMS 재고보충 통지 (S3, 채널3)
@@ -305,7 +307,7 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 |-----------|-----------|------|
 | **OMS가 죽은 채로 입고 발생** | 통지는 best-effort — 실패해도 입고·원장은 커밋(`OmsReplenishmentNotifier`가 예외를 삼킴) | 재고 무손실. 승격만 지연되고, OMS 복구 후 **보상 스윕**이 누락분 회수 |
 | **WMS가 죽은 채로 주문 유입** | OMS 어댑터가 가용수량을 **0으로 폴백** | 주문은 실패하지 않고 백오더로 접수. 없는 재고를 팔지 않음 |
-| **반품 검수 결과 통지 실패** | 통지는 best-effort — 실패해도 재입고·완료 상태는 커밋 | 재고 무손실. OMS가 `GET /api/returns/{rmaId}`로 결과를 회수 |
+| **반품 상태 통지 실패** | 통지는 best-effort — 실패해도 입고·재입고·완료 상태는 커밋 | 재고 무손실. OMS가 60초 보상 스윕과 `GET /api/returns/{rmaId}`로 회수 |
 | **DB 장애 중 관리자 화면 접근** | 조회는 503 화면을 직접 렌더 — 목록으로 되돌리지 않음 | 목록·대시보드가 자기 자신으로 리다이렉트하는 무한 루프 차단 |
 | **상대가 응답 없이 매달림(hang)** | RestClient 타임아웃 (connect 1s / read 2s) | 스레드가 묶이지 않고 수 초 내 복귀 |
 | **타임아웃으로 생긴 반쪽 상태** | `shipAll`은 RELEASED 예약 출고를, `releaseAll`은 SHIPPED 예약 해제를 **거부** | `reservedQty` 음수 같은 재고 오염 차단 |

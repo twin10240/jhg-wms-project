@@ -19,6 +19,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @DataJpaTest
 class RmaServiceTest {
@@ -168,6 +171,51 @@ class RmaServiceTest {
         var rma = rmaService.createReturn(req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 2))).rma();
         rmaService.receive(rma.getId());
         assertThat(rmaService.findById(rma.getId()).getStatus()).isEqualTo(RmaStatus.RECEIVED);
+    }
+
+    // 통지가 없으면 OMS는 60초 스윕으로만 RECEIVED를 발견한다 — 그 안에 검수가 끝나면
+    // 고객 화면이 접수에서 완료로 건너뛴다. 입고도 통지 대상이라는 계약을 고정한다.
+    @Test
+    void 입고처리하면_OMS에_RECEIVED를_통지한다() {
+        seedAndShip(100L, Map.of(1L, 5));
+        var rma = rmaService.createReturn(req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 2))).rma();
+
+        rmaService.receive(rma.getId());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(RmaReturn.class);
+        verify(returnNotifier).notifyAfterCommit(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(RmaStatus.RECEIVED);
+    }
+
+    // OMS는 RECEIVED 품목에 acceptedQuantity=0, disposition=null을 요구한다(계약 불일치면 409).
+    @Test
+    void 입고_통지의_품목은_승인수량0_처분없음이다() {
+        seedAndShip(100L, Map.of(1L, 5));
+        var rma = rmaService.createReturn(req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 2))).rma();
+
+        rmaService.receive(rma.getId());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(RmaReturn.class);
+        verify(returnNotifier).notifyAfterCommit(captor.capture());
+        var payload = com.jhg.wms.web.RmaResponse.from(captor.getValue());
+        assertThat(payload.status()).isEqualTo("RECEIVED");
+        assertThat(payload.items()).singleElement().satisfies(item -> {
+            assertThat(item.acceptedQuantity()).isZero();
+            assertThat(item.disposition()).isNull();
+        });
+    }
+
+    @Test
+    void 입고_전이가_거부되면_통지하지_않는다() {
+        seedAndShip(100L, Map.of(1L, 5));
+        var rma = rmaService.createReturn(req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 2))).rma();
+        rmaService.receive(rma.getId());
+        reset(returnNotifier);
+
+        assertThatThrownBy(() -> rmaService.receive(rma.getId()))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(returnNotifier);
     }
 
     @Test
