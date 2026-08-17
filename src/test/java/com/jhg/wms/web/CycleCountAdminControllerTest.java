@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -279,7 +280,8 @@ class CycleCountAdminControllerTest {
                 .andExpect(content().string(containsString("1 / 2")));
     }
 
-    // 목록 행이 상세로 이어지는 클릭 경로(data-href)가 실제로 렌더되는지 — 스크립트가 빠지면
+    // 행 클릭이 의존하는 data-href가 렌더되는지만 본다. 클릭이 실제로 동작하는지는
+    // 브라우저 없이 확인할 수 없어 이 테스트의 범위가 아니다 — 스크립트가 빠지면 이 테스트는 통과한 채
     // 커서만 손가락 모양이고 클릭은 죽는다.
     @Test
     void 목록의_각_행은_상세_링크를_data_href로_들고_있다() throws Exception {
@@ -291,6 +293,48 @@ class CycleCountAdminControllerTest {
         mockMvc.perform(get("/admin/cycle-counts").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-href=\"/admin/cycle-counts/7\"")));
+    }
+
+    // 상세 화면 테스트가 전부 SUBMITTED 세션을 써서, 입력 폼과 저장·제출 버튼은 한 번도 렌더되지 않았다.
+    // 하필 여기가 실제로 사고가 났던 자리다 — 제출 버튼이 빈 폼을 가리켜 화면 입력이 버려졌다.
+    @Test
+    void 작성중_상세는_제출_버튼이_입력_폼을_가리킨다() throws Exception {
+        when(cycleCountService.findById(7L)).thenReturn(open());
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 13, 0, 13)));
+
+        String html = mockMvc.perform(get("/admin/cycle-counts/7").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("작성 중")))
+                .andReturn().getResponse().getContentAsString();
+
+        // 저장과 제출이 같은 폼을 쓴다 — 제출이 화면 값을 건너뛸 수 없다는 것이 이 화면의 계약이다.
+        assertThat(html).containsPattern("form=\"ccCounts\"[^>]*>실물 수량 저장<");
+        assertThat(html).containsPattern("form=\"ccCounts\"[^>]*name=\"action\"[^>]*value=\"submit\"");
+        assertThat(html).doesNotContain("ccSubmit");   // 저장을 건너뛰던 옛 경로
+    }
+
+    // 미입력과 0("세어보니 없었다")을 구분해야 안 센 품목이 조용히 확정되지 않는다.
+    @Test
+    void 작성중_상세의_실물_수량칸에는_기본값이_없다() throws Exception {
+        when(cycleCountService.findById(7L)).thenReturn(open());
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 13, 0, 13)));
+
+        String html = mockMvc.perform(get("/admin/cycle-counts/7").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 입력칸 태그만 잘라서 본다 — 페이지 전체에서 문자열을 찾으면 다른 태그에 우연히 매칭된다.
+        int start = html.indexOf("name=\"items[0].countedQty\"");
+        assertThat(start).as("실물 수량 입력칸이 렌더돼야 한다").isNotNegative();
+        String input = html.substring(start, html.indexOf('>', start));
+        // Thymeleaf는 null인 th:value를 value=""로 렌더한다(속성 생략 아님). 빈 값은 정상이고,
+        // 값이 들어 있으면 담당자가 세지 않은 수량이 기본값으로 확정된다.
+        assertThat(input).as("갓 연 세션의 입력칸은 비어 있어야 한다")
+                .doesNotContainPattern("value=\"[^\"]+\"");
+        // 세션 시작 장부(15)와 현재 장부(13)를 함께 보여준다 — 실사 중 이동을 눈으로 확인하는 자리다.
+        assertThat(html).contains(">15<").contains(">13<");
     }
 
     // I-2: 생성 화면에 렌더 테스트가 없었다 — 대상 후보 목록이 실제로 그려지는지 고정한다.
