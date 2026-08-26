@@ -345,6 +345,22 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 
 ## 테스트
 
+> **전제 조건**: 테스트는 실제 PostgreSQL 17에서 돕니다. 먼저 띄워주세요.
+>
+> ```bash
+> brew services start postgresql@17
+> ```
+>
+> 개발용은 `wms`, 테스트용은 `wms_test` 데이터베이스를 씁니다(테스트가 `create-drop`이라 분리).
+> 최초 1회만 아래로 롤과 DB를 만듭니다.
+>
+> ```bash
+> createuser -s wms 2>/dev/null; psql -d postgres -c "ALTER ROLE wms PASSWORD 'wms'"
+> createdb -O wms wms; createdb -O wms wms_test
+> ```
+>
+> `docker-compose.yml`은 수평 확장 데모 전용이며 테스트와 무관합니다.
+
 ```bash
 ./gradlew test
 ```

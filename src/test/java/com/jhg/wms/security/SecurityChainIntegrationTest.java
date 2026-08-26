@@ -1,11 +1,13 @@
 package com.jhg.wms.security;
 
+import com.jhg.wms.InitDb;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -16,6 +18,9 @@ class SecurityChainIntegrationTest {
 
     @Autowired TestRestTemplate rest;
     @LocalServerPort int port;
+    // 실제 Postgres(wms_test) 공유 DB에 InitDb가 재고를 실제로 커밋하는 것을 막는다 —
+    // 이 테스트는 보안 체인 동작만 보므로 시딩과 무관하다(JhgWmsApplicationTests와 동일 사유).
+    @MockitoBean InitDb initDb;
 
     private String url(String path) { return "http://localhost:" + port + path; }
 

@@ -11,6 +11,24 @@ jobs:
   build-and-test:
     name: Build & Test (JDK 21)
     runs-on: ubuntu-latest
+
+    # 테스트가 운영과 같은 엔진을 쓴다. Actions가 컨테이너를 붙여주므로
+    # Testcontainers 같은 Gradle 의존성이 필요 없다.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: wms_test
+          POSTGRES_USER: wms
+          POSTGRES_PASSWORD: wms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wms -d wms_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v5
 
@@ -25,7 +43,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # build = 테스트(임베디드 H2) + bootJar 조립. 배포 산출물이 실제로 만들어지는지까지 검증.
+      # build = 테스트(services의 PostgreSQL) + bootJar 조립. 배포 산출물이 실제로 만들어지는지까지 검증.
       - name: Build & run tests
         run: ./gradlew build --no-daemon
 
