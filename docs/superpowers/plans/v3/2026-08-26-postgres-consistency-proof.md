@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** dev·test·prod를 PostgreSQL 16으로 통일하고, 그 위에서 오버셀 방지·원장 불변식·회복탄력성·실사 경합을 실제 동시 요청으로 증명한다.
+**Goal:** dev·test·prod를 PostgreSQL로 통일하고(로컬·CI는 17), 그 위에서 오버셀 방지·원장 불변식·회복탄력성·실사 경합을 실제 동시 요청으로 증명한다.
 
 **Architecture:** Phase 1은 설정 변경만으로 H2를 걷어내고 테스트를 실제 Postgres로 옮긴다(게이트: 로컬 1분 / CI 3분). Phase 2는 `@SpringBootTest` 기반 동시성 하니스(`race()`)를 만들어 진짜 트랜잭션 경계에서 경합을 재현하고, 불변식은 `@AfterEach` 후크로 모든 시나리오에 자동 적용한다. 실사 겹침 경합은 재현 후 비관적 락으로 직렬화해 고친다.
 
-**Tech Stack:** Java 21, Spring Boot 3.5.5, Spring Data JPA, PostgreSQL 16, Thymeleaf, JUnit 5 + AssertJ + Mockito, Gradle, Docker Compose, GitHub Actions.
+**Tech Stack:** Java 21, Spring Boot 3.5.5, Spring Data JPA, PostgreSQL(로컬·CI 17), Thymeleaf, JUnit 5 + AssertJ + Mockito, Gradle, GitHub Actions.
 
 ## Global Constraints
 
@@ -18,7 +18,16 @@
 - 시작 시점 테스트 278건 전부 통과. 각 태스크 종료 시 전체 그린 유지.
 - **새 Gradle 의존성을 추가하지 않는다.** Testcontainers·WireMock 금지. `org.postgresql:postgresql`은 이미 있다.
 - 동시성 단언은 타이밍이 아니라 불변 조건으로 쓴다. 스레드 수는 2~5.
-- 동시성 테스트는 `productId >= 9000`, `orderId >= 9000`만 쓴다 — `InitDb`가 시드하는 1~20과 겹치지 않게.
+- 동시성 테스트는 `productId >= 9000`, `orderId >= 9000`만 쓴다. (Task 2 이후 `InitDb` 시딩은
+  테스트에서 꺼져 있어 1~20이 없지만, 캐시된 `@DataJpaTest` 컨텍스트가 1·2를 고정으로 쓰므로 구간을 분리한다.)
+- **테스트 DB 사실 (Task 2에서 확인됨. 이 전제 위에서 설계한다):**
+  - `InitDb`는 `wms.init-db.enabled: false`로 테스트에서 꺼져 있다. 목킹할 필요 없고, 시드 1~20도 없다.
+  - `@DataJpaTest`의 datasource 치환은 `spring.test.database.replace: none`으로 전역 해제돼 있다.
+  - `ddl-auto: create-drop`이라 **새 스프링 컨텍스트가 뜰 때마다 `wms_test` 스키마가 통째로 재생성된다.**
+    커밋한 행은 클래스 안에서는 살아 있지만 컨텍스트 경계를 넘어 살아남는다고 가정하면 안 된다.
+  - `@GeneratedValue`는 시퀀스(allocationSize 50, pooled)다. 컨텍스트가 뜰 때마다 시퀀스가 1로 리셋되는데
+    캐시된 컨텍스트는 메모리 할당분을 들고 있다. **행을 커밋하는 테스트에서 PK 충돌로 드러날 수 있다** —
+    발생하면 우회하지 말고 보고한다.
 - 화면에 enum 원문을 노출하지 않는다.
 - 커밋 메시지는 한국어, 본문에 "왜"를 적는다. 끝에 `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
 
@@ -81,9 +90,9 @@ spring:
 
 ```yaml
 spring:
-  # 테스트도 운영과 같은 엔진(PostgreSQL 16)을 쓴다 — FOR UPDATE·격리 수준은
+  # 테스트도 운영과 같은 엔진(PostgreSQL)을 쓴다 — FOR UPDATE·격리 수준은
   # 엔진이 직접 구현하는 부분이라 H2로는 운영 동작을 증명할 수 없다.
-  # 전제: docker compose up -d postgres
+  # 전제: 로컬 Homebrew postgresql@17이 기동 중이고 wms/wms_test가 준비돼 있음.
   datasource:
     url: jdbc:postgresql://localhost:5432/wms_test
     driver-class-name: org.postgresql.Driver
@@ -171,8 +180,8 @@ EOF
 교체 후:
 
 ```yaml
-  # WMS 자체 DB(OMS와 물리 분리). 개발·테스트·운영 모두 PostgreSQL 16.
-  # 전제: docker compose up -d postgres
+  # WMS 자체 DB(OMS와 물리 분리). 개발·테스트·운영 모두 PostgreSQL.
+  # 전제(로컬): brew services start postgresql@17 — 로컬 개발·테스트는 Docker를 쓰지 않는다(운영 배포는 Dockerfile 사용).
   datasource:
     url: jdbc:postgresql://localhost:5432/wms
     driver-class-name: org.postgresql.Driver
@@ -378,8 +387,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 경합이 아니라 그냥 실패한다. 그래서 @SpringBootTest(테스트 트랜잭션 없음)를 쓰고,
  * 시드·정리를 TransactionTemplate으로 직접 커밋한다.
  *
- * <p>롤백이 없으므로 뒷정리가 필수다. InitDb가 시드하는 상품 1~20을 건드리지 않도록
- * 테스트는 productId·orderId 모두 9000 이상만 쓰고, 정리도 그 범위만 지운다.
+ * <p>롤백이 없으므로 뒷정리가 필수다. 정리하지 않으면 캐시된 @DataJpaTest 컨텍스트가
+ * 고정으로 쓰는 productId 1·2와 충돌한다. 테스트는 productId·orderId 모두 9000 이상만 쓴다.
+ *
+ * <p>InitDb 시딩은 테스트에서 꺼져 있으므로(wms.init-db.enabled=false) 목킹하지 않는다.
  */
 @SpringBootTest
 abstract class ConcurrencySupport {
@@ -470,7 +481,7 @@ abstract class ConcurrencySupport {
         cleanUpTestRows();
     }
 
-    /** 테스트가 만든 행만 지운다. InitDb 시드(1~20)는 남긴다. */
+    /** 테스트가 만든 행을 지운다. 9000 이상 구간만 건드려 다른 클래스와 간섭하지 않는다. */
     private void cleanUpTestRows() {
         tx.executeWithoutResult(s -> {
             em.createQuery("DELETE FROM CycleCountItem i").executeUpdate();
@@ -1572,7 +1583,7 @@ docs(wms): V3.0 정합성 증명 반영
 README의 회복탄력성 표가 주장만 나열하고 있었다. 각 항목이 어떤 테스트로
 CI에서 검증되는지 연결해, 주장과 증거가 문서에서 이어지게 했다.
 
-로컬 실행 전제(docker compose up -d postgres)와 dev/test DB 분리도 명시한다.
+로컬 실행 전제(brew services start postgresql@17)와 dev/test DB 분리도 명시한다.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
