@@ -51,10 +51,18 @@ public class InventoryService {
         return after;
     }
 
-    /** 관리자 수동 재고 조정(+/-). */
+    /**
+     * 관리자 수동 재고 조정(+/-). 사유 필수.
+     * <p>OPERATOR도 조정할 수 있어(SecurityConfig 참고) 통제가 사후 추적뿐이다 —
+     * 사유가 비면 원장에 "누가 몇 개"만 남고 "왜"가 비어 추적의 절반이 무너진다.
+     * 화면의 required 속성은 직접 POST로 우회되므로 여기가 정본 가드다.
+     * applyDelta에는 두지 않는다: RETURN·COUNT는 참조(RMA#/COUNT#)가 사유를 대신한다.
+     */
     @Transactional
     public int adjust(Long productId, int delta, String reason) {
-        return applyDelta(productId, delta, InventoryTransactionType.ADJUST, null, reason);
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("조정 사유는 필수입니다.");
+        return applyDelta(productId, delta, InventoryTransactionType.ADJUST, null, reason.trim());
     }
 
     /** 관리자 재고 화면용 전체 목록. */
@@ -81,12 +89,23 @@ public class InventoryService {
         });
     }
 
-    /** 전부-아니면-실패 예약. orderId 멱등: 같은 주문 재요청은 현재 상태 그대로 반환. */
+    /**
+     * 전부-아니면-실패 예약. orderId 멱등: 같은 주문 + 같은 품목 재요청은 현재 상태 그대로 반환.
+     * 같은 orderId인데 품목·수량이 다르면 409 — OMS·WMS DB가 따로 초기화돼 orderId가 재사용되면
+     * 과거 예약이 현재 주문의 예약으로 오인된다. 상태는 보지 않는다(SHIPPED·RELEASED도 동일하게 거부).
+     */
     @Transactional
     public boolean reserveAll(Long orderId, Map<Long, Integer> qtyByProductId) {
         validateWriteRequest(orderId, qtyByProductId);
         Reservation existing = reservationRepository.findByOrderId(orderId).orElse(null);
-        if (existing != null) return existing.getStatus() != ReservationStatus.RELEASED;
+        if (existing != null) {
+            Map<Long, Integer> ledger = existing.getQtyByProductId();
+            if (!ledger.equals(qtyByProductId))
+                throw new IllegalStateException("orderId 예약 원장 불일치 — 같은 orderId의 기존 예약과 요청 품목이 다릅니다."
+                        + " orderId=" + orderId + ", 기존원장=" + new TreeMap<>(ledger)
+                        + ", 요청=" + new TreeMap<>(qtyByProductId));
+            return existing.getStatus() != ReservationStatus.RELEASED;
+        }
 
         Map<Long, Inventory> byId = inventoryRepository.findByProductIdIn(qtyByProductId.keySet())
                 .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));

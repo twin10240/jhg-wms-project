@@ -111,6 +111,21 @@ public class CycleCountService {
         session.approve(actorProvider.current());
     }
 
+    /**
+     * 실사 중인 상품이면 수동 조정을 거부한다.
+     * <p>승인은 계수값을 <b>절대값</b>으로 덮어쓰므로, 세션이 열린 사이에 넣은 조정은 효과가 사라지고
+     * 원장에 ADJUST와 COUNT가 상쇄된 채로만 남는다 — 같은 오차를 두 사람이 각자 고치는 상황이다.
+     * 조정은 사람이 하는 수동 작업이라 실사가 끝날 때까지 미룰 수 있어 막는다.
+     * 출고·입고·반품은 막지 않는다: 미룰 수 없고 OMS 매출까지 멎는다
+     * (설계 문서의 "대상 동결 미채택" 판단 그대로).
+     * <p>물리 이동 중 계수라는 근본 문제는 이걸로 해결되지 않는다 — 위치 단위 동결이 필요하다.
+     */
+    public void assertAdjustable(Long productId) {
+        if (cycleCountRepository.existsOpenByProductId(productId))
+            throw new IllegalStateException(
+                    "실사가 진행 중인 상품은 조정할 수 없습니다. 실사를 승인·반려한 뒤 조정하세요. (productId=" + productId + ")");
+    }
+
     @Transactional
     public void reject(Long sessionId, String reason) {
         findById(sessionId).reject(actorProvider.current(), reason);

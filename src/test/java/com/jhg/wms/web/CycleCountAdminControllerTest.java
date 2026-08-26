@@ -168,6 +168,22 @@ class CycleCountAdminControllerTest {
     }
 
     @Test
+    void 반려_사유는_모달_안에서_받는다() throws Exception {
+        when(cycleCountService.findById(7L)).thenReturn(submittedBy("operator"));
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 15, 0, 15)));
+
+        String html = mockMvc.perform(get("/admin/cycle-counts/7").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 사유 입력칸이 <dialog> 밖에 상시 노출되면 버튼과 떨어져 어디 적는지 보이지 않는다.
+        assertThat(html).contains("<dialog id=\"ccRejectDialog\"");
+        assertThat(html).contains("showModal()");
+        assertThat(html.indexOf("name=\"reason\"")).isGreaterThan(html.indexOf("ccRejectDialog"));
+    }
+
+    @Test
     void OPERATOR가_반려를_직접_POST하면_403() throws Exception {
         mockMvc.perform(post("/admin/cycle-counts/7/reject")
                         .with(user("op").roles("OPERATOR")).with(csrf())

@@ -129,4 +129,24 @@ class CycleCountTest {
         c.submit("operator");
         return c;
     }
+
+    @Test
+    void 반려_사유가_비면_거부하고_상태가_바뀌지_않는다() {
+        // 반려는 계수 작업을 무르는 결정이라 사유가 없으면 계수자가 무엇을 고칠지 모른다.
+        for (String blank : new String[] {null, "", "   "}) {
+            CycleCount c = submitted();
+            assertThatThrownBy(() -> c.reject("manager", blank))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("반려 사유");
+            assertThat(c.getStatus()).isEqualTo(CycleCountStatus.SUBMITTED);
+            assertThat(c.getRejectedBy()).isNull();
+        }
+    }
+
+    @Test
+    void 반려_사유의_앞뒤_공백은_제거된다() {
+        CycleCount c = submitted();
+        c.reject("manager", "  재계수 필요  ");
+        assertThat(c.getRejectReason()).isEqualTo("재계수 필요");
+    }
 }

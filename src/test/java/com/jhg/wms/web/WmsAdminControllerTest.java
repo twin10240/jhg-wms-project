@@ -324,6 +324,38 @@ class WmsAdminControllerTest {
     }
 
     @Test
+    void 실사_중인_상품은_조정이_거부되고_서비스가_호출되지_않는다() throws Exception {
+        doThrow(new IllegalStateException("실사가 진행 중인 상품은 조정할 수 없습니다."))
+                .when(cycleCountService).assertAdjustable(1L);
+
+        mockMvc.perform(post("/admin/inventory/adjust")
+                        .with(user("op").roles("OPERATOR")).with(csrf())
+                        .param("productId", "1").param("delta", "-2").param("reason", "파손"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/inventory"))
+                .andExpect(flash().attribute("errorMessage",
+                        containsString("실사가 진행 중인 상품")));
+
+        verify(inventoryService, never()).adjust(anyLong(), anyInt(), anyString());
+    }
+
+    // 권한 축소 회귀 방지 — adjust는 MANAGER 전용이 아니다(SecurityConfig 주석 참고).
+    // 파손·오차의 현장 즉시 보정이 운영 요구이고, 통제는 원장 actor 추적으로 대신한다.
+    @Test
+    void OPERATOR도_재고를_조정할_수_있다() throws Exception {
+        when(inventoryService.adjust(1L, -2, "파손")).thenReturn(8);
+
+        mockMvc.perform(post("/admin/inventory/adjust")
+                        .with(user("op").roles("OPERATOR")).with(csrf())
+                        .param("productId", "1").param("delta", "-2").param("reason", "파손"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/inventory"))
+                .andExpect(flash().attributeExists("successMessage"));
+
+        verify(inventoryService).adjust(1L, -2, "파손");
+    }
+
+    @Test
     void OPERATOR는_발주_취소가_403() throws Exception {
         mockMvc.perform(post("/admin/purchase-orders/1/cancel")
                         .with(user("op").roles("OPERATOR")).with(csrf()))

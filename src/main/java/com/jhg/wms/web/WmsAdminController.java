@@ -97,9 +97,10 @@ public class WmsAdminController {
                          @RequestParam(defaultValue = "") String reason,
                          RedirectAttributes ra) {
         try {
+            cycleCountService.assertAdjustable(productId);   // 실사 중인 상품은 조정 거부
             int adjusted = inventoryService.adjust(productId, delta, reason);
             ra.addFlashAttribute("successMessage", "재고 조정 완료. (현재 " + adjusted + "개)");
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
         return "redirect:/admin/inventory";
