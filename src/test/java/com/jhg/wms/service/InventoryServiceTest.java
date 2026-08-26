@@ -202,6 +202,81 @@ class InventoryServiceTest {
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(6);
     }
 
+    // ── orderId 재사용 방어(OMS·WMS DB 개별 초기화) ────────────────────
+
+    @Test
+    void adjust_사유가_비면_거부하고_재고를_바꾸지_않는다() {
+        // OPERATOR도 조정 가능해 통제가 사후 추적뿐 — 사유 없는 조정은 추적을 무력화한다.
+        seed(1L, 10);
+
+        for (String blank : new String[] {null, "", "   "}) {
+            assertThatThrownBy(() -> service.adjust(1L, -3, blank))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("사유는 필수");
+        }
+
+        assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getOnHandQty()).isEqualTo(10);
+        assertThat(adjustmentRepo.count()).isZero();
+    }
+
+    @Test
+    void reserveAll_같은_orderId_다른_상품이면_409용_예외를_던지고_불변이다() {
+        // OMS 주문 52는 상품1×1·상품2×2인데 WMS에는 상품2×1짜리 과거 예약 52가 남은 상황.
+        seed(1L, 10); seed(2L, 10);
+        service.reserveAll(52L, Map.of(2L, 1));
+
+        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 1, 2L, 2)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("예약 원장 불일치")
+                .hasMessageContaining("orderId=52");
+
+        assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
+        assertThat(repo.findByProductIdIn(List.of(2L)).get(0).getReservedQty()).isEqualTo(1);
+        assertThat(reservationRepo.findByOrderId(52L).orElseThrow().getQtyByProductId())
+                .isEqualTo(Map.of(2L, 1));
+    }
+
+    @Test
+    void reserveAll_같은_orderId_같은_상품_다른_수량이면_예외를_던지고_불변이다() {
+        seed(1L, 10);
+        service.reserveAll(52L, Map.of(1L, 1));
+
+        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 3)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("예약 원장 불일치");
+
+        assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(1);
+    }
+
+    @Test
+    void reserveAll_기존이_SHIPPED여도_품목이_다르면_예외다() {
+        seed(1L, 10); seed(2L, 10);
+        service.reserveAll(52L, Map.of(2L, 1));
+        service.shipAll(52L, Map.of(2L, 1));
+
+        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 1)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("예약 원장 불일치");
+
+        Inventory p2 = repo.findByProductIdIn(List.of(2L)).get(0);
+        assertThat(p2.getOnHandQty()).isEqualTo(9);
+        assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
+    }
+
+    @Test
+    void reserveAll_기존이_RELEASED여도_품목이_다르면_예외다() {
+        seed(1L, 10); seed(2L, 10);
+        service.reserveAll(52L, Map.of(2L, 1));
+        service.releaseAll(52L, Map.of(2L, 1));
+
+        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 1)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("예약 원장 불일치");
+
+        assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
+        assertThat(repo.findByProductIdIn(List.of(2L)).get(0).getReservedQty()).isEqualTo(0);
+    }
+
     @Test
     void shipAll_이미_출고됐으면_노옵() {
         seed(1L, 10);

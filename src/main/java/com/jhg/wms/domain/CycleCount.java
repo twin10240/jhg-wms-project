@@ -85,12 +85,15 @@ public class CycleCount {
         approvedAt = LocalDateTime.now();
     }
 
+    /** 반려는 계수 작업을 통째로 무르는 결정이다 — 사유가 없으면 계수자는 무엇을 고쳐야 할지 모른다. */
     public void reject(String actor, String reason) {
         requireSubmitted();
+        if (reason == null || reason.isBlank())
+            throw new IllegalArgumentException("반려 사유를 입력해야 합니다.");
         status = CycleCountStatus.REJECTED;
         rejectedBy = actor;
         rejectedAt = LocalDateTime.now();
-        rejectReason = reason;
+        rejectReason = reason.trim();
     }
 
     private void requireOpen() {

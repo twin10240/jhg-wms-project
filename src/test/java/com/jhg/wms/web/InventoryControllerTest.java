@@ -131,6 +131,18 @@ class InventoryControllerTest {
     }
 
     @Test
+    void reserve_예약원장_불일치는_409를_반환한다() throws Exception {
+        when(inventoryService.reserveAll(eq(1L), any()))
+                .thenThrow(new IllegalStateException("orderId 예약 원장 불일치 — 같은 orderId의 기존 예약과 요청 품목이 다릅니다."));
+
+        mockMvc.perform(post("/api/inventory/reserve").with(httpBasic("wms", "wms"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                .andExpect(status().isConflict())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("예약 원장 불일치")));
+    }
+
+    @Test
     void reserve_잘못된_수량은_400을_반환한다() throws Exception {
         when(inventoryService.reserveAll(eq(1L), any()))
                 .thenThrow(new IllegalArgumentException("수량은 1 이상이어야 합니다."));

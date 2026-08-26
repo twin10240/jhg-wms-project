@@ -61,6 +61,11 @@ public class SecurityConfig {
             .userDetailsService(users)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/error", "/css/**", "/js/**", "/images/**").permitAll()
+                // MANAGER 전용은 "결정"하는 액션 — 발주 생성·취소, 승인·반려, 반품 처리.
+                // POST /admin/inventory/adjust는 의도적으로 여기 없다: 파손·오차를 현장에서 즉시
+                // 보정해야 하므로 OPERATOR도 조정할 수 있다. 통제는 사전 승인이 아니라 사후 추적 —
+                // 모든 조정이 ADJUST 원장에 actor와 함께 남는다(InventoryService.applyDelta).
+                // 실사의 제출자·승인자 분리를 우회하는 경로이지만, 운영상 필요로 감수한 결정이다.
                 .requestMatchers(HttpMethod.POST, "/admin/purchase-orders").hasRole("MANAGER")
                 .requestMatchers(HttpMethod.POST, "/admin/purchase-orders/*/cancel").hasRole("MANAGER")
                 .requestMatchers(HttpMethod.POST, "/admin/replenishment-requests/*/approve").hasRole("MANAGER")

@@ -81,11 +81,25 @@
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
   </form>
 
-  <form id="ccReject" sec:authorize="hasRole('MANAGER')" th:if="${cc.status.name() == 'SUBMITTED'}"
-        th:action="@{/admin/cycle-counts/{id}/reject(id=${cc.id})}" method="post">
-    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-    <input type="text" name="reason" placeholder="반려 사유" style="width:260px" />
-  </form>
+  <!-- 반려 사유는 <dialog> 안에서 받는다 — 상시 노출하면 버튼과 떨어져 어디 적는지 안 보이고,
+       좁은 화면에서 자리만 차지한다. 모달 동작·ESC 닫기·포커스 트랩은 브라우저 기본 기능이다.
+       required는 브라우저 단계일 뿐이고, 빈 사유의 정본 가드는 CycleCount.reject에 있다. -->
+  <dialog id="ccRejectDialog" sec:authorize="hasRole('MANAGER')"
+          th:if="${cc.status.name() == 'SUBMITTED'}">
+    <form th:action="@{/admin/cycle-counts/{id}/reject(id=${cc.id})}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <h3>실사 반려</h3>
+      <p class="hint">계수 결과가 무효가 되고 재고는 그대로 유지됩니다. 계수자가 무엇을 고쳐야 하는지 적어주세요.</p>
+      <label for="ccRejectReason">반려 사유</label>
+      <input type="text" id="ccRejectReason" name="reason" required autofocus
+             placeholder="예) 3번 선반 누락 — 다시 계수 필요" />
+      <div class="dialog-actions">
+        <button type="button" class="btn--muted"
+                onclick="document.getElementById('ccRejectDialog').close()">취소</button>
+        <button type="submit" class="btn--danger">반려</button>
+      </div>
+    </form>
+  </dialog>
 
   <p class="hint" sec:authorize="hasRole('MANAGER')"
      th:if="${cc.status.name() == 'SUBMITTED' and cc.submittedBy == #authentication.name}">
@@ -100,8 +114,9 @@
             onclick="return confirm('제출하면 승인 대기 상태로 넘어가며, 이후에는 실물 수량을 고칠 수 없습니다. 진행하시겠습니까?');">제출</button>
     <button type="submit" form="ccApprove" sec:authorize="hasRole('MANAGER')"
             th:if="${cc.status.name() == 'SUBMITTED' and cc.submittedBy != #authentication.name}">승인</button>
-    <button type="submit" form="ccReject" class="btn btn--danger" sec:authorize="hasRole('MANAGER')"
-            th:if="${cc.status.name() == 'SUBMITTED'}">반려</button>
+    <button type="button" class="btn btn--danger" sec:authorize="hasRole('MANAGER')"
+            th:if="${cc.status.name() == 'SUBMITTED'}"
+            onclick="document.getElementById('ccRejectDialog').showModal()">반려</button>
   </div>
 
   <p><a th:href="@{/admin/cycle-counts}">← 실사 목록</a></p>

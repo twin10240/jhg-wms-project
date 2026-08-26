@@ -23,6 +23,12 @@ public interface CycleCountRepository extends JpaRepository<CycleCount, Long> {
 
     long countByStatus(CycleCountStatus status);
 
+    /** 이 상품이 종결되지 않은 세션에 잡혀 있는가. 조정 차단은 상품 하나만 보면 되므로 목록 대신 exists. */
+    @Query("SELECT COUNT(i) > 0 FROM CycleCount c JOIN c.items i WHERE i.productId = :productId " +
+           "AND c.status IN (com.jhg.wms.domain.CycleCountStatus.OPEN, " +
+           "                 com.jhg.wms.domain.CycleCountStatus.SUBMITTED)")
+    boolean existsOpenByProductId(Long productId);
+
     /** 아직 종결되지 않은 세션이 잡고 있는 상품들. 겹침 검사 한 번에 쓰려고 productId만 뽑는다. */
     @Query("SELECT DISTINCT i.productId FROM CycleCount c JOIN c.items i " +
            "WHERE c.status IN (com.jhg.wms.domain.CycleCountStatus.OPEN, " +

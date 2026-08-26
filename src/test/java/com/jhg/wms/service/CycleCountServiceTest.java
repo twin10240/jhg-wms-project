@@ -309,4 +309,41 @@ class CycleCountServiceTest {
                 .filter(i -> i.getProductId() == productId)
                 .findFirst().orElseThrow().getId();
     }
+
+    // ── 실사 중 조정 차단 ──────────────────────────────────────────
+
+    @Test
+    void 실사가_열려있으면_해당_상품은_조정할_수_없다() {
+        seed(1L, 10); seed(2L, 10);
+        service.open(List.of(1L), "정기");
+
+        assertThatThrownBy(() -> service.assertAdjustable(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("실사가 진행 중인 상품");
+
+        service.assertAdjustable(2L);   // 실사에 없는 상품은 통과
+    }
+
+    @Test
+    void 제출된_실사도_조정을_막는다() {
+        seed(1L, 10);
+        CycleCount session = service.open(List.of(1L), "정기");
+        service.saveCounts(session.getId(), Map.of(session.getItems().get(0).getId(), 9));
+        service.submit(session.getId());
+
+        assertThatThrownBy(() -> service.assertAdjustable(1L))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void 실사가_종결되면_다시_조정할_수_있다() {
+        seed(1L, 10);
+        CycleCount session = service.open(List.of(1L), "정기");
+        service.saveCounts(session.getId(), Map.of(session.getItems().get(0).getId(), 9));
+        service.submit(session.getId());
+        ccActor.set("manager");
+        service.reject(session.getId(), "다시 세기");
+
+        service.assertAdjustable(1L);   // REJECTED는 잠그지 않는다
+    }
 }
