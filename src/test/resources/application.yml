@@ -35,6 +35,11 @@ spring:
   http:
     client:
       redirects: dont_follow
+  # @DataJpaTest 기본값은 datasource를 임베디드로 치환한다. 위의 실제 PostgreSQL 설정을
+  # 쓰게 하려면 꺼야 한다. 클래스마다 @AutoConfigureTestDatabase를 붙이는 대신 여기서 한 번에 끈다.
+  test:
+    database:
+      replace: none
 
 # 테스트에서 실제 OMS 호출 없음(커밋 후 발화 + 테스트 트랜잭션 롤백) — 빈 생성용 값만 제공
 oms:
@@ -44,6 +49,10 @@ oms:
     password: wms
 
 wms:
+  # InitDb의 @PostConstruct 시딩은 실제로 커밋된다 — 여러 테스트 컨텍스트가 물리 DB(wms_test)
+  # 하나를 공유하므로 기본은 끈다. 시딩 자체를 검증하는 InitDbSeedingSmokeTest만 켠다.
+  init-db:
+    enabled: false
   basic:
     user: wms
     password: wms

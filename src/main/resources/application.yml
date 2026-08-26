@@ -1,8 +1,8 @@
 spring:
   application:
     name: jhg-wms
-  # WMS 자체 DB(OMS와 물리 분리). 개발·테스트·운영 모두 PostgreSQL 16.
-  # 전제: docker compose up -d postgres
+  # WMS 자체 DB(OMS와 물리 분리). 개발·테스트·운영 모두 PostgreSQL.
+  # 전제(로컬): brew services start postgresql@17 — 이 저장소는 Docker를 쓰지 않는다.
   datasource:
     url: jdbc:postgresql://localhost:5432/wms
     driver-class-name: org.postgresql.Driver

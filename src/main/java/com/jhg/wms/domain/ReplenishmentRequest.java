@@ -41,7 +41,7 @@ public class ReplenishmentRequest {
     @Column(nullable = false)
     private String reason;
 
-    @JdbcTypeCode(SqlTypes.VARCHAR)   // H2 네이티브 ENUM 회피 — 값 추가 시 기존 컬럼이 거부하는 사고 방지
+    @JdbcTypeCode(SqlTypes.VARCHAR)   // DB 네이티브 ENUM 대신 VARCHAR 저장 — 값 추가 시 기존 컬럼이 거부하는 사고 방지(PostgreSQL도 동일)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

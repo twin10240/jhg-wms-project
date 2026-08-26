@@ -13,11 +13,15 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
+// 여러 테스트 컨텍스트가 물리 DB 하나를 공유하는데 @PostConstruct 시딩은 실제로 커밋된다 —
+// 테스트에서 끌 수 있게 가드를 둔다. 기본은 켜짐이라 운영 동작은 그대로.
+@ConditionalOnProperty(name = "wms.init-db.enabled", havingValue = "true", matchIfMissing = true)
 @RequiredArgsConstructor
 public class InitDb {
 

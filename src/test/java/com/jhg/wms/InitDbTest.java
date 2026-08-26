@@ -13,7 +13,6 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.util.Map;
@@ -22,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** InitDb.InitService의 시드/백필 루틴 검증 — 실제 프로덕션 메서드를 직접 호출한다(로직 재구현 금지). */
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class InitDbTest {
 
     @Autowired InventoryRepository inventoryRepository;

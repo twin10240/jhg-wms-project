@@ -80,16 +80,16 @@
 | Java | 21 |
 | Spring Boot | 3.5.5 |
 | JPA / Hibernate | Spring Data JPA |
-| DB | H2 TCP (OMS와 물리 분리) |
+| DB | PostgreSQL (OMS와 물리 분리) |
 | 빌드 | Gradle |
 
 ## 실행
 
-H2 서버를 먼저 띄운 뒤 애플리케이션을 실행합니다.
+PostgreSQL을 먼저 띄운 뒤 애플리케이션을 실행합니다(로컬은 Homebrew — 이 저장소는 Docker를 쓰지 않습니다).
 
 ```bash
-# H2 서버 (별도 터미널)
-java -cp h2*.jar org.h2.tools.Server -tcp -tcpAllowOthers -ifNotExists
+# PostgreSQL 기동 (최초 1회: createuser/createdb로 롤 wms, DB wms·wms_test 준비)
+brew services start postgresql@17
 
 # WMS 실행 (포트 8081 — OMS가 8080 사용)
 ./gradlew bootRun
@@ -98,8 +98,8 @@ java -cp h2*.jar org.h2.tools.Server -tcp -tcpAllowOthers -ifNotExists
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
-H2 콘솔: `http://localhost:8081/h2-console`  
-JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
+DB 접속: `psql -U wms -d wms`  
+JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 
 ### 로컬 계정 (기동 시 자동 시드)
 
@@ -116,7 +116,7 @@ JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 > 배포 설정과 과거 운영 검증 기록은 보존돼 있지만 **현재 Railway 서비스는 중단 상태**입니다.
 
 - Dockerfile(멀티스테이지 JDK21) 존재 시 Railway가 자동 사용. `.dockerignore`로 build/·.git/ 제외.
-- `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`, H2 콘솔 off. 빈 DB면 `InitDb`가 재고 1~20 시드.
+- `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`. 빈 DB면 `InitDb`가 재고 1~20 시드.
 - Variables:
   - `SPRING_PROFILES_ACTIVE=prod`, `PORT=8081`(private networking 주소 고정용), `OMS_BASE_URL=http://<oms>.railway.internal:8080`
   - `WMS_BASIC_USER`/`WMS_BASIC_PASSWORD` — `/api/**` 서비스 계정. **OMS 서비스에도 동일 값 필수**
