@@ -13,7 +13,8 @@
 - 스펙: `docs/superpowers/specs/v3/2026-08-26-postgres-consistency-proof-design.md`
 - 브랜치: `feat/wms-v3.0` (이미 생성됨, 스펙 커밋 `1bb005d`)
 - 빌드/테스트: `JAVA_HOME=/Users/jo/Library/Java/JavaVirtualMachines/ms-21.0.12/Contents/Home ./gradlew test`
-- 테스트 전 `docker compose up -d postgres` 가 떠 있어야 한다.
+- 테스트 전 로컬 PostgreSQL 17이 떠 있어야 한다: `brew services start postgresql@17`.
+  이 머신에는 Docker가 없다 — docker-compose는 수평 확장 데모 전용이며 이 계획에서 쓰지 않는다.
 - 시작 시점 테스트 278건 전부 통과. 각 태스크 종료 시 전체 그린 유지.
 - **새 Gradle 의존성을 추가하지 않는다.** Testcontainers·WireMock 금지. `org.postgresql:postgresql`은 이미 있다.
 - 동시성 단언은 타이밍이 아니라 불변 조건으로 쓴다. 스레드 수는 2~5.
@@ -28,63 +29,28 @@
 ### Task 1: 테스트를 PostgreSQL로 옮기고 속도를 측정한다
 
 **Files:**
-- Create: `docker/postgres-init.sql`
-- Modify: `docker-compose.yml` (postgres 서비스)
 - Modify: `src/test/resources/application.yml:7-16`
 
 **Interfaces:**
 - Produces: 테스트용 데이터베이스 `wms_test` (dev용 `wms`와 분리 — `create-drop`이 개발 데이터를 지우지 않게)
-- Produces: 로컬 Postgres 접속점 `localhost:5432`
+- Produces: 로컬 Postgres 접속점 `localhost:5432`, 롤 `wms` / 비밀번호 `wms`
 
-- [ ] **Step 1: 테스트 DB 생성 스크립트를 만든다**
+- [ ] **Step 1: 로컬 PostgreSQL이 준비됐는지 확인한다**
 
-`docker/postgres-init.sql` 생성:
-
-```sql
--- 테스트 전용 DB. dev(wms)와 분리한다 — 테스트는 ddl-auto: create-drop이라
--- 같은 DB를 쓰면 개발 데이터가 매 실행마다 사라진다.
-CREATE DATABASE wms_test;
-GRANT ALL PRIVILEGES ON DATABASE wms_test TO wms;
-```
-
-- [ ] **Step 2: docker-compose의 postgres에 포트와 init 스크립트를 붙인다**
-
-`docker-compose.yml`의 `postgres` 서비스를 아래로 교체한다. 현재는 포트 노출이 없어 로컬에서 붙을 수 없다.
-
-```yaml
-  postgres:
-    image: postgres:16-alpine
-    # 로컬 개발·테스트가 직접 붙는다: docker compose up -d postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: wms
-      POSTGRES_USER: wms
-      POSTGRES_PASSWORD: wms
-    # 최초 기동 시 1회 실행 — 테스트용 wms_test를 함께 만든다.
-    volumes:
-      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wms -d wms"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-```
-
-- [ ] **Step 3: Postgres를 띄우고 wms_test가 생겼는지 확인한다**
+이 머신에는 Docker가 없다. Homebrew의 `postgresql@17`을 쓴다.
+통제자가 사전에 기동과 DB 생성을 마쳐두었으므로 여기서는 확인만 한다.
 
 ```bash
-docker compose up -d postgres
-docker compose exec postgres psql -U wms -d postgres -c "\l" | grep wms_test
+psql -h localhost -p 5432 -U wms -d wms_test -c "SELECT current_database(), version();"
 ```
 
-Expected: `wms_test` 행이 출력된다.
+Expected: `wms_test`와 PostgreSQL 17.x 버전 문자열이 출력된다.
 
-이미 postgres 컨테이너가 있던 경우 init 스크립트는 돌지 않는다. 그때는 아래로 다시 만든다:
+실패하면 **BLOCKED로 보고한다.** 직접 `brew services`를 조작하지 않는다 — 호스트 수준 변경이다.
 
-```bash
-docker compose down postgres && docker volume prune -f && docker compose up -d postgres
-```
+- [ ] **Step 2: (해당 없음 — 통제자가 환경을 준비했다)**
+
+- [ ] **Step 3: (해당 없음 — 통제자가 환경을 준비했다)**
 
 - [ ] **Step 4: 테스트 데이터소스를 Postgres로 바꾼다**
 
@@ -158,16 +124,15 @@ Expected: `tests=278 skipped=0 failures=0 errors=0`
 - [ ] **Step 7: 커밋**
 
 ```bash
-git add docker/postgres-init.sql docker-compose.yml src/test/resources/application.yml
+git add src/test/resources/application.yml
 git commit -m "$(cat <<'EOF'
 test(wms): 테스트 DB를 H2 인메모리에서 PostgreSQL로 교체
 
 FOR UPDATE와 격리 수준은 DB 엔진이 직접 구현하는 부분이라, 운영이 Postgres인데
 H2로 증명하면 동시성 주장이 운영 보증이 되지 않는다. 정합성 증명(Phase 2)의 전제다.
 
-- docker-compose의 postgres에 5432 노출 — 지금까지 노출이 없어 로컬에서 붙을 수 없었다.
-- 테스트 전용 DB wms_test를 init 스크립트로 분리한다. dev와 같은 DB를 쓰면
-  ddl-auto: create-drop이 개발 데이터를 매 실행마다 지운다.
+테스트 전용 DB wms_test를 dev(wms)와 분리한다 — 같은 DB를 쓰면
+ddl-auto: create-drop이 개발 데이터를 매 실행마다 지운다.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
@@ -185,7 +150,7 @@ EOF
 - Modify: `README.md`
 
 **Interfaces:**
-- Consumes: Task 1의 `wms_test` DB와 노출된 5432 포트
+- Consumes: Task 1의 `wms_test` DB와 로컬 5432 포트
 - Produces: `dev = test = prod = PostgreSQL`. classpath에 H2 없음
 
 - [ ] **Step 1: 개발 데이터소스를 Postgres로 바꾼다**
@@ -287,7 +252,7 @@ Expected: `BUILD SUCCESSFUL`, 278건 통과. H2 클래스를 참조하는 코드
     # Testcontainers 같은 Gradle 의존성이 필요 없다.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17-alpine
         env:
           POSTGRES_DB: wms_test
           POSTGRES_USER: wms
@@ -324,14 +289,21 @@ CI에서는 `POSTGRES_DB`를 바로 `wms_test`로 만들므로 init 스크립트
 `README.md`의 `## 테스트` 섹션 첫 줄 앞에 아래를 추가한다.
 
 ```markdown
-> **전제 조건**: 테스트는 실제 PostgreSQL에서 돕니다. 먼저 띄워주세요.
+> **전제 조건**: 테스트는 실제 PostgreSQL 17에서 돕니다. 먼저 띄워주세요.
 >
 > ```bash
-> docker compose up -d postgres
+> brew services start postgresql@17
 > ```
 >
-> 전체 데모 스택(nginx + WMS 3대 + redis)을 띄울 필요는 없습니다 — 이 서비스 하나만 올라옵니다.
 > 개발용은 `wms`, 테스트용은 `wms_test` 데이터베이스를 씁니다(테스트가 `create-drop`이라 분리).
+> 최초 1회만 아래로 롤과 DB를 만듭니다.
+>
+> ```bash
+> createuser -s wms 2>/dev/null; psql -d postgres -c "ALTER ROLE wms PASSWORD 'wms'"
+> createdb -O wms wms; createdb -O wms wms_test
+> ```
+>
+> `docker-compose.yml`은 수평 확장 데모 전용이며 테스트와 무관합니다.
 ```
 
 - [ ] **Step 6: 전체 테스트 재확인 후 커밋**
@@ -1183,14 +1155,25 @@ Expected: **FAIL** — `succeeded()`가 2로 나온다. 문서와 주석에만 �
 
 경합이 매번 잡히지 않고 간헐적으로 통과한다면, 두 스레드가 실제로 겹치도록 `race()` 호출 전에 세션 개설 경로가 충분히 무거운지 확인한다. 그래도 재현이 불안정하면 그 사실을 사용자에게 보고한다 — Task 7의 수정은 재현 여부와 무관하게 옳지만, "고쳐졌다"의 증거가 약해지기 때문이다.
 
-- [ ] **Step 3: 재현 결과를 커밋한다**
+- [ ] **Step 3: 재현 결과를 보고서에 기록한다**
 
-실패하는 테스트를 그대로 커밋하지 않는다. Task 7에서 고친 뒤 함께 커밋한다.
-이 단계는 **재현 확인만** 하고 다음 태스크로 넘어간다. 커밋하지 않는다.
+실패하는 테스트를 커밋하지 않는다. **Task 6과 Task 7은 한 번의 작업으로 이어서 수행한다** —
+재현이 곧 수정의 근거이고, 재현 없이 고치면 "고쳐졌다"의 증거가 없다.
+
+보고서에 아래를 그대로 남긴다:
+
+- 실패 시 `succeeded()`의 실제 값
+- 실패 메시지 전문
+- 5회 중 몇 회 실패했는지(간헐적 재현이면 그 사실 자체가 기록 대상)
+
+기록했으면 곧바로 Task 7로 넘어간다.
 
 ---
 
 ### Task 7: 겹침 경합을 비관적 락으로 고친다
+
+> Task 6과 이어서 같은 작업으로 수행한다. 재현(Task 6)과 수정(Task 7)이 한 커밋으로 묶인다 —
+> 실패하는 테스트를 커밋에 남기지 않기 위해서다.
 
 **Files:**
 - Modify: `src/main/java/com/jhg/wms/repository/InventoryRepository.java`
@@ -1574,7 +1557,7 @@ V3.0에서 실사의 계수-승인 사이 물리 이동 문제는 위치 단위 
 ```markdown
 2. OMS를 `--spring.profiles.active=local`로 기동해 스키마를 재생성한다(`ddl-auto: create`).
 3. WMS도 `--spring.profiles.active=local`로 기동해 스키마를 재생성한다.
-   WMS는 V3.0부터 PostgreSQL을 쓴다 — 먼저 `docker compose up -d postgres`가 떠 있어야 한다.
+   WMS는 V3.0부터 PostgreSQL 17을 쓴다 — 먼저 `brew services start postgresql@17`이 떠 있어야 한다.
    개발용은 `wms`, 테스트용은 `wms_test` 데이터베이스다.
 ```
 
@@ -1601,7 +1584,7 @@ EOF
 ## 최종 확인
 
 - [ ] `./gradlew test` — 289건 통과, 실패 0
-- [ ] `docker compose down && docker compose up -d postgres` 후 재실행 — 깨끗한 DB에서도 통과
+- [ ] `dropdb wms_test && createdb -O wms wms_test` 후 재실행 — 깨끗한 DB에서도 통과
 - [ ] 동시성 테스트 5회 연속 통과 (플레이키 없음)
 - [ ] `grep -rn "h2" build.gradle src/main src/test --include='*.yml' --include='*.gradle'` — 결과 없음
 - [ ] PR 생성 후 CI 초록 확인. **CI 시간이 3분을 넘으면 병합 전에 보고한다.**
