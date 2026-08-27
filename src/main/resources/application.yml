@@ -1,12 +1,13 @@
 spring:
   application:
     name: jhg-wms
-  # WMS 자체 DB(OMS와 물리 분리). OMS는 ~/hgpage, WMS는 ~/jhg-wms 로 별도 파일.
+  # WMS 자체 DB(OMS와 물리 분리). 개발·테스트·운영 모두 PostgreSQL.
+  # 전제(로컬): brew services start postgresql@17 — 로컬 개발·테스트는 Docker를 쓰지 않는다(운영 배포는 Dockerfile 사용).
   datasource:
-    url: jdbc:h2:tcp://localhost/~/jhg-wms
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://localhost:5432/wms
+    driver-class-name: org.postgresql.Driver
+    username: wms
+    password: wms
   jpa:
     hibernate:
       ddl-auto: update   # 기본: 데이터 보존. local 프로파일은 create(아래)
@@ -15,9 +16,6 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100
     open-in-view: false
-  h2:
-    console:
-      enabled: true
   # S4: RestClient 공통 타임아웃 — OMS 콜백(OmsReplenishmentNotifier) hang 방지.
   # 자동구성 RestClient.Builder 전체에 적용(Spring Boot 3.4+).
   http:
@@ -91,9 +89,6 @@ spring:
       hibernate:
         format_sql: false
         default_batch_fetch_size: 100
-  h2:
-    console:
-      enabled: false
 # 로컬 기본값(wms/wms) 없이 오버라이드 — 미설정 시 플레이스홀더 해석 실패로 기동 자체가 막힌다.
 oms:
   callback:

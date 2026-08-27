@@ -223,6 +223,32 @@ public class InventoryService {
     public record LedgerRow(Long productId, String productName, int opening, int initial,
                              int receive, int returnQty, int ship, int adjust, int countQty, int closing) {}
 
+    /** 원장 합계(기말)와 실제 보유수량이 어긋난 상품. */
+    public record InvariantViolation(Long productId, String productName,
+                                     int ledgerClosing, int actualOnHand) {}
+
+    /**
+     * 원장에서 유도한 기말재고와 실제 onHand를 대조한다.
+     * <p>불변식 Σdelta == onHand는 문서 주장이었을 뿐 어디서도 확인하지 않았다.
+     * buildLedger가 이미 원장을 집계하므로 대조는 상품 목록 한 번 더 읽는 값이면 된다.
+     * <p>주의: 기간의 끝이 오늘 이전이면 기말재고는 그 시점 값이라 현재 onHand와 다른 게 정상이다.
+     * 호출 측이 기간을 확인하고 부른다.
+     */
+    public List<InvariantViolation> findInvariantViolations(List<LedgerRow> ledger) {
+        Map<Long, LedgerRow> byId = ledger.stream()
+                .collect(Collectors.toMap(LedgerRow::productId, row -> row));
+        List<InvariantViolation> violations = new ArrayList<>();
+        for (Inventory inv : inventoryRepository.findAll()) {
+            LedgerRow row = byId.get(inv.getProductId());
+            int closing = row == null ? 0 : row.closing();
+            if (inv.getOnHandQty() != closing)
+                violations.add(new InvariantViolation(
+                        inv.getProductId(), row == null ? inv.getProductName() : row.productName(),
+                        closing, inv.getOnHandQty()));
+        }
+        return violations;
+    }
+
     /** 관리자 화면용 재고 트랜잭션 이력(최신 200건, type 필터 지원). 원장이 계속 자라므로 전건 조회는 하지 않는다. */
     public List<InventoryTransaction> findTransactions(InventoryTransactionType type) {
         return type == null

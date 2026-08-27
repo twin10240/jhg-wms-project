@@ -113,9 +113,18 @@ public class WmsAdminController {
         if (from == null) from = LocalDate.now().withDayOfMonth(1);
         if (to == null) to = LocalDate.now();
         try {
-            model.addAttribute("ledger", inventoryService.buildLedger(from, to));
+            List<InventoryService.LedgerRow> ledger = inventoryService.buildLedger(from, to);
+            model.addAttribute("ledger", ledger);
+            // 기간의 끝이 과거면 기말재고는 그 시점 값이라 현재 onHand와 달라야 정상이다.
+            // 오늘까지 포함할 때만 불변식을 대조한다.
+            boolean coversToday = !to.isBefore(LocalDate.now());
+            model.addAttribute("invariantChecked", coversToday);
+            model.addAttribute("invariantViolations",
+                    coversToday ? inventoryService.findInvariantViolations(ledger) : List.of());
         } catch (IllegalArgumentException e) {
             model.addAttribute("ledger", List.of());
+            model.addAttribute("invariantChecked", false);
+            model.addAttribute("invariantViolations", List.of());
             model.addAttribute("errorMessage", e.getMessage());
         }
         model.addAttribute("from", from);

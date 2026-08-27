@@ -10,7 +10,7 @@ WMS 변경을 검증할 때도 기준본의 로그인·API 401·부분입고·�
 
 ## 개발 DB 초기화 절차 (OMS·WMS 동시)
 
-OMS(`~/hgpage`)와 WMS(`~/jhg-wms`)는 물리적으로 다른 H2 파일이고 `orderId` 시퀀스도 각자 센다.
+OMS(`~/hgpage`)와 WMS(`PostgreSQL wms`)는 물리적으로 다른 DB이고 `orderId` 시퀀스도 각자 센다.
 **한쪽만 초기화하면 `orderId`가 재사용되어 과거 예약이 새 주문의 예약으로 오인된다.**
 (실제 사고: OMS 주문 52 = 상품1×1·상품2×2인데 WMS에는 상품2×1 `SHIPPED` 예약 52가 남아 있었다.)
 
@@ -18,7 +18,9 @@ OMS(`~/hgpage`)와 WMS(`~/jhg-wms`)는 물리적으로 다른 H2 파일이고 `o
 
 1. 두 앱을 모두 중단한다.
 2. OMS를 `--spring.profiles.active=local`로 기동해 스키마를 재생성한다(`ddl-auto: create`).
-3. WMS를 `--spring.profiles.active=local`로 기동해 스키마를 재생성한다.
+3. WMS도 `--spring.profiles.active=local`로 기동해 스키마를 재생성한다.
+   WMS는 V3.0부터 PostgreSQL 17을 쓴다 — 먼저 `brew services start postgresql@17`이 떠 있어야 한다.
+   개발용은 `wms`, 테스트용은 `wms_test` 데이터베이스다.
 4. 두 앱을 평소 프로파일로 재기동한다.
 
 한쪽만 초기화한 상태에서 예약이 들어오면 `reserveAll`이 **409 "orderId 예약 원장 불일치"** 로 거부한다.
@@ -97,4 +99,3 @@ OMS `feature/oms-v2-rma` 워크트리(:8080)와 WMS `feat/wms-v2`(:8081)를 함�
 **환경 이슈(기록용)**: OMS DB만 초기화돼 주문 ID가 1부터 다시 시작하는데 WMS에는 이전 `orderId 1~11`
 예약이 남아 있어, 같은 `orderId`의 옛 예약과 충돌해 접수가 `400`으로 거부됐다. 두 시스템이 `orderId`를
 공유 키로 쓰는 구조라 **한쪽만 리셋하면 안 된다** — 검증용 데이터는 양쪽을 함께 초기화해야 한다.
-

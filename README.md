@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 278개 (도메인 · 서비스 · MockMvc 슬라이스 · **실서블릿 보안 통합**) |
+| 테스트 | 291개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -80,16 +80,16 @@
 | Java | 21 |
 | Spring Boot | 3.5.5 |
 | JPA / Hibernate | Spring Data JPA |
-| DB | H2 TCP (OMS와 물리 분리) |
+| DB | PostgreSQL (OMS와 물리 분리) |
 | 빌드 | Gradle |
 
 ## 실행
 
-H2 서버를 먼저 띄운 뒤 애플리케이션을 실행합니다.
+PostgreSQL을 먼저 띄운 뒤 애플리케이션을 실행합니다(로컬은 Homebrew — 이 저장소는 Docker를 쓰지 않습니다).
 
 ```bash
-# H2 서버 (별도 터미널)
-java -cp h2*.jar org.h2.tools.Server -tcp -tcpAllowOthers -ifNotExists
+# PostgreSQL 기동 (최초 1회: createuser/createdb로 롤 wms, DB wms·wms_test 준비)
+brew services start postgresql@17
 
 # WMS 실행 (포트 8081 — OMS가 8080 사용)
 ./gradlew bootRun
@@ -98,8 +98,9 @@ java -cp h2*.jar org.h2.tools.Server -tcp -tcpAllowOthers -ifNotExists
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
-H2 콘솔: `http://localhost:8081/h2-console`  
-JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
+DB 접속: `psql -U wms -d wms`
+
+JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 
 ### 로컬 계정 (기동 시 자동 시드)
 
@@ -116,7 +117,7 @@ JDBC URL: `jdbc:h2:tcp://localhost/~/jhg-wms`
 > 배포 설정과 과거 운영 검증 기록은 보존돼 있지만 **현재 Railway 서비스는 중단 상태**입니다.
 
 - Dockerfile(멀티스테이지 JDK21) 존재 시 Railway가 자동 사용. `.dockerignore`로 build/·.git/ 제외.
-- `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`, H2 콘솔 off. 빈 DB면 `InitDb`가 재고 1~20 시드.
+- `prod` 프로파일: PostgreSQL(PG* 변수), `ddl-auto: update`. 빈 DB면 `InitDb`가 재고 1~20 시드.
 - Variables:
   - `SPRING_PROFILES_ACTIVE=prod`, `PORT=8081`(private networking 주소 고정용), `OMS_BASE_URL=http://<oms>.railway.internal:8080`
   - `WMS_BASIC_USER`/`WMS_BASIC_PASSWORD` — `/api/**` 서비스 계정. **OMS 서비스에도 동일 값 필수**
@@ -334,6 +335,12 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 | **자격증명 오설정으로 조용한 전면 실패** | 운영 프로파일은 자격증명에 **기본값 없음** → 누락·공백이면 기동 실패(fail-fast) | `wms/wms` 같은 기본값으로 운영에 뜨는 사고 차단 |
 | **인증 실패가 성공으로 오인** | `/api/**`는 인증 실패 시 **401을 직접 응답**(폼 로그인 302로 새지 않게) | 호출자가 로그인 페이지를 200으로 받아 "성공"으로 착각하는 문제 차단 |
 
+이 표의 항목들은 **실행 가능한 증거**로 고정돼 있습니다. 오버셀 방지는 실제 스레드 경합으로
+(`InventoryConcurrencyTest`), OMS 다운·지연·401은 죽은 포트와 JDK 내장 HTTP 서버로
+(`OmsDownTest`·`OmsSlowTest`·`OmsUnauthorizedTest`), 실사 세션 겹침은 동시 개설로
+(`CycleCountConcurrencyTest`) 매 PR마다 검증됩니다. 원장 불변식(Σdelta == onHand)은 모든
+동시성 시나리오의 `@AfterEach` 후크로 확인되고, 수불대장 화면에도 대조 결과가 표시됩니다.
+
 > 마지막 항목은 실제로 겪은 버그입니다. OMS 콜백 인증을 붙였을 때 인증 실패가 302(로그인 리다이렉트)로 응답돼, WMS가 이를 실패로 인지하지 못하고 조용히 넘어갔습니다. 원인은 서블릿이 401을 `/error`로 재디스패치하면서 폼 로그인 체인에 걸린 것이었고, MockMvc는 이 재디스패치를 재현하지 못해 테스트도 통과하고 있었습니다. 그래서 **실서블릿 통합 테스트**(`SecurityChainIntegrationTest`)로 "미인증 `/api`는 401이고 리다이렉트가 아니다"를 고정해두었습니다.
 
 재고 변경 경로가 `InventoryService.applyDelta` 한 곳으로 모이는 것도 같은 목적입니다 — 입고·조정·시드가 전부 한 지점을 지나므로 **원장 누락이 구조적으로 불가능**하고, 불변식(Σdelta == onHand)으로 검증됩니다.
@@ -344,6 +351,22 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 - **관리자 계정**: `WmsUserSeeder`가 `operator`(OPERATOR)·`manager`(MANAGER)를 시드합니다. 비밀번호는 BCrypt로만 저장하며, 같은 username이 이미 있으면 건너뜁니다(멱등).
 
 ## 테스트
+
+> **전제 조건**: 테스트는 실제 PostgreSQL 17에서 돕니다. 먼저 띄워주세요.
+>
+> ```bash
+> brew services start postgresql@17
+> ```
+>
+> 개발용은 `wms`, 테스트용은 `wms_test` 데이터베이스를 씁니다(테스트가 `create-drop`이라 분리).
+> 최초 1회만 아래로 롤과 DB를 만듭니다.
+>
+> ```bash
+> createuser -s wms 2>/dev/null; psql -d postgres -c "ALTER ROLE wms PASSWORD 'wms'"
+> createdb -O wms wms; createdb -O wms wms_test
+> ```
+>
+> `docker-compose.yml`은 수평 확장 데모 전용이며 테스트와 무관합니다.
 
 ```bash
 ./gradlew test
@@ -360,6 +383,7 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 - **보안 통합**(`@SpringBootTest(RANDOM_PORT)`) — `SecurityChainIntegrationTest`
   - `/api/**` 미인증 **401 유지**(302 아님), Basic 200, 폼 로그인 왕복. MockMvc가 재현 못 하는 실서블릿 `/error` 재디스패치를 검증
 - **설정·기동** — `WmsUserSeederTest`(멱등·BCrypt·공백 자격증명 기동 실패) / `DbUserDetailsServiceTest`(롤→`ROLE_` 권한)
+- **실제 동시 요청**(`@SpringBootTest`) — 오버셀 방지, 실사 세션 겹침, 이중 승인·조정 차단, 원장 불변식 검증
 
 ### 수동 검증
 

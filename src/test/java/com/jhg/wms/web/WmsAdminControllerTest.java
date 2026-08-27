@@ -383,6 +383,32 @@ class WmsAdminControllerTest {
     }
 
     @Test
+    void 수불대장_기간이_오늘까지면_불변식_일치를_표시한다() throws Exception {
+        when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 10, 0, 5, 0, -3, 0, 0, 12)));
+        when(inventoryService.findInvariantViolations(anyList())).thenReturn(List.of());
+
+        mockMvc.perform(get("/admin/inventory/ledger").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("원장 합계와 실제 보유수량이 일치")));
+    }
+
+    @Test
+    void 수불대장_불변식이_깨지면_상품과_차이를_보여준다() throws Exception {
+        when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 10, 0, 5, 0, -3, 0, 0, 12)));
+        when(inventoryService.findInvariantViolations(anyList())).thenReturn(List.of(
+                new InventoryService.InvariantViolation(1L, "상품 1", 12, 15)));
+
+        mockMvc.perform(get("/admin/inventory/ledger").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("원장 합계와 실제 보유수량이 다릅니다")))
+                .andExpect(content().string(containsString("상품 1")))
+                .andExpect(content().string(containsString("12")))
+                .andExpect(content().string(containsString("15")));
+    }
+
+    @Test
     void 수불대장_기간이_뒤집히면_500이_아니라_에러메시지를_렌더링한다() throws Exception {
         when(inventoryService.buildLedger(any(), any()))
                 .thenThrow(new IllegalArgumentException("시작일이 종료일보다 뒤입니다."));
