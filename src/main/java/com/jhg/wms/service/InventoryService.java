@@ -235,15 +235,16 @@ public class InventoryService {
      * 호출 측이 기간을 확인하고 부른다.
      */
     public List<InvariantViolation> findInvariantViolations(List<LedgerRow> ledger) {
-        Map<Long, Inventory> byId = inventoryRepository.findAll().stream()
-                .collect(Collectors.toMap(Inventory::getProductId, i -> i));
+        Map<Long, LedgerRow> byId = ledger.stream()
+                .collect(Collectors.toMap(LedgerRow::productId, row -> row));
         List<InvariantViolation> violations = new ArrayList<>();
-        for (LedgerRow row : ledger) {
-            Inventory inv = byId.get(row.productId());
-            if (inv == null) continue;   // 원장에만 있고 재고 행이 없는 상품 — 대조 대상 아님
-            if (inv.getOnHandQty() != row.closing())
+        for (Inventory inv : inventoryRepository.findAll()) {
+            LedgerRow row = byId.get(inv.getProductId());
+            int closing = row == null ? 0 : row.closing();
+            if (inv.getOnHandQty() != closing)
                 violations.add(new InvariantViolation(
-                        row.productId(), row.productName(), row.closing(), inv.getOnHandQty()));
+                        inv.getProductId(), row == null ? inv.getProductName() : row.productName(),
+                        closing, inv.getOnHandQty()));
         }
         return violations;
     }

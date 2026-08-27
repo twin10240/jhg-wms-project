@@ -524,6 +524,16 @@ class InventoryServiceTest {
     }
 
     @Test
+    void 불변식검사는_원장이_통째로_누락된_재고도_위반으로_잡는다() {
+        seed(1L, 7);
+
+        var violations = service.findInvariantViolations(List.of());
+
+        assertThat(violations).containsExactly(
+                new InventoryService.InvariantViolation(1L, null, 0, 7));
+    }
+
+    @Test
     void buildLedger_시작일이_종료일보다_뒤면_예외() {
         assertThatThrownBy(() -> service.buildLedger(
                 java.time.LocalDate.now(), java.time.LocalDate.now().minusDays(1)))
