@@ -35,6 +35,11 @@ spring:
   http:
     client:
       redirects: dont_follow
+      # main의 application.yml은 이 파일에 통째로 덮여 테스트에 적용되지 않는다(위 exclude와 같은 이유).
+      # OMS 콜백 hang 방지 타임아웃도 그래서 테스트에선 꺼져 있었다 — OmsSlowTest가 이 사실을 드러냈다.
+      # main과 같은 값으로 맞춰야 "느린 OMS는 2초에 끊긴다"를 테스트가 증명할 수 있다.
+      connect-timeout: 1s
+      read-timeout: 2s
   # @DataJpaTest 기본값은 datasource를 임베디드로 치환한다. 위의 실제 PostgreSQL 설정을
   # 쓰게 하려면 꺼야 한다. 클래스마다 @AutoConfigureTestDatabase를 붙이는 대신 여기서 한 번에 끈다.
   test:
