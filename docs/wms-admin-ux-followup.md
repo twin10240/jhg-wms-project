@@ -25,9 +25,12 @@
   — V2 이후 신규 화면 5개(`returns`·`returndetail`·`cycle-counts`·`cycle-count-new`·
   `cycle-count-detail`) 포함 전 화면 이상 없음. 확인 전에 viewport 메타 누락과
   `.table-wrap` 누락 3곳을 고쳤다. 기록: `docs/oms-wms-manual-verification.md`
-- 실제 데이터로 대시보드 집계와 목록 건수 대조
-- OPERATOR 버튼 미노출과 직접 POST `403` 확인
-- 로그인 성공·실패·로그아웃, API 미인증 `401` 확인
+- ~~실제 데이터로 대시보드 집계와 목록 건수 대조~~ ✅ 완료 (2026-08-27)
+  — 일치. 다만 15개 지표 중 10개가 0이라 변별력은 제한적이었다(기록 참조).
+- ~~OPERATOR 버튼 미노출과 직접 POST `403` 확인~~ ✅ 완료 (2026-08-27)
+- ~~로그인 성공·실패·로그아웃, API 미인증 `401` 확인~~ ✅ 완료 (2026-08-27)
+
+기록: `docs/oms-wms-manual-verification.md`. **1차 검증 대기 항목은 전부 완료됐다.**
 
 ## 1차 이후 후보
 
