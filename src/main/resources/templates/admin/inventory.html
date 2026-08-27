@@ -29,21 +29,23 @@
   </form>
 
   <h3>전체 재고</h3>
-  <table>
-    <thead><tr><th>상품 ID</th><th>상품명</th><th>보유</th><th>예약</th><th>가용</th></tr></thead>
-    <tbody>
-      <tr th:each="p : ${products}" th:classappend="${p.availableQty == 0} ? 'soldout'">
-        <td th:text="${p.productId}">1</td>
-        <td th:text="${p.productName}">상품 1</td>
-        <td th:text="${p.onHandQty}">15</td>
-        <td th:text="${p.reservedQty}">0</td>
-        <td th:text="${p.availableQty}">15</td>
-      </tr>
-      <tr th:if="${#lists.isEmpty(products)}">
-        <td colspan="5">재고 없음</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>상품 ID</th><th>상품명</th><th>보유</th><th>예약</th><th>가용</th></tr></thead>
+      <tbody>
+        <tr th:each="p : ${products}" th:classappend="${p.availableQty == 0} ? 'soldout'">
+          <td th:text="${p.productId}">1</td>
+          <td th:text="${p.productName}">상품 1</td>
+          <td th:text="${p.onHandQty}">15</td>
+          <td th:text="${p.reservedQty}">0</td>
+          <td th:text="${p.availableQty}">15</td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(products)}">
+          <td colspan="5">재고 없음</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
 </main>
 </body>
