@@ -7,6 +7,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,6 +39,26 @@ public class Reservation {
     @Column(name = "qty", nullable = false)
     private Map<Long, Integer> qtyByProductId = new HashMap<>();
 
+    /** 데모용 송장. 실제 택배사 연동이 아니라 MOCK 하나만 지원한다. */
+    public static final String CARRIER_CODE = "MOCK";
+    public static final String CARRIER_NAME = "테스트택배";
+
+    // 송장번호의 시각은 issuedAt과 같은 UTC다. 로컬 시각으로 만들면 응답 안에서 두 값이
+    // 서로 다른 숫자를 보여준다(KST 15:30 vs UTC 06:30Z).
+    private static final DateTimeFormatter TRACKING_TS =
+            DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
+
+    /** 송장번호. 주문당 1회만 발급되므로 unique. 출고 전·해제된 예약은 null이 정상이다. */
+    @Column(unique = true)
+    private String trackingNumber;
+
+    @Column
+    private String carrierCode;
+
+    /** 서버 시간대에 따라 해석이 갈리면 안 되는 값이라 Instant다(서비스 경계를 넘는다). */
+    @Column
+    private Instant issuedAt;
+
     public static Reservation reserve(Long orderId, Map<Long, Integer> qtyByProductId) {
         Reservation r = new Reservation();
         r.orderId = orderId;
@@ -46,4 +69,15 @@ public class Reservation {
 
     public void ship()    { this.status = ReservationStatus.SHIPPED; }
     public void release() { this.status = ReservationStatus.RELEASED; }
+
+    /**
+     * 출고 송장 발급. 주문당 1회이며 재발급하지 않는다 — 호출 측이 trackingNumber == null을 확인하고 부른다.
+     * 여기서 다시 검사하지 않는 이유: 발급 여부 판단은 락을 쥔 서비스의 책임이고,
+     * 도메인이 조용히 no-op 하면 호출 측 버그가 숨는다.
+     */
+    public void issueShipment(Instant now) {
+        this.carrierCode = CARRIER_CODE;
+        this.issuedAt = now;
+        this.trackingNumber = CARRIER_CODE + "-" + orderId + "-" + TRACKING_TS.format(now);
+    }
 }
