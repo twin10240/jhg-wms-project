@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,18 +58,37 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
     }
 
     @Test
-    void 같은_예약을_두_스레드가_동시에_출고해도_이중_차감되지_않는다() {
+    void 같은_예약을_두_스레드가_동시에_출고해도_이중차감되지_않고_송장은_하나만_발급된다() {
         long pid = PID_BASE + 3;
         long orderId = ORDER_BASE + 20;
         seedInventory(pid, 10);
         inventoryService.reserveAll(orderId, Map.of(pid, 4));
 
-        race(2, i -> {
-            inventoryService.shipAll(orderId, Map.of(pid, 4));
+        // 두 스레드가 받은 송장번호를 모은다. 잠금이 없으면 서로 다른 두 장이 나온다.
+        Set<String> trackingNumbers = ConcurrentHashMap.newKeySet();
+        RaceResult result = race(2, i -> {
+            trackingNumbers.add(inventoryService.shipAll(orderId, Map.of(pid, 4)).trackingNumber());
             return true;
         });
 
+        // 출고는 멱등이므로 둘 다 성공해야 한다. 한 쪽이 예외로 튕기면 OMS 재시도가 실패한다.
+        assertThat(result.succeeded()).isEqualTo(2);
+        assertThat(trackingNumbers)
+                .as("송장이 두 장 발급됐다 — 잠금이 없거나 발급 가드를 통과했다")
+                .hasSize(1);
         assertThat(onHandOf(pid)).isEqualTo(6);    // 10 - 4, 한 번만 차감
         assertThat(reservedOf(pid)).isZero();
+        assertThat(shipRowCountOf(pid))
+                .as("SHIP 원장이 두 번 기록됐다 — 재고 차감이 두 번 일어났다는 뜻")
+                .isEqualTo(1);
+    }
+
+    /** 상품의 SHIP 원장 행 수. 재고 수치는 맞는데 원장만 두 줄인 상태를 잡는다. */
+    private long shipRowCountOf(long productId) {
+        return tx.execute(s -> em.createQuery(
+                        "SELECT COUNT(t) FROM InventoryTransaction t WHERE t.productId = :pid "
+                                + "AND t.type = com.jhg.wms.domain.InventoryTransactionType.SHIP", Long.class)
+                .setParameter("pid", productId)
+                .getSingleResult());
     }
 }
