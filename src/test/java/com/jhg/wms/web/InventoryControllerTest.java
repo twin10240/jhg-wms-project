@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -89,11 +90,22 @@ class InventoryControllerTest {
     }
 
     @Test
-    void ship_서비스에_위임한다() throws Exception {
+    void ship_서비스에_위임하고_송장을_JSON으로_반환한다() throws Exception {
+        when(inventoryService.shipAll(eq(1L), any())).thenReturn(new ShipResponse(
+                1L, "MOCK", "테스트택배", "MOCK-1-20260827063000",
+                Instant.parse("2026-08-27T06:30:00Z")));
+
         mockMvc.perform(post("/api/inventory/ship").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value(1))
+                .andExpect(jsonPath("$.carrierCode").value("MOCK"))
+                .andExpect(jsonPath("$.carrierName").value("테스트택배"))
+                .andExpect(jsonPath("$.trackingNumber").value("MOCK-1-20260827063000"))
+                .andExpect(jsonPath("$.issuedAt").value("2026-08-27T06:30:00Z"))
+                // status는 계약에서 뺐다 — 성공이면 항상 SHIPPED라 중복이다.
+                .andExpect(jsonPath("$.status").doesNotExist());
 
         verify(inventoryService).shipAll(eq(1L), any());
     }

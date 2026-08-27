@@ -49,8 +49,8 @@ public class InventoryController {
     }
 
     @PostMapping("/ship")
-    public void ship(@RequestBody InventoryWriteRequest req) {
-        inventoryService.shipAll(req.orderId(), req.items());
+    public ShipResponse ship(@RequestBody InventoryWriteRequest req) {
+        return inventoryService.shipAll(req.orderId(), req.items());
     }
 
     @PostMapping("/release")

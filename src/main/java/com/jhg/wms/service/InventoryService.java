@@ -11,10 +11,12 @@ import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
+import com.jhg.wms.web.ShipResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -119,31 +121,44 @@ public class InventoryService {
         return true;
     }
 
-    /** 예약분 출고. 이미 출고됐으면 no-op. 해제된 예약은 출고 거부(반쪽 상태 오염 방지). */
+    /**
+     * 예약분 출고 + 송장 발급. 이미 출고됐으면 재고를 다시 깎지 않고, 이미 송장이 있으면 재발급하지 않는다.
+     * 해제된 예약은 출고 거부(반쪽 상태 오염 방지).
+     * <p>동시 요청은 findByOrderIdWithLock으로 직렬화한다 — 두 번째 요청은 첫 번째가 커밋한 뒤
+     * SHIPPED + 송장이 채워진 상태를 보고 같은 값을 반환한다.
+     */
     @Transactional
-    public void shipAll(Long orderId, Map<Long, Integer> qtyByProductId) {
+    public ShipResponse shipAll(Long orderId, Map<Long, Integer> qtyByProductId) {
         validateWriteRequest(orderId, qtyByProductId);
-        Reservation reservation = reservationRepository.findByOrderId(orderId)
+        // 잠금 조회로 바꾼다 — 두 요청이 동시에 오면 둘 다 SHIPPED 검사를 통과해 송장이 두 장 나온다.
+        Reservation reservation = reservationRepository.findByOrderIdWithLock(orderId)
                 .orElseThrow(() -> new IllegalStateException("예약이 없어 출고할 수 없습니다. orderId=" + orderId));
-        if (reservation.getStatus() == ReservationStatus.SHIPPED) return;
         if (reservation.getStatus() == ReservationStatus.RELEASED)
             throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. orderId=" + orderId);
-        // 호출자 요청 수량이 아니라 예약 원장(SSOT)을 재생한다 — 수량 오염·누락행 침묵 스킵 차단.
-        // ship()은 onHand·reserved를 동시에 깎아 applyDelta(onHand 전용)를 못 쓰므로 전용 루프로 SHIP을 기록한다.
-        Map<Long, Integer> ledger = reservation.getQtyByProductId();
-        Map<Long, Inventory> byId = inventoryRepository.findByProductIdIn(ledger.keySet())
-                .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));
-        ledger.forEach((pid, qty) -> {
-            Inventory inv = byId.get(pid);
-            if (inv == null)
-                throw new IllegalStateException("재고 행이 없어 처리할 수 없습니다. productId=" + pid);
-            int before = inv.getOnHandQty();
-            inv.ship(qty);
-            transactionRepository.save(InventoryTransaction.of(
-                pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(),
-                "ORDER#" + orderId, null, actorProvider.current()));
-        });
-        reservation.ship();
+
+        if (reservation.getStatus() != ReservationStatus.SHIPPED) {
+            // 호출자 요청 수량이 아니라 예약 원장(SSOT)을 재생한다 — 수량 오염·누락행 침묵 스킵 차단.
+            // ship()은 onHand·reserved를 동시에 깎아 applyDelta(onHand 전용)를 못 쓰므로 전용 루프로 SHIP을 기록한다.
+            Map<Long, Integer> ledger = reservation.getQtyByProductId();
+            Map<Long, Inventory> byId = inventoryRepository.findByProductIdIn(ledger.keySet())
+                    .stream().collect(Collectors.toMap(Inventory::getProductId, i -> i));
+            ledger.forEach((pid, qty) -> {
+                Inventory inv = byId.get(pid);
+                if (inv == null)
+                    throw new IllegalStateException("재고 행이 없어 처리할 수 없습니다. productId=" + pid);
+                int before = inv.getOnHandQty();
+                inv.ship(qty);
+                transactionRepository.save(InventoryTransaction.of(
+                    pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(),
+                    "ORDER#" + orderId, null, actorProvider.current()));
+            });
+            reservation.ship();
+        }
+        // 조기 return을 없앤 이유: 이미 출고됐지만 송장이 없는 기존 주문이 여기 도달해야 한다.
+        if (reservation.getTrackingNumber() == null)
+            reservation.issueShipment(Instant.now());
+
+        return ShipResponse.from(reservation);
     }
 
     /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. 출고된 예약은 해제 거부(반쪽 상태 오염 방지). */
