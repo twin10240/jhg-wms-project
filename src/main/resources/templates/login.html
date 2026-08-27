@@ -2,6 +2,9 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8" />
+  <!-- 없으면 모바일 브라우저가 약 980px로 렌더한 뒤 축소한다 —
+       .table-wrap의 가로 스크롤도 그 전제 위에서만 의미가 있다. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>로그인 · JHG-WMS</title>
   <link rel="stylesheet" th:href="@{/css/admin.css}" />
 </head>
