@@ -7,6 +7,7 @@ import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
+import com.jhg.wms.web.ShipResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -563,5 +564,62 @@ class InventoryServiceTest {
                 .filteredOn(t -> t.getType() == InventoryTransactionType.SHIP)
                 .extracting(com.jhg.wms.domain.InventoryTransaction::getActor)
                 .containsExactly("manager");
+    }
+
+    @Test
+    void shipAll_출고하면_MOCK_송장을_발급한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+
+        ShipResponse res = service.shipAll(99L, Map.of(1L, 6));
+
+        assertThat(res.orderId()).isEqualTo(99L);
+        assertThat(res.carrierCode()).isEqualTo("MOCK");
+        assertThat(res.carrierName()).isEqualTo("테스트택배");
+        assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}");
+        assertThat(res.issuedAt()).isNotNull();
+    }
+
+    @Test
+    void shipAll_재호출해도_같은_송장을_주고_재고는_한_번만_줄어든다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+
+        ShipResponse first = service.shipAll(99L, Map.of(1L, 6));
+        ShipResponse again = service.shipAll(99L, Map.of(1L, 6));
+
+        assertThat(again.trackingNumber()).isEqualTo(first.trackingNumber());
+        assertThat(again.issuedAt()).isEqualTo(first.issuedAt());
+        assertThat(repo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(4);
+    }
+
+    @Test
+    void shipAll_재고행이_없어_실패하면_송장도_생기지_않는다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        // 예약 후 재고 행이 사라진 상태 — 출고 루프가 예외를 던지고 송장 발급에 도달하지 못한다.
+        repo.delete(repo.findByProductId(1L).orElseThrow());
+        em.flush();
+
+        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(reservationRepo.findByOrderId(99L).orElseThrow().getTrackingNumber()).isNull();
+    }
+
+    @Test
+    void shipAll_이미_출고됐지만_송장이_없으면_송장만_보완한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.shipAll(99L, Map.of(1L, 6));
+        // 이 기능 이전에 출고된 주문 재현 — 송장 세 필드를 모두 비운다.
+        em.createQuery("UPDATE Reservation r SET r.trackingNumber = null, r.carrierCode = null, "
+                + "r.issuedAt = null WHERE r.orderId = 99").executeUpdate();
+        em.clear();
+
+        ShipResponse res = service.shipAll(99L, Map.of(1L, 6));
+
+        assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}");
+        assertThat(repo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(4);   // 재고 불변
     }
 }
