@@ -153,9 +153,16 @@ public record ShipResponse(Long orderId, String carrierCode, String carrierName,
   "carrierCode": "MOCK",
   "carrierName": "테스트택배",
   "trackingNumber": "MOCK-202-20260827063000",
-  "issuedAt": "2026-08-27T06:30:00Z"
+  "issuedAt": "2026-08-27T06:30:00.123456Z"
 }
 ```
+
+**`issuedAt`은 `Instant.now()`에서 만들어지고 `timestamp(6)` 컬럼을 그대로 왕복하므로 마이크로초
+자릿수를 갖는다.** 위 예시의 `.123456`은 매 호출마다 달라진다 — 초 단위로 딱 떨어지는 값을 예시로
+쓰면(예: `...T06:30:00Z`) OMS가 `SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")` 같은 고정 패턴
+파서를 만들고, 실제 응답을 만나는 즉시 파싱 예외를 던진다. 반드시 `Instant.parse` 등 ISO-8601
+instant 파서로 읽어야 한다. `trackingNumber`는 초 단위(`yyyyMMddHHmmss`)라 `issuedAt`과 초까지는
+같고 그 아래 자릿수만 다르다.
 
 **`status` 필드는 넣지 않는다.** 성공 응답은 항상 `SHIPPED`이고 나머지는 HTTP 오류이므로
 정보가 중복된다.
@@ -166,6 +173,11 @@ public record ShipResponse(Long orderId, String carrierCode, String carrierName,
 |---|---|
 | `400` | 형식 검증 실패 — `orderId` 누락, 품목 없음, 수량 0 이하 |
 | `409` | 예약 없음, 해제된 예약 출고 시도 |
+
+**본문 형식이 성공과 다르다.** `InventoryController`의 `@ExceptionHandler`는 문자열을 그대로
+반환하므로 400/409 응답 본문은 JSON이 아니라 일반 텍스트다. 성공(200) 본문만 JSON이므로,
+OMS가 이 엔드포인트에 JSON 디코더를 건다면 상태 코드로 먼저 분기해야 한다 — 그러지 않으면
+409(영구적 비즈니스 충돌)가 디코드 오류로 오분류되어 재시도 루프에 빠질 수 있다.
 
 ### OMS가 지켜야 할 계약
 

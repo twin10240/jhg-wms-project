@@ -48,7 +48,12 @@ public class Reservation {
     private static final DateTimeFormatter TRACKING_TS =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
 
-    /** 송장번호. 주문당 1회만 발급되므로 unique. 출고 전·해제된 예약은 null이 정상이다. */
+    /**
+     * 송장번호. 주문당 1회만 발급되므로 unique. 출고 전·해제된 예약은 null이 정상이다.
+     * 이 unique 제약은 최후 방어선일 뿐 "주문당 1건"을 실제로 강제하는 것은 shipAll의
+     * trackingNumber == null 가드(row lock 하)다 — 그 가드가 빠지면 재발급마다 초가 달라져
+     * 다른 문자열이 나오므로 이 인덱스를 그냥 통과한다.
+     */
     @Column(unique = true)
     private String trackingNumber;
 

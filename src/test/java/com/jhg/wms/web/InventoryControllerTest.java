@@ -91,9 +91,12 @@ class InventoryControllerTest {
 
     @Test
     void ship_서비스에_위임하고_송장을_JSON으로_반환한다() throws Exception {
+        // issuedAt은 실제로는 Instant.now()(timestamp(6) 왕복)라 초 단위로 딱 떨어지지 않는다.
+        // 초 단위 예시(...T06:30:00Z)로 스텁하면 이 테스트가 절대 나오지 않는 모양을 고정해버려
+        // 실제 와이어 포맷과 어긋난 문서/가정을 놓친다 — 소수점 이하 자릿수를 가진 값으로 스텁한다.
         when(inventoryService.shipAll(eq(1L), any())).thenReturn(new ShipResponse(
                 1L, "MOCK", "테스트택배", "MOCK-1-20260827063000",
-                Instant.parse("2026-08-27T06:30:00Z")));
+                Instant.parse("2026-08-27T06:30:00.123456Z")));
 
         mockMvc.perform(post("/api/inventory/ship").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +106,8 @@ class InventoryControllerTest {
                 .andExpect(jsonPath("$.carrierCode").value("MOCK"))
                 .andExpect(jsonPath("$.carrierName").value("테스트택배"))
                 .andExpect(jsonPath("$.trackingNumber").value("MOCK-1-20260827063000"))
-                .andExpect(jsonPath("$.issuedAt").value("2026-08-27T06:30:00Z"))
+                // 소수점 이하 자릿수가 실제 와이어 포맷에 존재함을 고정한다(FIX 1 검증).
+                .andExpect(jsonPath("$.issuedAt").value("2026-08-27T06:30:00.123456Z"))
                 // status는 계약에서 뺐다 — 성공이면 항상 SHIPPED라 중복이다.
                 .andExpect(jsonPath("$.status").doesNotExist());
 

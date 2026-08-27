@@ -165,7 +165,10 @@ public class InventoryService {
     @Transactional
     public void releaseAll(Long orderId, Map<Long, Integer> qtyByProductId) {
         validateWriteRequest(orderId, qtyByProductId);
-        reservationRepository.findByOrderId(orderId).ifPresent(r -> {
+        // shipAll과 동일하게 잠금 조회를 쓴다 — ship/release 경합이 Inventory의 @Version이 패자를
+        // 튕겨내는 우연(현재 flush 순서가 reservation을 inventory보다 먼저 반영하는 것)에 기대지 않고,
+        // 락 순서가 명시적으로 결정되도록 한다.
+        reservationRepository.findByOrderIdWithLock(orderId).ifPresent(r -> {
             if (r.getStatus() == ReservationStatus.RELEASED) return;
             if (r.getStatus() == ReservationStatus.SHIPPED)
                 throw new IllegalStateException("출고된 예약은 해제할 수 없습니다. orderId=" + orderId);
