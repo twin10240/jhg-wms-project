@@ -145,6 +145,33 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 | POST | `/api/inventory/ship` | `{"orderId":1,"items":{"1":3,"2":1}}` | 출고 |
 | POST | `/api/inventory/release` | `{"orderId":1,"items":{"1":3,"2":1}}` | 예약 해제 |
 
+#### 출고 응답 — 송장 (V3.1)
+
+출고가 성공하면 WMS가 데모용 송장을 발급하고 다음을 반환합니다. 현재 `MOCK` 택배사만 지원합니다.
+
+```json
+{
+  "orderId": 202,
+  "carrierCode": "MOCK",
+  "carrierName": "테스트택배",
+  "trackingNumber": "MOCK-202-20260827063000",
+  "issuedAt": "2026-08-27T06:30:00Z"
+}
+```
+
+- **송장번호 규칙**: `MOCK-{orderId}-{yyyyMMddHHmmss}`. 시각은 **UTC**이며 `issuedAt`과 같은 순간입니다.
+- **주문당 1건**: `Reservation`이 주문당 1행이라 송장도 하나뿐입니다. 재호출해도 재고를 다시 깎지 않고
+  송장도 재발급하지 않으며, **최초에 발급한 같은 송장을 반환**합니다.
+- **이 기능 이전에 출고된 주문**은 송장이 없습니다. 재호출하면 재고는 그대로 두고 송장만 발급합니다.
+- **`trackingNumber`를 키로 쓰지 마세요.** 발급 시각이 들어가므로 WMS DB가 초기화되면 같은 주문이
+  다른 번호를 받습니다. **상관관계는 `orderId`로** 잡고 `trackingNumber`는 표시용으로 저장하세요.
+- `status` 필드는 없습니다 — 성공 응답은 항상 `SHIPPED`이고 나머지는 HTTP 오류입니다.
+
+> **요청 `items`에 대한 주의**: `items`는 **형식 검증만** 거칩니다(비어있지 않음, 수량 1 이상).
+> **예약 원장과의 일치 여부는 검사하지 않습니다.** 실제 출고 수량은 예약 원장(SSOT)에서 재생되므로,
+> 원장과 다른 수량을 보내도 거부되지 않고 무시됩니다.
+> (`reserveAll`은 반대로 원장을 대조하고 불일치 시 409를 냅니다 — `ship`만 하지 않습니다.)
+
 수동 재고 조정·발주 생성·입고 처리는 WMS 관리자 UI와 내부 서비스가 소유합니다. 이를 원격으로 수행하던 legacy `/api/inventory/adjust` 및 `/api/purchase-orders` 쓰기 REST는 삭제되었습니다.
 
 ### 재고 상태 흐름
