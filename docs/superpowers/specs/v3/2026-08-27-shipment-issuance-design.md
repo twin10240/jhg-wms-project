@@ -190,12 +190,15 @@ OMS가 의존하기 전에 실제 응답을 보고 확인할 수 있어 이 순�
 |---|---|---|---|
 | ① | 정상 출고 시 송장 발급 | `InventoryServiceTest` | `MOCK-{orderId}-` 접두 + 14자리 숫자, `issuedAt` non-null |
 | ② | 재호출 시 동일 송장 | `InventoryServiceTest` | `trackingNumber`·`issuedAt` 동일, 재고 1회만 차감 |
-| ③ | **동시 요청 시 송장 하나** | `ShipmentConcurrencyTest` (신규) | 아래 |
+| ③ | **동시 요청 시 송장 하나** | `InventoryConcurrencyTest` (기존 확장) | 아래 |
 | ④ | 출고 실패 시 송장 미생성 | `InventoryServiceTest` | 재고 행 없는 상품 → 예외 → 롤백 후 `trackingNumber == null` |
 | ⑤ | 기존 출고 주문 송장 보완 | `InventoryServiceTest` | 송장만 생김, 재고 불변 |
 
-**③이 이 스펙의 핵심 증명이다.** `@SpringBootTest` + `ConcurrencySupport.race()`로 스레드 2~5개가
+**③이 이 스펙의 핵심 증명이다.** `@SpringBootTest` + `ConcurrencySupport.race()`로 스레드 2개가
 같은 `orderId`로 동시에 출고한다. 단언은 타이밍이 아니라 불변 조건이다.
+
+새 테스트 클래스를 만들지 않고 기존 `같은_예약을_두_스레드가_동시에_출고해도_이중_차감되지_않는다`를
+확장한다 — 정확히 같은 경합이라 두 번 재현할 이유가 없고, 한 판에 불변식을 더 얹는 쪽이 강하다.
 
 - 발급된 서로 다른 송장번호가 **정확히 1개**
 - 모든 성공 응답의 `trackingNumber`가 **동일**
