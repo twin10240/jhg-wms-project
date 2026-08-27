@@ -125,6 +125,10 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         assertThat(trackingNumbers)
                 .as("잠금이 없으면 둘 다 trackingNumber==null을 보고 각자 새 송장을 발급한다")
                 .hasSize(1);
+        // 이 비교가 성립하는 건 issueShipment가 issuedAt을 컬럼 정밀도(timestamp(6), 마이크로초)로
+        // 미리 잘라두기 때문이다 — 그러지 않으면 이긴 스레드가 돌려주는 메모리 값(나노초 정밀도일 수 있음)과
+        // 진 스레드가 재조회한 DB 값(마이크로초로 잘림)이 같은 발급 이벤트인데도 다른 Instant로 갈라져,
+        // 컬럼보다 시계 정밀도가 높은 플랫폼(Linux)에서만 이 테스트가 거짓으로 실패한다.
         assertThat(issuedAts)
                 .as("잠금이 없으면 각자 자기 시각으로 issueShipment를 호출한다 — 두 스레드가 서로 다른"
                         + " 발급 이벤트를 만들었다는 뜻(잠금이 있으면 뒤 스레드는 이미 채워진 값을 그대로 읽어 반환한다)")

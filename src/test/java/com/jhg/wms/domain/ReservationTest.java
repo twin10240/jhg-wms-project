@@ -44,6 +44,17 @@ class ReservationTest {
     }
 
     @Test
+    void issueShipment_issuedAt은_마이크로초로_잘려_저장된다() {
+        Reservation r = Reservation.reserve(203L, Map.of(3L, 1));
+
+        // issued_at 컬럼은 timestamp(6) — 마이크로초까지만 저장된다. Linux(CI)의 Instant.now()는
+        // 나노초 정밀도를 갖지만 macOS는 우연히 마이크로초 배수만 나와 이 차이가 로컬에서는 재현되지 않는다.
+        r.issueShipment(Instant.parse("2026-08-27T06:30:00.123456789Z"));
+
+        assertThat(r.getIssuedAt()).isEqualTo(Instant.parse("2026-08-27T06:30:00.123456Z"));
+    }
+
+    @Test
     void 예약_직후에는_송장이_없다() {
         Reservation r = Reservation.reserve(202L, Map.of(3L, 1));
 

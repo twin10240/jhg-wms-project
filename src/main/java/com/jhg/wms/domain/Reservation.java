@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -82,7 +83,11 @@ public class Reservation {
      */
     public void issueShipment(Instant now) {
         this.carrierCode = CARRIER_CODE;
-        this.issuedAt = now;
+        // issued_at 컬럼은 timestamp(6) — 마이크로초까지만 저장된다. 여기서 미리 자르지 않으면
+        // Linux(나노초 정밀도 Instant.now())에서는 메모리 값과 재조회 값이 달라진다: 저장 직후
+        // 응답에 실리는 값은 나노초가 살아있지만, DB는 그걸 못 담아 조용히 잘라버리고 이후 조회는
+        // 잘린 값을 돌려준다. 마이크로초로 미리 자르면 두 값이 항상 같아 플랫폼에 관계없이 일관된다.
+        this.issuedAt = now.truncatedTo(ChronoUnit.MICROS);
         this.trackingNumber = CARRIER_CODE + "-" + orderId + "-" + TRACKING_TS.format(now);
     }
 }
