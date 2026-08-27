@@ -31,21 +31,21 @@ public class CycleCountService {
     private final InventoryService inventoryService;
     private final ActorProvider actorProvider;
 
-    // ponytail: 겹침 검사(findOpenProductIds)와 세션 생성 사이에 락이 없다 — 동시에 두 요청이 들어오면
-    // 같은 상품이 두 세션에 함께 담길 수 있다. 세션 개설은 사람이 수동으로 트리거하는 저빈도 작업이고
-    // 재고 반영은 승인(approve) 단계에서 그 시점 장부로 재계산되므로, 지금은 데이터가 깨지지 않는다.
-    // 실제로 충돌이 발생하면 cycle_count_item(product_id) 부분 유니크 인덱스나 락 기반 단일 쿼리로 올릴 것.
+    /**
+     * 대상 재고 행을 productId 순서로 잠근 뒤 겹침을 검사한다.
+     * ponytail: 대상 수만큼 쿼리한다. 세션 대상이 수백 개가 되면 정렬된 IN + FOR UPDATE로 바꿀 것.
+     */
     @Transactional
     public CycleCount open(List<Long> productIds, String memo) {
         if (productIds == null || productIds.isEmpty())
             throw new IllegalArgumentException("실사 대상을 1개 이상 선택해야 합니다.");
 
-        List<Long> distinct = productIds.stream().distinct().toList();
-        Map<Long, Inventory> inventories = inventoryRepository.findByProductIdIn(distinct).stream()
-                .collect(Collectors.toMap(Inventory::getProductId, i -> i));
+        List<Long> distinct = productIds.stream().distinct().sorted().toList();
+        Map<Long, Inventory> inventories = new LinkedHashMap<>();
         for (Long pid : distinct) {
-            if (!inventories.containsKey(pid))
-                throw new IllegalArgumentException("재고에 없는 상품입니다. productId=" + pid);
+            Inventory inventory = inventoryRepository.findByProductIdWithLock(pid)
+                    .orElseThrow(() -> new IllegalArgumentException("재고에 없는 상품입니다. productId=" + pid));
+            inventories.put(pid, inventory);
         }
 
         Set<Long> locked = Set.copyOf(cycleCountRepository.findOpenProductIds());
