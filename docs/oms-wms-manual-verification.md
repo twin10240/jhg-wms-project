@@ -51,6 +51,36 @@ Chrome 기기 툴바로 주요 관리자 화면(대시보드·재고·재고 이
 **미수행(범위 밖)** — OMS 연동(주문·취소·백오더·FIFO·출고), 장애와 복구, 최종 화면·반응형.
 이들은 두 앱을 함께 띄워야 하므로 기준본 절차로 수행하고 결과도 기준본에 기록한다.
 
+### 2026-08-27 — 수불대장 원장 불변식 표시 (V3.0, WMS 단독)
+
+`Σdelta == onHand`를 화면에서 대조하는 기능(`/admin/inventory/ledger`)을 4갈래로 확인했다.
+정상 사용으로는 불변식이 깨지지 않으므로(모든 재고 변경이 `applyDelta` 하나를 지나며 원장을 함께 쓴다)
+위반 경로는 DB를 직접 건드려 만들어야 한다.
+
+| # | 시나리오 | 조작 | 기대 |
+|---|---|---|---|
+| ① | 일치 | 기본 기간(이번 달 1일~오늘)으로 조회 | "✓ 원장 합계와 실제 보유수량이 일치합니다." |
+| ② | 과거 기간은 대조 안 함 | 종료일을 어제로 변경 | 초록·빨강 **모두 미표시** (기말재고는 그 시점 값이라 현재 onHand와 달라야 정상 — 대조하면 거짓 경고) |
+| ③ | 수량 불일치 | `UPDATE inventory SET on_hand_qty = on_hand_qty + 3 WHERE product_id = 1` | 빨간 경고 + 상품1 / 원장 15 / 실제 18 / 차이 3 |
+| ④ | 원장 없는 재고 | `INSERT INTO inventory (inventory_id, product_id, product_name, on_hand_qty, reserved_qty, version) VALUES (9999, 9999, '검증용', 7, 0, 0)` | 빨간 경고 + 검증용 / 원장 0 / 실제 7 / 차이 7. **본표에는 9999가 안 나옴**(거래가 없어 등장 근거 없음)인데도 경고에는 잡혀야 한다 |
+
+정리: ③은 `- 3`으로 되돌리고, ④는 `DELETE FROM inventory WHERE product_id = 9999`.
+정리 후 아래 쿼리가 0행이어야 한다.
+
+```sql
+select i.product_id, i.on_hand_qty, coalesce(sum(a.delta),0)
+from inventory i left join inventory_adjustment a on a.product_id = i.product_id
+group by i.product_id, i.on_hand_qty
+having i.on_hand_qty <> coalesce(sum(a.delta),0);
+```
+
+**발견하고 고친 것**: 위반 표의 숫자 열이 `td`에만 우측 정렬돼 있어 머리글과 값이 어긋났다
+(`admin.css`의 `th, td`가 left 정렬). 또 경고 블록이 `.table-wrap` 안에 있어 10열 본표 폭에 맞춰
+가로 스크롤되는 영역에 갇혀 있었다. 둘 다 수정.
+
+**환경 이슈(재확인)**: 템플릿만 고치고 앱을 재기동하지 않으면 반영되지 않는다
+(devtools 없음, `spring.thymeleaf.cache` 기본값 = 켜짐, IntelliJ 실행은 `build/resources/main`을 읽는다).
+
 ### 2026-08-26 — 실사 중 수동 조정 차단 (WMS 단독, 부분)
 
 가드를 넣은 뒤 실행 중이던 앱이 옛 빌드라 조정이 통과한 것을 발견 → 재기동 후 확인.
