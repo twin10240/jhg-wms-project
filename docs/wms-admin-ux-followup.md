@@ -21,10 +21,10 @@
 
 ## 포트폴리오 1차 검증 대기
 
-- 375px와 1280px에서 핵심 작업이 가려지지 않는지 확인
-  — 2026-07-26 확인분은 V1 화면 기준. V2 이후 추가된 `returns`·`returndetail`·`cycle-counts`·
-  `cycle-count-new`·`cycle-count-detail` 5개는 **미확인**. 입력 요소가 든 표(실사 상세 9열,
-  반품 상세 검수 폼)가 좁은 화면에서 손이 닿는지가 관건이다. 반려 모달도 함께 볼 것.
+- ~~375px와 1280px에서 핵심 작업이 가려지지 않는지 확인~~ ✅ 완료 (2026-08-27)
+  — V2 이후 신규 화면 5개(`returns`·`returndetail`·`cycle-counts`·`cycle-count-new`·
+  `cycle-count-detail`) 포함 전 화면 이상 없음. 확인 전에 viewport 메타 누락과
+  `.table-wrap` 누락 3곳을 고쳤다. 기록: `docs/oms-wms-manual-verification.md`
 - 실제 데이터로 대시보드 집계와 목록 건수 대조
 - OPERATOR 버튼 미노출과 직접 POST `403` 확인
 - 로그인 성공·실패·로그아웃, API 미인증 `401` 확인
