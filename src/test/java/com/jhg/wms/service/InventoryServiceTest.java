@@ -1,18 +1,22 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.client.OmsDeliveryNotifier;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
+import com.jhg.wms.domain.ReservationStatus;
 import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.ShipResponse;
+import com.jhg.wms.web.ShipmentResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -30,11 +34,14 @@ class InventoryServiceTest {
     @Autowired jakarta.persistence.EntityManager em;
     InventoryService service;
     OmsReplenishmentNotifier notifier;
+    OmsDeliveryNotifier deliveryNotifier;
 
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
-        service = new InventoryService(repo, reservationRepo, adjustmentRepo, notifier, () -> "manager");
+        deliveryNotifier = mock(OmsDeliveryNotifier.class);
+        service = new InventoryService(repo, reservationRepo, adjustmentRepo, notifier,
+                deliveryNotifier, () -> "manager");
     }
 
     private void seed(long pid, int qty) {
@@ -286,6 +293,127 @@ class InventoryServiceTest {
         service.shipAll(99L, Map.of(1L, 6)); // 두 번째: no-op, 예외 없음
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4); // 한 번만 차감됨
+    }
+
+    // ── 송장 조회 ──────────────────────────────────────────────
+
+    @Test
+    void findShipment_발급된_송장과_배송상태를_돌려준다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        ShipResponse shipped = service.shipAll(99L, Map.of(1L, 6));
+
+        ShipmentResponse inTransit = service.findShipment(99L).orElseThrow();
+        assertThat(inTransit.orderId()).isEqualTo(99L);
+        assertThat(inTransit.carrierCode()).isEqualTo("MOCK");
+        assertThat(inTransit.carrierName()).isEqualTo("테스트택배");
+        assertThat(inTransit.trackingNumber()).isEqualTo(shipped.trackingNumber());
+        assertThat(inTransit.issuedAt()).isEqualTo(shipped.issuedAt());
+        assertThat(inTransit.deliveredAt()).isNull();          // 배송 중
+
+        service.markDelivered(99L);
+        assertThat(service.findShipment(99L).orElseThrow().deliveredAt())
+                .isEqualTo(reservationRepo.findByOrderId(99L).orElseThrow().getDeliveredAt());
+    }
+
+    @Test
+    void findShipment_예약이_없거나_송장이_미발급이면_비어있다() {
+        assertThat(service.findShipment(404L)).isEmpty();       // 예약 없음
+
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));                 // 출고 전 = 송장 미발급
+        assertThat(service.findShipment(99L)).isEmpty();
+    }
+
+    @Test
+    void findShipment_여러_번_조회해도_아무것도_바꾸지_않는다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.shipAll(99L, Map.of(1L, 6));
+        service.markDelivered(99L);
+        long txnsBefore = adjustmentRepo.count();
+
+        ShipmentResponse first = service.findShipment(99L).orElseThrow();
+        service.findShipment(99L);
+        ShipmentResponse third = service.findShipment(99L).orElseThrow();
+
+        assertThat(third).isEqualTo(first);                     // 송장·발급시각·배송시각 그대로
+        Inventory inv = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(inv.getOnHandQty()).isEqualTo(4);
+        assertThat(inv.getReservedQty()).isEqualTo(0);
+        assertThat(reservationRepo.findByOrderId(99L).orElseThrow().getStatus())
+                .isEqualTo(ReservationStatus.SHIPPED);
+        assertThat(adjustmentRepo.count()).isEqualTo(txnsBefore);
+    }
+
+    // ── 배송 완료 ──────────────────────────────────────────────
+
+    @Test
+    void markDelivered_시각을_남기고_OMS에_통지하되_재고는_건드리지_않는다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.shipAll(99L, Map.of(1L, 6));
+        long txnsBefore = adjustmentRepo.count();
+
+        assertThat(service.markDelivered(99L)).isTrue();   // 최초 기록
+
+        Reservation r = reservationRepo.findByOrderId(99L).orElseThrow();
+        assertThat(r.getDeliveredAt()).isNotNull();
+        assertThat(r.getStatus()).isEqualTo(ReservationStatus.SHIPPED);   // 상태는 그대로 — 세 군데 SHIPPED 분기를 안 건드린다
+        verify(deliveryNotifier).notifyAfterCommit(99L, r.getDeliveredAt());
+
+        Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
+        assertThat(after.getOnHandQty()).isEqualTo(4);                    // 출고 때 깎인 그대로
+        assertThat(after.getReservedQty()).isEqualTo(0);
+        assertThat(adjustmentRepo.count()).isEqualTo(txnsBefore);         // 원장 사건이 아니다
+    }
+
+    @Test
+    void markDelivered_재호출은_시각을_덮어쓰지_않고_통지만_재발송한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        service.shipAll(99L, Map.of(1L, 6));
+        service.markDelivered(99L);
+        Instant first = reservationRepo.findByOrderId(99L).orElseThrow().getDeliveredAt();
+
+        assertThat(service.markDelivered(99L)).isFalse();   // 통지만 재발송
+
+        assertThat(reservationRepo.findByOrderId(99L).orElseThrow().getDeliveredAt()).isEqualTo(first);
+        verify(deliveryNotifier, times(2)).notifyAfterCommit(99L, first);  // 통지 유실 시 재클릭이 복구 경로
+    }
+
+    @Test
+    void markDelivered_출고전_예약은_거부한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+
+        assertThatThrownBy(() -> service.markDelivered(99L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("출고된 주문만");
+        verifyNoInteractions(deliveryNotifier);
+    }
+
+    @Test
+    void markDelivered_송장이_없으면_거부한다() {
+        seed(1L, 10);
+        service.reserveAll(99L, Map.of(1L, 6));
+        // 송장 발급 이전에 출고된 기존 주문 재현 — shipAll을 거치지 않고 상태만 SHIPPED로 만든다.
+        Reservation r = reservationRepo.findByOrderId(99L).orElseThrow();
+        r.ship();
+        em.flush();
+
+        assertThatThrownBy(() -> service.markDelivered(99L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("송장이 없어");
+        verifyNoInteractions(deliveryNotifier);
+    }
+
+    @Test
+    void markDelivered_예약이_없으면_거부한다() {
+        assertThatThrownBy(() -> service.markDelivered(404L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("예약이 없어");
+        verifyNoInteractions(deliveryNotifier);
     }
 
     @Test

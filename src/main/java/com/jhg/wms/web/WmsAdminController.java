@@ -45,8 +45,10 @@ public class WmsAdminController {
                 .filter(po -> po.getStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED).count());
         model.addAttribute("pendingRequestCount", replenishmentRequestService.findAll().stream()
                 .filter(r -> r.getStatus() == ReplenishmentRequestStatus.REQUESTED).count());
-        Map<ReservationStatus, Long> resCounts = inventoryService.findAllReservations().stream()
+        List<Reservation> reservations = inventoryService.findAllReservations();
+        Map<ReservationStatus, Long> resCounts = reservations.stream()
                 .collect(Collectors.groupingBy(Reservation::getStatus, Collectors.counting()));
+        model.addAttribute("deliveryPendingCount", reservations.stream().filter(PENDING_DELIVERY).count());
         model.addAttribute("reservedCount", resCounts.getOrDefault(ReservationStatus.RESERVED, 0L));
         model.addAttribute("shippedCount", resCounts.getOrDefault(ReservationStatus.SHIPPED, 0L));
         model.addAttribute("releasedCount", resCounts.getOrDefault(ReservationStatus.RELEASED, 0L));
@@ -59,16 +61,43 @@ public class WmsAdminController {
         return "admin/dashboard";
     }
 
+    /** 배송 대기 = 출고됐고 아직 배송 완료를 기록하지 않은 예약. 창고가 손댈 행이 이것뿐이다. */
+    private static final java.util.function.Predicate<Reservation> PENDING_DELIVERY =
+            r -> r.getStatus() == ReservationStatus.SHIPPED && r.getDeliveredAt() == null;
+
     @GetMapping("/admin/reservations")
-    public String reservations(@RequestParam(required = false) ReservationStatus status, Model model) {
+    public String reservations(@RequestParam(required = false) ReservationStatus status,
+                               @RequestParam(defaultValue = "false") boolean pendingDelivery,
+                               Model model) {
         List<Reservation> reservations = inventoryService.findAllReservations();
-        if (status != null)
+        // 배송 대기 탭은 상태 탭과 배타적이다 — 이미 SHIPPED로 좁혀진 목록이라 상태 필터를 겹칠 이유가 없다.
+        if (pendingDelivery)
+            reservations = reservations.stream().filter(PENDING_DELIVERY).toList();
+        else if (status != null)
             reservations = reservations.stream().filter(r -> r.getStatus() == status).toList();
         model.addAttribute("reservations", reservations);
         model.addAttribute("activeStatus", status);
+        model.addAttribute("pendingDelivery", pendingDelivery);
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         return "admin/reservations";
+    }
+
+    /**
+     * 배송 완료 처리. MANAGER 전용으로 두지 않은 이유는 재고 조정과 같다 —
+     * 승인 성격의 "결정"이 아니라 현장이 관측한 사실의 기록이라 OPERATOR도 남길 수 있어야 한다.
+     */
+    @PostMapping("/admin/reservations/{orderId}/deliver")
+    public String deliver(@PathVariable Long orderId, RedirectAttributes ra) {
+        try {
+            boolean firstTime = inventoryService.markDelivered(orderId);
+            ra.addFlashAttribute("successMessage", firstTime
+                    ? "배송 완료 처리했습니다. (주문 #" + orderId + ")"
+                    : "OMS에 배송 완료를 다시 통지했습니다. (주문 #" + orderId + ")");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ra.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/admin/reservations";
     }
 
     @GetMapping("/admin/inventory")

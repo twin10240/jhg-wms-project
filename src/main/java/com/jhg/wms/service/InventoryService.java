@@ -1,5 +1,6 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.client.OmsDeliveryNotifier;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.config.ActorProvider;
 import com.jhg.wms.domain.Inventory;
@@ -12,6 +13,7 @@ import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import com.jhg.wms.web.InventoryRowResponse;
 import com.jhg.wms.web.ShipResponse;
+import com.jhg.wms.web.ShipmentResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class InventoryService {
     private final ReservationRepository reservationRepository;
     private final InventoryTransactionRepository transactionRepository;
     private final OmsReplenishmentNotifier omsReplenishmentNotifier;
+    private final OmsDeliveryNotifier omsDeliveryNotifier;
     private final ActorProvider actorProvider;
 
     /** onHand 변경 + 원장 기록의 유일 지점. 모든 실물 변동 경로가 통과한다. */
@@ -161,6 +164,30 @@ public class InventoryService {
         return ShipResponse.from(reservation);
     }
 
+    /**
+     * 배송 완료 기록 + OMS 통지. 출고되고 송장이 있는 주문만 대상이다.
+     * <p>재고는 건드리지 않는다 — 출고에서 이미 차감됐고 배송 완료는 원장 사건이 아니다.
+     * <p>재호출은 시각을 덮어쓰지 않고 통지만 재발송한다. 통지가 유실됐을 때(best-effort)
+     * 관리자가 화면의 재통지 버튼으로 복구하는 경로이며, OMS 쪽이 멱등이라 안전하다.
+     *
+     * @return 이번 호출이 배송 완료를 처음 기록했으면 true, 이미 기록돼 있어 통지만 재발송했으면 false
+     */
+    @Transactional
+    public boolean markDelivered(Long orderId) {
+        Reservation reservation = reservationRepository.findByOrderIdWithLock(orderId)
+                .orElseThrow(() -> new IllegalStateException("예약이 없어 배송 완료할 수 없습니다. orderId=" + orderId));
+        if (reservation.getStatus() != ReservationStatus.SHIPPED)
+            throw new IllegalStateException("출고된 주문만 배송 완료할 수 있습니다. orderId=" + orderId);
+        if (reservation.getTrackingNumber() == null)
+            throw new IllegalStateException("송장이 없어 배송 완료할 수 없습니다. orderId=" + orderId);
+
+        boolean firstTime = reservation.getDeliveredAt() == null;
+        if (firstTime)
+            reservation.deliver(Instant.now());
+        omsDeliveryNotifier.notifyAfterCommit(orderId, reservation.getDeliveredAt());
+        return firstTime;
+    }
+
     /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. 출고된 예약은 해제 거부(반쪽 상태 오염 방지). */
     @Transactional
     public void releaseAll(Long orderId, Map<Long, Integer> qtyByProductId) {
@@ -187,6 +214,16 @@ public class InventoryService {
                 throw new IllegalStateException("재고 행이 없어 처리할 수 없습니다. productId=" + pid);
             op.accept(inv, qty);
         });
+    }
+
+    /**
+     * 송장 조회(읽기 전용). 송장이 발급되지 않은 예약과 없는 예약은 똑같이 비어 있는 결과다.
+     * 잠금 없는 findByOrderId를 쓴다 — 아무것도 쓰지 않으므로 다른 요청을 막을 이유가 없다.
+     */
+    public Optional<ShipmentResponse> findShipment(Long orderId) {
+        return reservationRepository.findByOrderId(orderId)
+                .filter(r -> r.getTrackingNumber() != null)
+                .map(ShipmentResponse::from);
     }
 
     /** 관리자 예약 화면·대시보드용 전체 예약 목록 (최신 먼저). */

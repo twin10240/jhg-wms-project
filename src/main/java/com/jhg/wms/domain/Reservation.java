@@ -65,6 +65,15 @@ public class Reservation {
     @Column
     private Instant issuedAt;
 
+    /**
+     * 배송 완료 시각. null이면 아직 배송 중이다.
+     * <p>상태를 ReservationStatus에 값으로 넣지 않은 이유: SHIPPED 비교가 세 군데 있고
+     * (shipAll의 재차감 방지, releaseAll의 해제 거부, RmaService의 반품 게이트) 값을 추가하면
+     * 셋 다 의미가 조용히 뒤집힌다. 배송 완료는 출고의 후속 사실이지 별개 상태가 아니다.
+     */
+    @Column
+    private Instant deliveredAt;
+
     public static Reservation reserve(Long orderId, Map<Long, Integer> qtyByProductId) {
         Reservation r = new Reservation();
         r.orderId = orderId;
@@ -89,5 +98,14 @@ public class Reservation {
         // 잘린 값을 돌려준다. 마이크로초로 미리 자르면 두 값이 항상 같아 플랫폼에 관계없이 일관된다.
         this.issuedAt = now.truncatedTo(ChronoUnit.MICROS);
         this.trackingNumber = CARRIER_CODE + "-" + orderId + "-" + TRACKING_TS.format(now);
+    }
+
+    /**
+     * 배송 완료 기록. 재고는 출고에서 이미 차감됐으므로 원장을 만들지 않는다 — 사실만 남긴다.
+     * 절삭 이유는 issueShipment와 같다(issued_at/delivered_at 모두 timestamp(6)).
+     * 재호출 방지는 호출 측(락을 쥔 서비스)의 책임 — issueShipment와 같은 규칙이다.
+     */
+    public void deliver(Instant now) {
+        this.deliveredAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 }
