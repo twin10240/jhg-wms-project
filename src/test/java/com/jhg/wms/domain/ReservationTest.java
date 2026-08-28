@@ -32,6 +32,21 @@ class ReservationTest {
     }
 
     @Test
+    void deliver_배송완료_시각을_마이크로초로_잘라_담는다() {
+        Reservation r = Reservation.reserve(1L, Map.of(10L, 3));
+        // Linux의 Instant.now()는 나노초까지 준다 — delivered_at은 timestamp(6)이라 DB 왕복에서 잘린다.
+        r.deliver(Instant.parse("2026-08-27T06:30:00.123456789Z"));
+        assertThat(r.getDeliveredAt()).isEqualTo(Instant.parse("2026-08-27T06:30:00.123456Z"));
+    }
+
+    @Test
+    void deliver_이전에는_배송완료_시각이_비어있다() {
+        Reservation r = Reservation.reserve(1L, Map.of(10L, 3));
+        r.ship();
+        assertThat(r.getDeliveredAt()).isNull();
+    }
+
+    @Test
     void issueShipment_송장번호는_MOCK과_주문번호와_UTC_시각으로_만든다() {
         Reservation r = Reservation.reserve(202L, Map.of(3L, 1));
 

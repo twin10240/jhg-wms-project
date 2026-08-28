@@ -37,7 +37,9 @@
         <span class="badge badge-shipped">출고 완료</span> <b th:text="${shippedCount}">0</b><br/>
         <span class="badge badge-released">예약 해제</span> <b th:text="${releasedCount}">0</b>
       </p>
-      <p><a th:href="@{/admin/reservations}">예약 현황 →</a></p>
+      <p class="label">배송 대기 <b th:text="${deliveryPendingCount}">0</b></p>
+      <p><a th:href="@{/admin/reservations(pendingDelivery=true)}">배송 대기 →</a>
+         · <a th:href="@{/admin/reservations}">예약 현황 →</a></p>
     </div>
     <div class="card" th:if="${rmaRequestedCount != null}">
       <h3>반품(RMA)</h3>

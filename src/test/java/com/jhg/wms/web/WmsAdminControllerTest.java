@@ -138,6 +138,7 @@ class WmsAdminControllerTest {
                 .andExpect(model().attribute("reservedCount", 1L))
                 .andExpect(model().attribute("shippedCount", 1L))
                 .andExpect(model().attribute("releasedCount", 0L))
+                .andExpect(model().attribute("deliveryPendingCount", 1L))   // 출고됐고 배송 완료 미기록
                 // 처리 대기 카드
                 .andExpect(model().attribute("pendingRequestCount", 1L))   // 검토 대기 보충 요청
                 .andExpect(model().attribute("partialPoCount", 0L))        // 부분 입고 발주
@@ -164,6 +165,100 @@ class WmsAdminControllerTest {
         mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")).param("status", "SHIPPED"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("reservations", List.of(shipped)));
+    }
+
+    @Test
+    void 예약화면_배송대기_탭은_출고완료중_미배송만_남긴다() throws Exception {
+        Reservation reserved = Reservation.reserve(10L, Map.of(1L, 1));
+        Reservation pending = Reservation.reserve(20L, Map.of(1L, 1));
+        pending.ship();
+        pending.issueShipment(java.time.Instant.parse("2026-08-27T06:30:00Z"));
+        Reservation done = Reservation.reserve(30L, Map.of(1L, 1));
+        done.ship();
+        done.issueShipment(java.time.Instant.parse("2026-08-27T06:30:00Z"));
+        done.deliver(java.time.Instant.parse("2026-08-28T01:00:00Z"));
+        when(inventoryService.findAllReservations()).thenReturn(List.of(reserved, pending, done));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR"))
+                        .param("pendingDelivery", "true"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("reservations", List.of(pending)));
+    }
+
+    @Test
+    void 예약화면_송장번호를_보여준다() throws Exception {
+        Reservation shipped = Reservation.reserve(20L, Map.of(1L, 1));
+        shipped.ship();
+        shipped.issueShipment(java.time.Instant.parse("2026-08-27T06:30:00Z"));
+        when(inventoryService.findAllReservations()).thenReturn(List.of(shipped));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("MOCK-20-20260827063000")));
+    }
+
+    @Test
+    void 예약화면_배송완료_버튼은_출고완료_행에만_나온다() throws Exception {
+        Reservation shipped = Reservation.reserve(20L, Map.of(1L, 1));
+        shipped.ship();
+        shipped.issueShipment(java.time.Instant.parse("2026-08-27T06:30:00Z"));
+        when(inventoryService.findAllReservations())
+                .thenReturn(List.of(Reservation.reserve(10L, Map.of(1L, 1)), shipped));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/admin/reservations/20/deliver")))
+                .andExpect(content().string(not(containsString("/admin/reservations/10/deliver"))));
+    }
+
+    @Test
+    void 예약화면_배송완료된_행은_시각과_재통지_버튼을_보여준다() throws Exception {
+        Reservation delivered = Reservation.reserve(30L, Map.of(1L, 1));
+        delivered.ship();
+        delivered.issueShipment(java.time.Instant.parse("2026-08-27T06:30:00Z"));
+        delivered.deliver(java.time.Instant.parse("2026-08-28T01:00:00Z"));
+        when(inventoryService.findAllReservations()).thenReturn(List.of(delivered));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("배송 완료 2026-08-28")))
+                // 재통지 버튼은 남는다 — 최초 콜백이 실패했을 때의 유일한 복구 경로다.
+                .andExpect(content().string(containsString("OMS 재통지")))
+                .andExpect(content().string(containsString("/admin/reservations/30/deliver")));
+    }
+
+    @Test
+    void 배송완료_처리는_서비스를_호출하고_예약화면으로_돌아간다() throws Exception {
+        when(inventoryService.markDelivered(20L)).thenReturn(true);
+
+        mockMvc.perform(post("/admin/reservations/20/deliver")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/reservations"))
+                .andExpect(flash().attribute("successMessage", "배송 완료 처리했습니다. (주문 #20)"));
+
+        verify(inventoryService).markDelivered(20L);
+    }
+
+    @Test
+    void 이미_배송완료된_주문의_재통지는_통지_문구로_안내한다() throws Exception {
+        when(inventoryService.markDelivered(20L)).thenReturn(false);
+
+        mockMvc.perform(post("/admin/reservations/20/deliver")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("successMessage", "OMS에 배송 완료를 다시 통지했습니다. (주문 #20)"));
+    }
+
+    @Test
+    void 배송완료_실패하면_에러_플래시를_담는다() throws Exception {
+        doThrow(new IllegalStateException("송장이 없어 배송 완료할 수 없습니다. orderId=20"))
+                .when(inventoryService).markDelivered(20L);
+
+        mockMvc.perform(post("/admin/reservations/20/deliver")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("errorMessage", "송장이 없어 배송 완료할 수 없습니다. orderId=20"));
     }
 
     @Test

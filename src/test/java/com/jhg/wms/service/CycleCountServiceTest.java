@@ -42,8 +42,8 @@ class CycleCountServiceTest {
     @BeforeEach
     void setUp() {
         notifier = mock(OmsReplenishmentNotifier.class);
-        inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
-                notifier, () -> "manager");
+        inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo, notifier,
+                mock(com.jhg.wms.client.OmsDeliveryNotifier.class), () -> "manager");
         ccActor.set("operator");
         service = new CycleCountService(cycleCountRepo, inventoryRepo, txnRepo, inventoryService, ccActor::get);
     }

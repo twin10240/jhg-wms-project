@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 291개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
+| 테스트 | 325개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -68,6 +68,8 @@
 | S3 | WMS → OMS | 재고 증가(입고·조정) 통지 → OMS 백오더 FIFO 승격 |
 | S4 | 양방향 | 회복탄력성 — 타임아웃 · best-effort · 보상 스윕 |
 | S5 | 양방향 | 반품(RMA) — OMS가 접수 `POST /api/returns`, WMS가 입고·검수 결과 통지 `POST /api/return-status-events` |
+| S6 | WMS → OMS | 배송 완료 통지 `POST /api/delivery-events` — 창고가 기록하면 OMS 주문이 `DELIVERED`로 전이 |
+| S7 | OMS → WMS | 송장 조회 `GET /api/shipments/{orderId}` — OMS가 자기 송장·배송 상태의 불일치를 확인·복구 |
 
 보충 흐름: OMS가 백오더로 부족을 감지 → WMS에 **보충 요청** → WMS 관리자가 **승인 → 발주 생성 → 입고** → 재고 증가 → S3로 OMS에 통지 → OMS가 백오더 승격. (상세: 아래 [보충 요청과 발주](#보충-요청과-발주) · [OMS 재고보충 통지](#oms-재고보충-통지-s3-채널3) 절)
 
@@ -136,6 +138,7 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 |--------|-----|------|
 | GET | `/api/inventory/availability?productIds=1,2,3` | 가용수량 맵 반환 (OMS 채널1 연동) |
 | GET | `/api/inventory/rows` | 전체 재고 목록 (관리자) |
+| GET | `/api/shipments/{orderId}` | 송장·배송 상태 조회 (읽기 전용) |
 
 ### 주문 이행 재고 쓰기
 
@@ -189,6 +192,33 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 > (`reserveAll`은 반대로 원장을 대조하고 불일치 시 409를 냅니다 — `ship`만 하지 않습니다.)
 
 수동 재고 조정·발주 생성·입고 처리는 WMS 관리자 UI와 내부 서비스가 소유합니다. 이를 원격으로 수행하던 legacy `/api/inventory/adjust` 및 `/api/purchase-orders` 쓰기 REST는 삭제되었습니다.
+
+### 송장 조회 (V3.2)
+
+OMS가 자기 쪽 송장·배송 상태와 대조해 불일치를 복구하기 위한 **읽기 전용** 엔드포인트입니다.
+
+```
+GET /api/shipments/{orderId}
+```
+
+```json
+{
+  "orderId": 202,
+  "carrierCode": "MOCK",
+  "carrierName": "테스트택배",
+  "trackingNumber": "MOCK-202-20260827063000",
+  "issuedAt": "2026-08-27T06:30:00.123456Z",
+  "deliveredAt": "2026-08-28T01:00:00.123456Z"
+}
+```
+
+- **`deliveredAt`은 배송 중이면 `null`** 입니다(JSON에서 생략되지 않고 `null`로 나갑니다).
+- **`404`**: 예약이 없거나 아직 송장이 발급되지 않은 주문. 둘을 구분하지 않습니다.
+- **인증**: 다른 `/api/**`와 같은 서비스 계정 Basic. 미인증은 `401`.
+- **아무것도 바꾸지 않습니다**: 조회는 재고·예약·송장·배송 상태를 건드리지 않고, 송장 재발급이나 출고 처리도 하지 않습니다. 몇 번을 호출해도 같은 값입니다.
+- **출고 응답(`POST /api/inventory/ship`) 계약은 그대로입니다** — 그쪽에는 `deliveredAt`이 없습니다(출고 시점에는 항상 null이고, 이미 OMS가 파싱 중인 계약을 바꾸지 않기 위해 별도 응답으로 둡니다).
+- `issuedAt`·`deliveredAt` 모두 **마이크로초 정밀도**입니다 — 초 단위 고정 패턴 파서 대신 `Instant.parse` 등 ISO-8601 instant 파서를 쓰세요.
+- **`trackingNumber`를 키로 쓰지 마세요** — WMS DB가 초기화되면 같은 주문이 다른 번호를 받습니다. 상관관계는 `orderId`입니다.
 
 ### 재고 상태 흐름
 
@@ -313,6 +343,17 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
 - 통지·전 REST 응답에 타임아웃(connect 1s / read 2s, `spring.http.client.*`) — OMS hang이어도 최대 수 초 내 복귀 (S4)
 - `shipAll`은 RELEASED 예약 출고를, `releaseAll`은 SHIPPED 예약 해제를 거부(S4) — 타임아웃 반쪽 상태에서의 재고 오염(reservedQty 음수) 방지
 
+### OMS 배송 완료 통지 (S6)
+
+창고가 `/admin/reservations`에서 **배송 완료**를 누르면 `Reservation.deliveredAt`을 남기고, `OmsDeliveryNotifier`가 커밋 후 OMS `POST /api/delivery-events` 에 `{"orderId":202,"deliveredAt":"2026-08-28T01:00:00.123456Z"}` 를 보냅니다 — OMS가 `Delivery`를 `DELIVERED`로 올립니다. OMS는 이 상태에서만 고객 반품 신청을 허용하므로, 반품 흐름이 열리는 시점이기도 합니다.
+
+- **대상**: `SHIPPED`이고 송장이 발급된 예약만. 출고 전이거나 송장이 없으면 거부합니다.
+- **작업 큐**: 대시보드의 `배송 대기`(출고 완료 & 배송 완료 미기록) 수치가 예약 화면의 같은 탭으로 연결됩니다.
+- **재고 무변동**: 배송 완료는 원장 사건이 아닙니다 — `InventoryTransaction`을 만들지 않고 `onHand`·`reserved`를 건드리지 않습니다. 실물 차감은 출고에서 이미 끝났습니다.
+- **상태를 추가하지 않았습니다**: `ReservationStatus`에 `DELIVERED`를 넣으면 `SHIPPED` 비교 세 곳(출고 재차감 방지, 해제 거부, 반품 게이트)의 의미가 뒤집힙니다. 배송 완료는 출고의 후속 사실이라 타임스탬프 한 칸으로 기록합니다.
+- **멱등**: 재클릭해도 최초 시각을 덮어쓰지 않고 통지만 재발송합니다. OMS 쪽도 이미 `DELIVERED`면 no-op(200)입니다.
+- **best-effort**: 통지 실패는 warn 로그만 남기고 배송 완료 기록은 유지됩니다. 보상 스윕은 두지 않았습니다 — 대신 **배송 완료된 행에도 `OMS 재통지` 버튼이 남습니다**(완료 시각은 그대로, 통지만 재발송). WMS 자체가 다운이라 통지가 아예 나가지 못한 경우의 최후 복구는 OMS 관리자 화면의 `배송 완료(수동)` 버튼입니다 — 그쪽은 정상 경로가 아니라 복구용으로 표기돼 있습니다.
+
 ### 관리자 UI (Thymeleaf)
 
 | URL | 설명 | 권한 |
@@ -322,7 +363,8 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
 | `/admin/inventory` | 재고 조회(보유·예약·가용)·수동 조정(**사유 필수**, 실사 중인 상품은 거부) | 인증 |
 | `/admin/inventory/transactions` | 재고 트랜잭션 이력 — 유형 필터(기초/입고/출고/조정/반품), 상품명·변경 전→후·참조(`발주 #N`/`주문 #N`/`RMA #N`)·사유 표시, 20건씩 페이징 | 인증 |
 | `/admin/inventory/ledger` | 수불대장 — 기간별 상품당 기초·기초설정·입고·반품·출고·조정·실사·기말 집계(원장에서 유도) | 인증 |
-| `/admin/reservations` | 예약 현황 조회 — 상태 필터, 주문별 상품·수량 표시 (조회 전용) | 인증 |
+| `/admin/reservations` | 예약 현황 — 상태 필터와 **배송 대기** 탭, 주문별 상품·수량, 송장번호, 배송 완료 여부 표시 | 인증 |
+| `/admin/reservations/{orderId}/deliver` (POST) | 배송 완료 기록 + OMS 통지 (출고·송장 발급된 주문만) | 인증 |
 | `/admin/purchase-orders` | 발주 목록(`ORDERED`/`PARTIALLY_RECEIVED`/`RECEIVED`/`CANCELLED` 필터) — 미완료를 발주일시 오래된 순으로, 종료된 건은 뒤로 | 인증 |
 | `/admin/purchase-orders` (POST) | 발주 생성(다품목) | **MANAGER** |
 | `/admin/purchase-orders/{poId}` | 발주 상세 — 품목별 발주량·입고량·잔량, 입고 처리(여러 번 나눠 입고) | 인증 |
@@ -388,7 +430,7 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 
 이 표의 항목들은 **실행 가능한 증거**로 고정돼 있습니다. 오버셀 방지는 실제 스레드 경합으로
 (`InventoryConcurrencyTest`), OMS 다운·지연·401은 죽은 포트와 JDK 내장 HTTP 서버로
-(`OmsDownTest`·`OmsSlowTest`·`OmsUnauthorizedTest`), 실사 세션 겹침은 동시 개설로
+(`OmsDownTest`·`OmsSlowTest`·`OmsUnauthorizedTest` — 재고 조정과 배송 완료 기록 둘 다), 실사 세션 겹침은 동시 개설로
 (`CycleCountConcurrencyTest`) 매 PR마다 검증됩니다. 원장 불변식(Σdelta == onHand)은 모든
 동시성 시나리오의 `@AfterEach` 후크로 확인되고, 수불대장 화면에도 대조 결과가 표시됩니다.
 
@@ -428,11 +470,14 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 - **서비스 통합**(`@DataJpaTest`) — `InventoryServiceTest` / `PurchaseOrderServiceTest` / `ReplenishmentRequestServiceTest` / `RmaServiceTest`
   - 원장 재구성 불변식(Σ delta == onHand), 발주 취소 시 연결 요청 종결·재고 불변, 목록 정렬 검증
   - 수불대장 기말 항등식, 반품 접수 검증·멱등·누적 반품량·처분별 재고 반영(RESTOCKED만 증가)
-- **MockMvc 슬라이스** — `InventoryControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest` / `RmaControllerTest` / `RmaAdminControllerTest`
+- **MockMvc 슬라이스** — `InventoryControllerTest` / `ShipmentControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest` / `RmaControllerTest` / `RmaAdminControllerTest`
   - 롤 경계(OPERATOR가 MANAGER 액션 호출 시 403), 화면 렌더링(한글 상태·상품명·참조) 포함
   - 반품 API 상태 코드 계약(201/200/409/400/404/401), 검수 폼 기본값 부재, DB 장애 시 503(리다이렉트 루프 아님)
+  - 송장 조회 계약(200/404/401, `deliveredAt`이 생략이 아니라 `null`로 직렬화), 배송 완료·재통지 액션과 배송 대기 탭
 - **보안 통합**(`@SpringBootTest(RANDOM_PORT)`) — `SecurityChainIntegrationTest`
   - `/api/**` 미인증 **401 유지**(302 아님), Basic 200, 폼 로그인 왕복. MockMvc가 재현 못 하는 실서블릿 `/error` 재디스패치를 검증
+- **OMS 통지 클라이언트**(`@RestClientTest`) — `OmsReplenishmentNotifierTest` / `OmsDeliveryNotifierTest`
+  - Basic 자격증명 헤더, 페이로드 계약, 5xx·401을 삼켜 커밋 경로를 지키는지(afterCommit 예외 전파 차단)
 - **설정·기동** — `WmsUserSeederTest`(멱등·BCrypt·공백 자격증명 기동 실패) / `DbUserDetailsServiceTest`(롤→`ROLE_` 권한)
 - **실제 동시 요청**(`@SpringBootTest`) — 오버셀 방지, 실사 세션 겹침, 이중 승인·조정 차단, 원장 불변식 검증
 
