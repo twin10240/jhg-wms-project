@@ -24,6 +24,39 @@
     <span th:if="${rma.cancelledAt != null}"> · 취소: <span th:text="${#temporals.format(rma.cancelledAt,'yyyy-MM-dd HH:mm')}">—</span></span>
   </p>
 
+  <!-- AI 분류 참고 영역. 분류가 없으면 통째로 렌더하지 않는다 — 빈 껍데기를 두지 않기 위해서다.
+       검수 폼과 시각적으로 갈라 둔다: 제안이 입력칸의 기본값처럼 보이면 원칙이 무너진다. -->
+  <section class="ai-hint" th:if="${classification != null}">
+    <h3>분류 제안 <span class="ai-hint__tag">참고</span></h3>
+    <dl>
+      <dt>분류</dt>
+      <dd>
+        <span th:switch="${classification.category.name()}">
+          <span th:case="'DAMAGED'">파손</span>
+          <span th:case="'WRONG_ITEM'">오배송</span>
+          <span th:case="'CHANGED_MIND'">변심</span>
+          <span th:case="*">기타</span>
+        </span>
+        · 신뢰도
+        <span th:switch="${classification.confidence.name()}">
+          <span th:case="'HIGH'">높음</span>
+          <span th:case="'MEDIUM'">보통</span>
+          <span th:case="*">낮음</span>
+        </span>
+      </dd>
+      <dt>근거</dt>
+      <dd th:text="${#strings.isEmpty(classification.evidence) ? '—' : classification.evidence}">—</dd>
+      <dt>처분 제안</dt>
+      <dd th:switch="${classification.suggestedDisposition?.name()}">
+        <span th:case="'RESTOCKED'">재입고</span>
+        <span th:case="'DISPOSED'">폐기</span>
+        <span th:case="'REJECTED'">거절</span>
+        <span th:case="*">—</span>
+      </dd>
+    </dl>
+    <p class="ai-hint__note">참고용입니다. 확정은 아래에서 직접 입력하세요.</p>
+  </section>
+
   <!-- RECEIVED 상태: 검수 완료 폼 -->
   <form id="rmaComplete" sec:authorize="hasRole('MANAGER')" th:if="${rma.status.name() == 'RECEIVED'}"
         th:action="@{/admin/returns/{id}/complete(id=${rma.id})}" method="post"

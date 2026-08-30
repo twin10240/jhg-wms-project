@@ -3,6 +3,7 @@ package com.jhg.wms.web;
 import com.jhg.wms.domain.RmaReturn;
 import com.jhg.wms.domain.RmaStatus;
 import com.jhg.wms.service.InventoryService;
+import com.jhg.wms.service.ReturnClassificationService;
 import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ public class RmaAdminController {
 
     private final RmaService rmaService;
     private final InventoryService inventoryService;
+    private final ReturnClassificationService returnClassificationService;
 
     @GetMapping("/admin/returns")
     public String list(@RequestParam(required = false) RmaStatus status, Model model) {
@@ -38,6 +40,9 @@ public class RmaAdminController {
         model.addAttribute("rma", rma);
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
+        // 없으면 null — 템플릿이 참고 영역을 통째로 건너뛴다.
+        model.addAttribute("classification",
+                returnClassificationService.findByRmaId(id).orElse(null));
         return "admin/returndetail";
     }
 

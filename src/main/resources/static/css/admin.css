@@ -269,3 +269,27 @@ dialog label { display: block; margin-bottom: 4px; font-weight: 600; }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 .btn--muted { background: var(--color-text-muted); }
 .btn--muted:hover { background: var(--color-text); }
+
+/* AI 분류 참고 영역 — 검수 폼과 시각적으로 갈라 둔다.
+   제안이 입력의 기본값처럼 보이면 "확정에 기본값을 두지 않는다"가 무너진다. */
+.ai-hint {
+  margin: 16px 0;
+  padding: 14px 18px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: #fbfbfd;
+}
+.ai-hint h3 { margin: 0 0 10px; font-size: 1em; }
+.ai-hint__tag {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  font-size: .78em;
+  font-weight: 500;
+}
+.ai-hint dl { display: grid; grid-template-columns: 76px 1fr; gap: 6px 12px; margin: 0; }
+.ai-hint dt { color: var(--color-text-muted); font-size: .9em; }
+.ai-hint dd { margin: 0; }
+.ai-hint__note { margin: 12px 0 0; color: var(--color-text-muted); font-size: .88em; }

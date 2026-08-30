@@ -2,9 +2,13 @@ package com.jhg.wms.web;
 
 import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
+import com.jhg.wms.domain.Confidence;
+import com.jhg.wms.domain.ReturnCategory;
+import com.jhg.wms.domain.ReturnClassification;
 import com.jhg.wms.domain.RmaDisposition;
 import com.jhg.wms.domain.RmaReturn;
 import com.jhg.wms.service.InventoryService;
+import com.jhg.wms.service.ReturnClassificationService;
 import com.jhg.wms.service.RmaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +21,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,6 +46,7 @@ class RmaAdminControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean RmaService rmaService;
     @MockitoBean InventoryService inventoryService;
+    @MockitoBean ReturnClassificationService classificationService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
     // 행 전체 클릭은 tr의 data-href에 의존한다 — 이 속성이 빠지면 클릭이 조용히 죽으므로 렌더링을 검증한다.
@@ -188,5 +195,70 @@ class RmaAdminControllerTest {
         mockMvc.perform(get("/admin/returns").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(view().name("error"));
+    }
+
+    private RmaReturn receivedRma() {
+        RmaReturn rma = RmaReturn.create("RMA-100-9", 100L, "받았는데 모서리가 깨져 있어요");
+        rma.addItem(501L, 1L, 2);
+        ReflectionTestUtils.setField(rma, "id", 9L);
+        ReflectionTestUtils.setField(rma.getItems().get(0), "id", 91L);
+        rma.receive();
+        return rma;
+    }
+
+    private void stubDetail(RmaReturn rma, ReturnClassification classification) {
+        when(rmaService.findById(9L)).thenReturn(rma);
+        when(inventoryService.findAllRows()).thenReturn(
+                List.of(new InventoryRowResponse(1L, "상품 1", 10, 3, 7)));
+        when(classificationService.findByRmaId(9L))
+                .thenReturn(Optional.ofNullable(classification));
+    }
+
+    @Test
+    void 분류가_있으면_한글_라벨로_참고영역을_렌더한다() throws Exception {
+        stubDetail(receivedRma(), ReturnClassification.create(9L, ReturnCategory.DAMAGED,
+                Confidence.HIGH, "모서리가 깨져 있어요", RmaDisposition.DISPOSED,
+                "claude-haiku-4-5", 400, 120));
+
+        mockMvc.perform(get("/admin/returns/9").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("분류 제안")))
+                .andExpect(content().string(containsString("파손")))
+                .andExpect(content().string(containsString("높음")))
+                .andExpect(content().string(containsString("모서리가 깨져 있어요")))
+                .andExpect(content().string(containsString("폐기")))
+                // enum 원문을 화면에 흘리지 않는다
+                .andExpect(content().string(not(containsString("DAMAGED"))));
+    }
+
+    // 빈 껍데기를 두지 않는다 — 분류가 없으면 영역 자체가 없어야 한다.
+    @Test
+    void 분류가_없으면_참고영역을_렌더하지_않는다() throws Exception {
+        stubDetail(receivedRma(), null);
+
+        mockMvc.perform(get("/admin/returns/9").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("분류 제안"))))
+                .andExpect(content().string(not(containsString("참고용입니다"))));
+    }
+
+    // V2.1 원칙: 되돌릴 수 없는 확정에 기본값을 두지 않는다. AI 제안도 예외가 아니다.
+    @Test
+    void 분류가_있어도_검수_입력칸은_여전히_비어_있다() throws Exception {
+        stubDetail(receivedRma(), ReturnClassification.create(9L, ReturnCategory.DAMAGED,
+                Confidence.HIGH, "모서리가 깨져 있어요", RmaDisposition.DISPOSED,
+                "claude-haiku-4-5", 400, 120));
+
+        String html = mockMvc.perform(get("/admin/returns/9").with(user("mgr").roles("MANAGER")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 승인 수량 input에 value가 채워지면 안 된다
+        assertThat(html).containsPattern("name=\"items\\[0\\]\\.acceptedQuantity\"[^>]*")
+                .doesNotContainPattern(
+                        "name=\"items\\[0\\]\\.acceptedQuantity\"[^>]*value=\"[^\"]+\"");
+        // 처분 select에서 선택된 것은 플레이스홀더뿐이다
+        assertThat(html).contains("<option value=\"\" disabled selected>선택하세요</option>");
+        assertThat(html).doesNotContainPattern("<option value=\"DISPOSED\"[^>]*selected");
     }
 }
