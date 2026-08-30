@@ -277,7 +277,7 @@ dialog label { display: block; margin-bottom: 4px; font-weight: 600; }
   padding: 14px 18px;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius);
-  background: #fbfbfd;
+  background: var(--color-surface);
 }
 .ai-hint h3 { margin: 0 0 10px; font-size: 1em; }
 .ai-hint__tag {

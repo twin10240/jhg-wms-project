@@ -20,8 +20,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -253,12 +256,41 @@ class RmaAdminControllerTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // 승인 수량 input에 value가 채워지면 안 된다
-        assertThat(html).containsPattern("name=\"items\\[0\\]\\.acceptedQuantity\"[^>]*")
-                .doesNotContainPattern(
-                        "name=\"items\\[0\\]\\.acceptedQuantity\"[^>]*value=\"[^\"]+\"");
-        // 처분 select에서 선택된 것은 플레이스홀더뿐이다
-        assertThat(html).contains("<option value=\"\" disabled selected>선택하세요</option>");
-        assertThat(html).doesNotContainPattern("<option value=\"DISPOSED\"[^>]*selected");
+        // 승인 수량 input에 value가 채워지면 안 된다.
+        // 속성 순서에 기대지 않도록 <input ...> 태그 전체를 뽑아서 확인한다
+        // (value가 name보다 앞에 와도 놓치지 않는다).
+        Pattern acceptedQuantityInputPattern = Pattern.compile(
+                "<input[^>]*name=\"items\\[0\\]\\.acceptedQuantity\"[^>]*>");
+        Matcher acceptedQuantityInputMatcher = acceptedQuantityInputPattern.matcher(html);
+        assertThat(acceptedQuantityInputMatcher.find())
+                .as("승인 수량 input이 렌더되어야 한다")
+                .isTrue();
+        assertThat(acceptedQuantityInputMatcher.group()).doesNotContain("value=");
+
+        // 처분 select에서 선택된 것은 플레이스홀더뿐이어야 한다.
+        // select 블록을 통째로 뽑은 뒤 그 안의 <option> 태그들을 개별로 검사한다 —
+        // selected가 value보다 앞에 와도 놓치지 않는다.
+        Pattern dispositionSelectPattern = Pattern.compile(
+                "<select[^>]*name=\"items\\[0\\]\\.disposition\"[^>]*>(.*?)</select>",
+                Pattern.DOTALL);
+        Matcher dispositionSelectMatcher = dispositionSelectPattern.matcher(html);
+        assertThat(dispositionSelectMatcher.find())
+                .as("처분 select가 렌더되어야 한다")
+                .isTrue();
+        String dispositionSelectHtml = dispositionSelectMatcher.group(1);
+        assertThat(dispositionSelectHtml)
+                .contains("<option value=\"\" disabled selected>선택하세요</option>");
+
+        Pattern optionPattern = Pattern.compile("<option[^>]*>");
+        Matcher optionMatcher = optionPattern.matcher(dispositionSelectHtml);
+        List<String> wronglySelectedOptions = new ArrayList<>();
+        while (optionMatcher.find()) {
+            String option = optionMatcher.group();
+            boolean isPlaceholder = option.contains("value=\"\"");
+            if (!isPlaceholder && option.contains("selected")) {
+                wronglySelectedOptions.add(option);
+            }
+        }
+        assertThat(wronglySelectedOptions).isEmpty();
     }
 }
