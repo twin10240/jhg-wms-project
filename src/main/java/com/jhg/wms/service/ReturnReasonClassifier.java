@@ -3,7 +3,6 @@ package com.jhg.wms.service;
 import com.jhg.wms.domain.Confidence;
 import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.RmaDisposition;
-import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
@@ -24,20 +23,4 @@ public interface ReturnReasonClassifier {
                           String model,
                           int inputTokens,
                           int outputTokens) {}
-
-    /**
-     * Anthropic 어댑터(Task 5)가 붙기 전까지 컨텍스트를 띄우기 위한 자리다.
-     * ReturnClassificationService가 이 인터페이스를 생성자 필수값으로 요구하는데
-     * 구현 빈이 하나도 없으면, 이 기능과 무관한 다른 전체-컨텍스트 테스트까지 전부
-     * NoSuchBeanDefinitionException으로 죽는다(실측: 12개 테스트 클래스, 103건 실패).
-     * 항상 empty만 반환해 실제 분류는 절대 하지 않는다. Task 5에서 진짜 어댑터가
-     * 빈으로 등록되면 이 자리는 지운다.
-     */
-    @Component
-    class NoOp implements ReturnReasonClassifier {
-        @Override
-        public Optional<Classification> classify(String reason) {
-            return Optional.empty();
-        }
-    }
 }
