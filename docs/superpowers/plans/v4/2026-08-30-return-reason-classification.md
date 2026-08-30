@@ -1239,8 +1239,22 @@ EOF
 - Modify: `build.gradle`
 - Create: `src/main/java/com/jhg/wms/client/ClaudeReturnReasonClassifier.java`
 - Create: `src/main/java/com/jhg/wms/config/AiConfig.java`
+- **Modify: `src/main/java/com/jhg/wms/service/ReturnReasonClassifier.java` — 임시 `NoOp` 중첩 클래스를 삭제한다** (아래 Step 0 참조)
 - Modify: `src/main/resources/application.yml`
 - Test: `src/test/java/com/jhg/wms/config/AiConfigTest.java`
+
+**Step 0 (필수, 다른 스텝보다 먼저): 임시 NoOp 제거**
+
+Task 2에서 `ReturnClassificationService`가 `ReturnReasonClassifier`를 생성자 필수값으로
+받는데 구현 빈이 하나도 없어, 이 기능과 무관한 전체-컨텍스트 테스트까지 전부
+`NoSuchBeanDefinitionException`으로 죽었다(실측 12개 클래스 103건). Task 2 구현자가
+`ReturnReasonClassifier.NoOp`(`@Component`, 항상 empty)을 임시로 두어 막았다 —
+계획서가 `@Service`를 그 의존 빈 제공자보다 먼저 배치한 결함에 대한 대응이다.
+
+이 태스크가 `AiConfig`로 진짜 빈을 등록하므로, **같은 커밋에서 `NoOp` 중첩 클래스와
+그것이 끌어온 `org.springframework.stereotype.Component` import를 삭제한다.**
+남겨두면 `ReturnClassificationService` 주입 지점에서 `NoUniqueBeanDefinitionException`이 난다.
+삭제 후 `ReturnReasonClassifier.java`는 인터페이스와 `Classification` 레코드만 남는다.
 
 **Interfaces:**
 - Consumes: Task 2의 `ReturnReasonClassifier`/`Classification`, Task 4의 `ClassificationJsonParser`
@@ -1539,6 +1553,7 @@ Expected: BUILD SUCCESSFUL, 349건
 git add build.gradle \
         src/main/java/com/jhg/wms/client/ClaudeReturnReasonClassifier.java \
         src/main/java/com/jhg/wms/config/AiConfig.java \
+        src/main/java/com/jhg/wms/service/ReturnReasonClassifier.java \
         src/main/resources/application.yml src/test/resources/application.yml \
         src/test/java/com/jhg/wms/config/AiConfigTest.java
 git commit -m "$(cat <<'EOF'
@@ -1555,6 +1570,9 @@ SDK 기본 타임아웃 10분을 20초로 줄였다. 참고 정보 하나 때문
 
 테스트 설정에서 키를 비워, 자동 테스트가 실제 API를 부르지 않는다는 성질을
 설정 파일에 못 박았다.
+
+Task 2가 컨텍스트를 띄우려고 임시로 뒀던 NoOp 구현을 지웠다 — 이제 진짜 빈이
+있으므로 둘 다 남으면 주입 지점에서 후보가 둘이 된다.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
