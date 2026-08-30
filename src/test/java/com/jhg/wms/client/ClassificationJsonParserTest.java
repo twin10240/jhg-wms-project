@@ -82,4 +82,20 @@ class ClassificationJsonParserTest {
 
         assertThat(parser.parse(json)).isEmpty();
     }
+
+    // evidence는 필수값이 아니라서 위의 필드_타입이_다르면_버린다()가 안 잡는다 —
+    // isTextual() 가드가 없으면 asText()가 숫자를 그대로 문자열로 밀어 넣는다.
+    @Test
+    void evidence가_문자열이_아니면_null로_버린다() {
+        String json = """
+                {"category":"DAMAGED","confidence":"HIGH",
+                 "evidence":12345,"suggested_disposition":"DISPOSED"}
+                """;
+
+        var parsed = parser.parse(json).orElseThrow();
+        assertThat(parsed.category()).isEqualTo(ReturnCategory.DAMAGED);
+        assertThat(parsed.confidence()).isEqualTo(Confidence.HIGH);
+        assertThat(parsed.evidence()).isNull();
+        assertThat(parsed.suggestedDisposition()).isEqualTo(RmaDisposition.DISPOSED);
+    }
 }

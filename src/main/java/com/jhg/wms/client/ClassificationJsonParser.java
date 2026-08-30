@@ -34,14 +34,28 @@ public class ClassificationJsonParser {
                     enumOf(RmaDisposition.class, text(node, "suggested_disposition"));
 
             if (category == null || confidence == null || disposition == null) {
-                log.warn("분류 응답이 스키마를 벗어남(무시): {}", abbreviate(json));
+                log.warn("분류 응답이 스키마를 벗어남(무시), 문제 필드: {}",
+                        invalidFields(category, confidence, disposition));
                 return Optional.empty();
             }
             return Optional.of(new Parsed(category, confidence, text(node, "evidence"), disposition));
         } catch (Exception e) {
-            log.warn("분류 응답 파싱 실패(무시): {}", abbreviate(json));
+            // e.getMessage()는 남기지 않는다 — Jackson 파싱 예외 메시지는 입력 일부를
+            // 그대로 인용한다(예: `at [Source: (String)"..."; line: 1, column: 28]`).
+            log.warn("분류 응답 파싱 실패(무시): {} (응답 길이 {})",
+                    e.getClass().getSimpleName(), json.length());
             return Optional.empty();
         }
+    }
+
+    // 로그에 응답 값을 남기지 않는다 — 사유 원문이 인용돼 들어올 수 있다.
+    // 어떤 필드가 문제인지 필드 "이름"만 남기고, 값은 절대 로그에 넣지 않는다.
+    private static String invalidFields(Object category, Object confidence, Object disposition) {
+        StringBuilder sb = new StringBuilder();
+        if (category == null) sb.append("category ");
+        if (confidence == null) sb.append("confidence ");
+        if (disposition == null) sb.append("suggested_disposition ");
+        return sb.toString().trim();
     }
 
     private static String text(JsonNode node, String field) {
@@ -56,11 +70,6 @@ public class ClassificationJsonParser {
         } catch (IllegalArgumentException e) {
             return null;
         }
-    }
-
-    // 로그에 응답 전문을 쏟지 않는다 — 사유 원문이 인용돼 들어올 수 있다.
-    private static String abbreviate(String json) {
-        return json.length() <= 200 ? json : json.substring(0, 200) + "…";
     }
 
     public record Parsed(ReturnCategory category,
