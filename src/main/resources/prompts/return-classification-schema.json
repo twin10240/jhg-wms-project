@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["DAMAGED", "WRONG_ITEM", "CHANGED_MIND", "OTHER"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["HIGH", "MEDIUM", "LOW"]
+    },
+    "evidence": {
+      "type": "string"
+    },
+    "suggested_disposition": {
+      "type": "string",
+      "enum": ["RESTOCKED", "DISPOSED", "REJECTED"]
+    }
+  },
+  "required": ["category", "confidence", "evidence", "suggested_disposition"],
+  "additionalProperties": false
+}
