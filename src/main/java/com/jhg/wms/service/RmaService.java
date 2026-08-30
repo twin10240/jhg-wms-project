@@ -21,6 +21,7 @@ public class RmaService {
     private final ReservationRepository reservationRepository;
     private final InventoryService inventoryService;
     private final OmsReturnStatusNotifier omsReturnStatusNotifier;
+    private final ReturnClassificationTrigger returnClassificationTrigger;
 
     /**
      * RMA 접수. requestKey로 멱등 — 같은 키+같은 내용이면 기존 반환, 다른 내용이면 409.
@@ -66,7 +67,11 @@ public class RmaService {
         for (var item : request.items())
             rma.addItem(item.orderItemId(), item.productId(), item.quantity());
 
-        return new CreateResult(true, rmaReturnRepository.save(rma));
+        RmaReturn saved = rmaReturnRepository.save(rma);
+        // 분류는 참고 정보라 접수와 한 트랜잭션에 묶지 않는다 —
+        // 외부 LLM 장애가 반품 접수를 막으면 안 된다.
+        returnClassificationTrigger.classifyAfterCommit(saved.getId(), saved.getReason());
+        return new CreateResult(true, saved);
     }
 
     public RmaReturn findById(Long rmaId) {

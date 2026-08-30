@@ -18,6 +18,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -33,6 +35,7 @@ class RmaServiceTest {
     InventoryService inventoryService;
     RmaService rmaService;
     OmsReturnStatusNotifier returnNotifier;
+    ReturnClassificationTrigger classificationTrigger;
 
     @BeforeEach
     void setUp() {
@@ -40,7 +43,9 @@ class RmaServiceTest {
         returnNotifier = mock(OmsReturnStatusNotifier.class);
         inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo, replenishNotifier,
                 mock(com.jhg.wms.client.OmsDeliveryNotifier.class), () -> "system");
-        rmaService = new RmaService(rmaRepo, reservationRepo, inventoryService, returnNotifier);
+        classificationTrigger = mock(ReturnClassificationTrigger.class);
+        rmaService = new RmaService(rmaRepo, reservationRepo, inventoryService, returnNotifier,
+                classificationTrigger);
     }
 
     private void seedAndShip(long orderId, Map<Long, Integer> items) {
@@ -138,6 +143,29 @@ class RmaServiceTest {
                 req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 0))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("수량은 1 이상");
+    }
+
+    // 분류는 접수 커밋 후 시도한다 — 접수 응답이 LLM 지연에 묶이지 않게.
+    @Test
+    void 접수하면_사유_분류를_커밋후로_예약한다() {
+        seedAndShip(140L, Map.of(1L, 5));
+        rmaService.createReturn(req(UUID.randomUUID().toString(), 140L,
+                "모서리가 깨져 있어요", items(541, 1, 1)));
+
+        verify(classificationTrigger).classifyAfterCommit(any(), eq("모서리가 깨져 있어요"));
+    }
+
+    // 멱등 재접수는 새 RMA를 만들지 않으므로 분류도 다시 시도하지 않는다.
+    @Test
+    void 같은_키로_재접수하면_분류를_다시_예약하지_않는다() {
+        seedAndShip(141L, Map.of(1L, 5));
+        String key = UUID.randomUUID().toString();
+        rmaService.createReturn(req(key, 141L, "깨졌어요", items(542, 1, 1)));
+        reset(classificationTrigger);
+
+        rmaService.createReturn(req(key, 141L, "깨졌어요", items(542, 1, 1)));
+
+        verifyNoInteractions(classificationTrigger);
     }
 
     // ── 동일 productId 여러 orderItemId ──────────────────────────
