@@ -69,3 +69,9 @@ wms:
     operator-password: operator
     manager-user: manager
     manager-password: manager
+  # 테스트는 실제 API를 부르지 않는다 — 키를 비워 AiConfig가 비활성 분류기를 만들게 한다.
+  ai:
+    api-key: ""
+    model: claude-haiku-4-5
+    max-tokens: 1024
+    timeout: 20s

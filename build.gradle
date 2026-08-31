@@ -29,6 +29,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.springframework.session:spring-session-data-redis'
 	implementation 'org.redisson:redisson:3.37.0'
+	// 반품 사유 자동 분류(V4.0). 키가 없으면 AiConfig가 비활성 구현으로 대체하므로 기동은 정상.
+	implementation 'com.anthropic:anthropic-java:2.34.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'   // dev·test·prod 공통 — H2는 V3.0에서 제거됨
 	annotationProcessor 'org.projectlombok:lombok'

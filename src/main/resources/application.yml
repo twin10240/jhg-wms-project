@@ -60,6 +60,15 @@ wms:
     operator-password: ${WMS_OPERATOR_PASSWORD:operator}
     manager-user: ${WMS_MANAGER_USER:manager}
     manager-password: ${WMS_MANAGER_PASSWORD:manager}
+  # 반품 사유 자동 분류(V4.0). 키가 없으면 분류만 꺼진 채로 기동한다 —
+  # basic·callback과 달리 분류는 없어도 창고 업무가 돌아가므로 fail-fast 대상이 아니다.
+  ai:
+    api-key: ${ANTHROPIC_API_KEY:}
+    # 분류는 짧은 단일 호출이라 Haiku로 충분하다(입력 약 400·출력 약 120 토큰, 건당 약 1.4원).
+    # Opus/Sonnet 5 계열로 바꾸면 확장 사고가 기본으로 켜져 max-tokens를 함께 올려야 한다.
+    model: ${WMS_AI_MODEL:claude-haiku-4-5}
+    max-tokens: 1024
+    timeout: 20s
 
 ---
 # 스키마 리셋용: --spring.profiles.active=local
