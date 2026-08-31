@@ -35,6 +35,10 @@ public class ReturnClassificationService {
                                 c.confidence(), c.evidence(), c.suggestedDisposition(),
                                 c.model(), c.inputTokens(), c.outputTokens()));
                         // 건당 토큰을 로그에도 남긴다 — 엔티티만 보면 총량을 세기 번거롭다.
+                        // 이 줄은 커밋보다 먼저 찍힌다 — save()는 @GeneratedValue(AUTO)라 여기선
+                        // em.persist()만 하고 실제 INSERT는 이 메서드가 반환된 뒤 트랜잭션 커밋
+                        // 시점에 플러시된다. 즉 이 로그는 "분류기가 값을 돌려줬다"는 증거일 뿐,
+                        // "행이 저장됐다"는 증거는 아니다.
                         log.info("반품 사유 분류: rmaId={} category={} confidence={} model={} in={} out={}",
                                 rmaReturnId, c.category(), c.confidence(), c.model(),
                                 c.inputTokens(), c.outputTokens());
