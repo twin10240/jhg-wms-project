@@ -510,6 +510,41 @@ class WmsAdminControllerTest {
     }
 
     @Test
+    void 수불대장_상품행은_상품과_기간을_실은_링크를_들고_있다() throws Exception {
+        when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+        when(inventoryService.findInvariantViolations(any())).thenReturn(List.of());
+
+        String html = mockMvc.perform(get("/admin/inventory/ledger")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains(
+                "data-href=\"/admin/inventory/transactions?productId=1&amp;from=2026-09-01&amp;to=2026-09-30\"");
+    }
+
+    // 합계 행은 상품이 아니다 — 눌리면 productId 없는 링크로 떨어진다.
+    @Test
+    void 수불대장_합계행에는_링크가_붙지_않는다() throws Exception {
+        when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+        when(inventoryService.findInvariantViolations(any())).thenReturn(List.of());
+
+        String html = mockMvc.perform(get("/admin/inventory/ledger")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        java.util.regex.Matcher tfoot = java.util.regex.Pattern
+                .compile("<tfoot.*?</tfoot>", java.util.regex.Pattern.DOTALL).matcher(html);
+        assertThat(tfoot.find()).as("tfoot 합계 블록이 렌더돼야 한다").isTrue();
+        assertThat(tfoot.group()).doesNotContain("data-href");
+    }
+
+    @Test
     void 수불대장_기간이_뒤집히면_500이_아니라_에러메시지를_렌더링한다() throws Exception {
         when(inventoryService.buildLedger(any(), any()))
                 .thenThrow(new IllegalArgumentException("시작일이 종료일보다 뒤입니다."));

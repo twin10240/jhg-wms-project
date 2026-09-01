@@ -30,7 +30,8 @@
       </tr>
     </thead>
     <tbody>
-      <tr th:each="row : ${ledger}">
+      <tr th:each="row : ${ledger}"
+          th:data-href="@{/admin/inventory/transactions(productId=${row.productId},from=${from},to=${to})}">
         <td th:text="${row.productId}">1</td>
         <td th:text="${row.productName}">상품 1</td>
         <td style="text-align:right" th:text="${row.opening}">100</td>
@@ -95,6 +96,18 @@
       </table>
     </div>
   </div>
+
+  <!-- 행 전체 클릭 → 그 상품·그 기간의 이동내역.
+       셀 링크를 두지 않아 키보드로는 갈 길이 없다(반품 리포트와 같은 상태).
+       필요해지면 두 화면의 tr에 tabindex와 Enter 핸들러를 함께 붙인다. -->
+  <script>
+    document.querySelector('main').addEventListener('click', function (e) {
+      var tr = e.target.closest('tr[data-href]');
+      if (!tr || e.target.closest('a')) return;
+      if (window.getSelection().toString()) return;   // 텍스트 드래그 복사 중이면 이동하지 않는다
+      location.href = tr.dataset.href;
+    });
+  </script>
 </main>
 </body>
 </html>
