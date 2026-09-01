@@ -111,4 +111,32 @@ class ReturnAnalyticsServiceTest {
 
         assertThat(report.observedDays()).isEqualTo(10);
     }
+
+    // 정렬 비교자가 두 키를 체인했을 때 .reversed()의 방향이 맞아야 한다.
+    // 기존 테스트는 전부 상품 하나만 다뤄서, 역순이 뒤집혀도 통과한다.
+    // 정렬은 이 클래스에서 조용히 틀릴 수 있는 유일한 자리다.
+    @Test
+    void 반품률이_높은_순으로_정렬되고_동률이면_반품수량이_많은_순이다() {
+        재고(1L, "상품 A");
+        재고(2L, "상품 B");
+        재고(3L, "상품 C");
+
+        // 상품 A: 반품률 0.20 (100 출고 중 20 반품)
+        출고(1L, 100, "ORDER#100", LocalDate.of(2026, 3, 10));
+        반품(100L, 1L, 20, "파손");
+
+        // 상품 B: 반품률 0.20 (50 출고 중 10 반품) — A와 동률이지만 반품수량이 적음
+        출고(2L, 50, "ORDER#101", LocalDate.of(2026, 3, 10));
+        반품(101L, 2L, 10, "파손");
+
+        // 상품 C: 반품률 0.05 (100 출고 중 5 반품) — 가장 낮은 반품률
+        출고(3L, 100, "ORDER#102", LocalDate.of(2026, 3, 10));
+        반품(102L, 3L, 5, "파손");
+
+        var report = service.productReturnRates(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(report.rows()).hasSize(3);
+        assertThat(report.rows()).extracting(ReturnAnalyticsService.ProductReturnRate::productId)
+                .containsExactly(1L, 2L, 3L);
+    }
 }
