@@ -618,6 +618,40 @@ class WmsAdminControllerTest {
         assertThat(html).doesNotContain("범위 해제");
     }
 
+    // to만 걸려도 findTransactions는 null인 from 쪽만 넓은 경계로 채우고 to는 그대로 좁은 경계로
+    // 쓴다 — 결과가 실제로 좁혀지는데 배지가 없으면 사용자는 걸린 필터를 보지도, 끄지도 못한다.
+    @Test
+    void 이력화면이_종료일만_걸려도_범위배지를_렌더한다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("범위 해제");
+        assertThat(html).contains("2026-09-30 까지");
+    }
+
+    @Test
+    void 이력화면이_시작일만_걸리면_null을_문자열로_찍지_않는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("from", "2026-09-01"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("2026-09-01 이후");
+        // SpEL의 +는 null 피연산자를 문자열 "null"로 이어붙인다 — from만 있을 때 화면에
+        // '~ null'이 그대로 찍히는 회귀는 위 텍스트 확인만으로는 못 잡으므로 따로 확인한다.
+        assertThat(html).doesNotContain("~ null");
+    }
+
     @Test
     void 대시보드는_승인대기_실사_건수를_보여준다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of());

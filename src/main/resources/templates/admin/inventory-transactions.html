@@ -7,11 +7,15 @@
   <h2>재고 트랜잭션 이력</h2>
 
   <!-- 범위가 걸렸을 때만. 빈 껍데기를 두면 전역 저널에도 의미 없는 줄이 남는다. -->
-  <p th:if="${productId != null or from != null}" class="hint">
+  <p th:if="${productId != null or from != null or to != null}" class="hint">
     <span th:if="${productId != null}"
           th:text="${productNames.getOrDefault(productId, '상품#' + productId)}">상품 1</span>
-    <span th:if="${from != null}"
+    <span th:if="${from != null and to != null}"
           th:text="' · ' + ${from} + ' ~ ' + ${to}"> · 2026-09-01 ~ 2026-09-30</span>
+    <span th:if="${from != null and to == null}"
+          th:text="' · ' + ${from} + ' 이후'"> · 2026-09-01 이후</span>
+    <span th:if="${from == null and to != null}"
+          th:text="' · ' + ${to} + ' 까지'"> · 2026-09-30 까지</span>
     <!-- Thymeleaf 링크식은 파라미터 값이 null이어도 "type="처럼 빈 값으로 남긴다 —
          유형이 안 걸려 있을 땐(filterType == null) 아예 유형 파라미터를 빼야 진짜 "전체"로 돌아간다. -->
     <a th:if="${filterType != null}"
