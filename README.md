@@ -346,6 +346,8 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
   `wms.basic`·`oms.callback`과 달리 분류는 없어도 창고 업무가 돌아가기 때문입니다.
 - 건별 입·출력 토큰을 엔티티와 로그에 남깁니다("얼마 드는지 모른다"를 피하려고).
 
+품질은 30건 평가셋으로 측정했습니다 — [측정 결과](docs/wms-classification-eval.md).
+
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
 | `ANTHROPIC_API_KEY` | (없음) | 미설정 시 분류 비활성 |
