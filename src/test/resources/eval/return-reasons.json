@@ -1,0 +1,35 @@
+[
+  { "id": "damaged-01", "reason": "택배 박스가 찌그러져서 안에 컵이 깨졌어요", "expectedCategory": "DAMAGED", "note": "파손이 명시적. 기본 케이스" },
+  { "id": "damaged-02", "reason": "화면에 금이 가 있는 상태로 도착했습니다", "expectedCategory": "DAMAGED", "note": "파손이 명시적. 기본 케이스" },
+  { "id": "damaged-03", "reason": "모서리가 다 까져서 왔네요", "expectedCategory": "DAMAGED", "note": "구어체 파손 표현" },
+  { "id": "damaged-04", "reason": "뚜껑이 부러진 채로 배송됐어요", "expectedCategory": "DAMAGED", "note": "부품 파손" },
+  { "id": "damaged-05", "reason": "긁힘이 있는데 쓰는 데는 문제없어요", "expectedCategory": "DAMAGED", "note": "매핑 탐침 — 파손이지만 재판매 가능. DISPOSED가 아닌 처분이 나오는지 본다" },
+  { "id": "damaged-06", "reason": "포장은 멀쩡한데 안에 내용물이 새어 있었어요", "expectedCategory": "DAMAGED", "note": "매핑 탐침 — 파손 원인이 포장이 아님" },
+  { "id": "damaged-07", "reason": "받자마자 열어보니 유리가 산산조각이던데요", "expectedCategory": "DAMAGED", "note": "감정 섞인 표현. 범주 판단이 흔들리는지" },
+
+  { "id": "wrong-01", "reason": "주문한 색상이랑 다른 게 왔어요", "expectedCategory": "WRONG_ITEM", "note": "오배송이 명시적. 기본 케이스" },
+  { "id": "wrong-02", "reason": "L 사이즈 시켰는데 S가 왔습니다", "expectedCategory": "WRONG_ITEM", "note": "옵션 불일치" },
+  { "id": "wrong-03", "reason": "두 개 주문했는데 하나만 들어있어요", "expectedCategory": "WRONG_ITEM", "note": "수량 불일치 — 프롬프트가 수량도 WRONG_ITEM에 넣는다" },
+  { "id": "wrong-04", "reason": "전혀 다른 상품이 배송됐네요", "expectedCategory": "WRONG_ITEM", "note": "상품 자체가 다름" },
+  { "id": "wrong-05", "reason": "구성품 중에 케이블이 빠져 있어요", "expectedCategory": "WRONG_ITEM", "note": "매핑 탐침 — 누락. 재입고가 자연스러운지" },
+  { "id": "wrong-06", "reason": "제품은 맞는데 사은품이 안 왔어요", "expectedCategory": "WRONG_ITEM", "note": "부분 불일치. OTHER로 새는지 본다" },
+  { "id": "wrong-07", "reason": "송장은 제 이름인데 물건이 제가 시킨 게 아니에요", "expectedCategory": "WRONG_ITEM", "note": "서술이 긴 오배송" },
+
+  { "id": "mind-01", "reason": "생각보다 커서 안 맞네요", "expectedCategory": "CHANGED_MIND", "note": "사이즈 불만족. 실제 관측된 케이스(rmaId=402)" },
+  { "id": "mind-02", "reason": "사이즈 교환하려구요", "expectedCategory": "CHANGED_MIND", "note": "교환 의사. 하자 언급 없음" },
+  { "id": "mind-03", "reason": "필요 없어져서 반품합니다", "expectedCategory": "CHANGED_MIND", "note": "프롬프트에 명시된 전형" },
+  { "id": "mind-04", "reason": "포장만 뜯었어요", "expectedCategory": "CHANGED_MIND", "note": "매핑 탐침 — 미개봉에 가까움. RESTOCKED가 나오는지" },
+  { "id": "mind-05", "reason": "몇 번 써봤는데 안 맞아서요", "expectedCategory": "CHANGED_MIND", "note": "매핑 탐침 — 사용 흔적. REJECTED가 나오는지가 핵심" },
+  { "id": "mind-06", "reason": "색이 화면이랑 달라서 마음에 안 들어요", "expectedCategory": "CHANGED_MIND", "note": "경계 — 오배송(WRONG_ITEM)으로 새기 쉽다. 하자가 아니라 취향이다" },
+  { "id": "mind-07", "reason": "한 달 정도 쓰다가 안 쓰게 됐어요", "expectedCategory": "CHANGED_MIND", "note": "매핑 탐침 — 기간 경과. REJECTED가 나오는지" },
+  { "id": "mind-08", "reason": "선물했는데 상대방이 이미 갖고 있대요", "expectedCategory": "CHANGED_MIND", "note": "제3자 사유. 범주가 흔들리는지" },
+
+  { "id": "other-01", "reason": "배송기사님이 너무 불친절했어요", "expectedCategory": "OTHER", "note": "명백한 범주 밖. OTHER가 안 나오면 프롬프트 문제다" },
+  { "id": "other-02", "reason": "그냥요", "expectedCategory": "OTHER", "note": "정보 없음. 프롬프트대로면 OTHER + LOW" },
+  { "id": "other-03", "reason": "음... 그냥 별로네요", "expectedCategory": "OTHER", "note": "실제 관측(rmaId=452)에서 CHANGED_MIND+LOW가 나왔다. 재현되는지" },
+  { "id": "other-04", "reason": "배송이 너무 늦게 와서요", "expectedCategory": "OTHER", "note": "물건이 아니라 배송에 대한 불만" },
+  { "id": "other-05", "reason": "결제가 중복으로 됐어요", "expectedCategory": "OTHER", "note": "결제 이슈 — 창고 범주 밖" },
+  { "id": "other-06", "reason": "ㅁㄴㅇㄹ", "expectedCategory": "OTHER", "note": "의미 없는 입력. 억지로 범주를 맞추지 않는지" },
+  { "id": "other-07", "reason": "반품이요", "expectedCategory": "OTHER", "note": "사유가 아닌 동작만 적음" },
+  { "id": "other-08", "reason": "환불 부탁드립니다", "expectedCategory": "OTHER", "note": "요청만 있고 사유 없음. CHANGED_MIND로 새기 쉽다" }
+]
