@@ -70,7 +70,8 @@ class WmsAdminControllerTest {
 
     @Test
     void 이력화면에_transactions_모델이_담긴다() throws Exception {
-        when(inventoryService.findTransactions(eq(null), any())).thenReturn(new PageImpl<>(List.of()));
+        when(inventoryService.findTransactions(eq(null), eq(null), eq(null), eq(null), any()))
+                .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
@@ -81,7 +82,7 @@ class WmsAdminControllerTest {
     @Test
     void 이력화면_트랜잭션_유형_필터가_동작한다() throws Exception {
         InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null, null);
-        when(inventoryService.findTransactions(eq(InventoryTransactionType.RECEIVE), any()))
+        when(inventoryService.findTransactions(eq(InventoryTransactionType.RECEIVE), eq(null), eq(null), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(receive)));
 
         mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")).param("type", "RECEIVE"))
@@ -93,7 +94,7 @@ class WmsAdminControllerTest {
     @Test
     void 이력화면은_상품명_한글유형_한글참조를_표시한다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
-        when(inventoryService.findTransactions(eq(null), any())).thenReturn(new PageImpl<>(List.of(
+        when(inventoryService.findTransactions(eq(null), eq(null), eq(null), eq(null), any())).thenReturn(new PageImpl<>(List.of(
                 InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null, null),
                 InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null, null))));
 
@@ -549,7 +550,7 @@ class WmsAdminControllerTest {
                 1L, InventoryTransactionType.ADJUST, 3, 10, 13, null, "파손 정정", "manager");
         InventoryTransaction legacy = InventoryTransaction.of(
                 1L, InventoryTransactionType.ADJUST, 1, 13, 14, null, "구 데이터", null);
-        when(inventoryService.findTransactions(eq(null), any()))
+        when(inventoryService.findTransactions(eq(null), eq(null), eq(null), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(withActor, legacy)));
 
         String html = mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))

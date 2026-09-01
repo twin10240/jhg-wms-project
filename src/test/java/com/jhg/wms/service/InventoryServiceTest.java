@@ -3,6 +3,7 @@ package com.jhg.wms.service;
 import com.jhg.wms.client.OmsDeliveryNotifier;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.domain.ReservationStatus;
@@ -15,8 +16,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -749,5 +754,83 @@ class InventoryServiceTest {
 
         assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}");
         assertThat(repo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(4);   // 재고 불변
+    }
+
+    // ── 드릴다운 조회 ────────────────────────────────────────────
+
+    /** createdAt은 of()가 now()로 박으므로, 기간 경계를 시험하려면 심어서 넣어야 한다. */
+    private void seedTxnAt(Long productId, InventoryTransactionType type, int delta, LocalDateTime at) {
+        var txn = InventoryTransaction.of(productId, type, delta, 0, delta, null, null, "test");
+        ReflectionTestUtils.setField(txn, "createdAt", at);
+        adjustmentRepo.save(txn);
+    }
+
+    @Test
+    void 상품으로_좁히면_다른_상품은_안_나온다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(2L, InventoryTransactionType.RECEIVE, 20, LocalDateTime.of(2026, 9, 3, 10, 0));
+
+        var page = service.findTransactions(null, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(InventoryTransaction::getProductId)
+                .containsOnly(1L);
+    }
+
+    // 반개구간 [from 00:00, to+1일 00:00). buildLedger와 같은 경계여야 수불대장과 상세가 맞는다.
+    @Test
+    void 종료일_당일은_포함하고_다음날은_제외한다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 1, LocalDateTime.of(2026, 9, 30, 23, 59));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 2, LocalDateTime.of(2026, 10, 1, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 3, LocalDateTime.of(2026, 8, 31, 23, 59));
+
+        var page = service.findTransactions(null, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(InventoryTransaction::getDelta)
+                .containsExactlyInAnyOrder(1);
+    }
+
+    @Test
+    void 유형과_상품과_기간을_함께_건다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.SHIP, -4, LocalDateTime.of(2026, 9, 5, 10, 0));
+        seedTxnAt(2L, InventoryTransactionType.SHIP, -7, LocalDateTime.of(2026, 9, 5, 10, 0));
+
+        var page = service.findTransactions(InventoryTransactionType.SHIP, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(InventoryTransaction::getDelta)
+                .containsExactly(-4);
+    }
+
+    // 범위를 안 걸면 전건이 나와야 한다 — 날짜를 넓은 경계로 대체하는 처리가 조용히 걸러내면 안 된다.
+    @Test
+    void 범위를_안_걸면_전건이_나온다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(2020, 1, 1, 0, 0));
+        seedTxnAt(2L, InventoryTransactionType.SHIP, -4, LocalDateTime.of(2030, 12, 31, 0, 0));
+
+        var page = service.findTransactions(null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).hasSize(2);
+    }
+
+    @Test
+    void 한_상품의_수불행을_꺼낸다() {
+        seedTxnAt(1L, InventoryTransactionType.OPENING, 100, LocalDateTime.of(2026, 8, 1, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 20, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.SHIP, -15, LocalDateTime.of(2026, 9, 11, 10, 0));
+
+        var row = service.ledgerRowOf(1L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30))
+                .orElseThrow();
+
+        assertThat(row.opening()).isEqualTo(100);
+        assertThat(row.closing()).isEqualTo(105);
+    }
+
+    @Test
+    void 트랜잭션이_전혀_없는_상품은_수불행이_없다() {
+        assertThat(service.ledgerRowOf(999L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30))).isEmpty();
     }
 }

@@ -113,7 +113,7 @@ public class WmsAdminController {
                                         @RequestParam(defaultValue = "0") int page,
                                         Model model) {
         var pageable = org.springframework.data.domain.PageRequest.of(page, 20);
-        var txnPage = inventoryService.findTransactions(type, pageable);
+        var txnPage = inventoryService.findTransactions(type, null, null, null, pageable);
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         model.addAttribute("transactions", txnPage.getContent());
