@@ -37,7 +37,8 @@
       <tbody>
         <tr th:each="row : ${report.rows}">
           <td th:text="${row.productId}">1</td>
-          <td th:text="${row.productName}">상품 1</td>
+          <td><a th:href="@{/admin/returns/report/detail(from=${from},to=${to},productId=${row.productId})}"
+                 th:text="${row.productName}">상품 1</a></td>
           <td style="text-align:right" th:text="${row.shippedQty}">100</td>
           <td style="text-align:right" th:text="${row.returnedQty}">8</td>
           <td style="text-align:right"
@@ -65,7 +66,8 @@
       </thead>
       <tbody>
         <tr th:each="c : ${breakdown.counts}">
-          <td th:text="${c.category.label()}">파손</td>
+          <td><a th:href="@{/admin/returns/report/detail(from=${from},to=${to},category=${c.category.name()})}"
+                 th:text="${c.category.label()}">파손</a></td>
           <td th:text="${c.ownerArea.label()}">포장·운송</td>
           <td style="text-align:right" th:text="${c.count}">0</td>
         </tr>
@@ -73,7 +75,7 @@
              네 줄의 합(분류된 건수)이 전체인 것처럼 읽히면, 분모가 다른 두 숫자를
              한 화면에 놓는 사고가 표 안에서 그대로 일어난다. 0건이면 낼 이유가 없다. -->
         <tr th:if="${breakdown.unclassified > 0}">
-          <td>미분류</td>
+          <td><a th:href="@{/admin/returns/report/detail(from=${from},to=${to},category='UNCLASSIFIED')}">미분류</a></td>
           <td>미분류</td>
           <td style="text-align:right" th:text="${breakdown.unclassified}">0</td>
         </tr>

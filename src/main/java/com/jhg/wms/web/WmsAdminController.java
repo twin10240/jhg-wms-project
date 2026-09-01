@@ -183,6 +183,38 @@ public class WmsAdminController {
         return "admin/return-report";
     }
 
+    /**
+     * 리포트 표의 한 칸에 든 반품들. 축은 상품 또는 범주 하나다.
+     *
+     * 범주 축의 UNCLASSIFIED는 enum에 없는 값이다. 그래도 이 파라미터로 받는 이유는
+     * 범주 표의 다섯 행이 전부 같은 링크 모양으로 열리게 하기 위해서다 — 미분류만 다른
+     * 파라미터를 쓰면 템플릿에 분기가 하나 더 생기고, 그 분기가 링크를 조용히 어긋나게 한다.
+     */
+    @GetMapping("/admin/returns/report/detail")
+    public String returnReportDetail(@RequestParam(required = false) LocalDate from,
+                                     @RequestParam(required = false) LocalDate to,
+                                     @RequestParam(required = false) Long productId,
+                                     @RequestParam(required = false) String category,
+                                     Model model) {
+        if (to == null) to = LocalDate.now();
+        if (from == null) from = to.minusDays(30);
+
+        if (productId != null) {
+            model.addAttribute("rows", returnAnalyticsService.detailsByProduct(productId, from, to));
+            model.addAttribute("title", "상품 " + productId);
+        } else if (category != null) {
+            ReturnCategory parsed = "UNCLASSIFIED".equals(category) ? null : ReturnCategory.valueOf(category);
+            model.addAttribute("rows", returnAnalyticsService.detailsByCategory(parsed, from, to));
+            model.addAttribute("title", parsed == null ? "미분류" : parsed.label());
+        } else {
+            model.addAttribute("rows", null);
+            model.addAttribute("errorMessage", "상품이나 범주를 골라 주세요.");
+        }
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        return "admin/return-detail-list";
+    }
+
     @GetMapping("/admin/purchase-orders")
     public String purchaseOrders(@RequestParam(required = false) PurchaseOrderStatus status, Model model) {
         List<PurchaseOrder> pos = purchaseOrderService.findAllWithItems();

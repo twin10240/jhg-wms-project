@@ -32,6 +32,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -598,7 +599,8 @@ class WmsAdminControllerTest {
                         containsString("8.0%"),           // 반품률이 퍼센트로 렌더링된다
                         containsString("피킹·출고"),        // 소관 라벨이 붙는다
                         containsString("미분류\n      <strong>1</strong>건 /"),   // 라벨만이 아니라 건수까지 숨기지 않는다
-                        containsString("<td>미분류</td>\n          <td>미분류</td>"),  // 표 안에서도 드러난다
+                        containsString("<td>미분류</td>"),               // 표 안에서도 드러난다
+                        containsString("category=UNCLASSIFIED"),        // 미분류도 나머지 넷과 같은 링크로 열린다
                         containsString("관찰 경과: 기간 종료일로부터 5일"),   // 코호트 미성숙 경고 — 관찰일수 숨기지 않는다
                         containsString("주문 연결 불가 출고 <strong>2</strong>건은 분모에서 빠졌습니다"))));  // 분모 제외분 숨기지 않는다
     }
@@ -649,4 +651,55 @@ class WmsAdminControllerTest {
 
         verify(returnAnalyticsService).productReturnRates(LocalDate.now().minusDays(30), LocalDate.now());
     }
+    @Test
+    void 반품상세_상품_축으로_열면_사유와_신뢰도가_렌더링된다() throws Exception {
+        when(returnAnalyticsService.detailsByProduct(eq(11L), any(), any())).thenReturn(
+                List.of(new ReturnAnalyticsService.ReturnDetailRow(
+                        552L, 70000L, 11L, "상품 11", 2, "다른 색상이 왔어요",
+                        ReturnCategory.WRONG_ITEM, Confidence.HIGH)));
+
+        mockMvc.perform(get("/admin/returns/report/detail")
+                        .param("productId", "11")
+                        .param("from", "2026-03-01").param("to", "2026-03-31")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/return-detail-list"))
+                .andExpect(content().string(allOf(
+                        containsString("다른 색상이 왔어요"),
+                        containsString("오배송"),
+                        containsString("높음"),
+                        containsString("/admin/returns/552"))));   // 검수로 이어지는 링크
+    }
+
+    // 미분류는 범주 표의 다섯 번째 행이고 링크 모양이 나머지 넷과 같아야 한다.
+    // 컨트롤러가 UNCLASSIFIED를 null로 바꿔 넘기는지가 이 테스트의 핵심이다.
+    @Test
+    void 반품상세_미분류로_열면_범주_없이_렌더링된다() throws Exception {
+        when(returnAnalyticsService.detailsByCategory(isNull(), any(), any())).thenReturn(
+                List.of(new ReturnAnalyticsService.ReturnDetailRow(
+                        1L, 152L, 2L, "상품 2", 1, "test", null, null)));
+
+        mockMvc.perform(get("/admin/returns/report/detail")
+                        .param("category", "UNCLASSIFIED")
+                        .param("from", "2026-03-01").param("to", "2026-03-31")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(allOf(
+                        containsString("미분류"),
+                        containsString("test"))));
+
+        verify(returnAnalyticsService).detailsByCategory(isNull(),
+                eq(LocalDate.of(2026, 3, 1)), eq(LocalDate.of(2026, 3, 31)));
+    }
+
+    // 축 없이 열리는 경우 — 사용자가 URL을 잘라 붙이면 생긴다. 500이 아니라 안내여야 한다.
+    @Test
+    void 반품상세_축을_안_주면_500이_아니라_안내를_낸다() throws Exception {
+        mockMvc.perform(get("/admin/returns/report/detail")
+                        .param("from", "2026-03-01").param("to", "2026-03-31")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("상품이나 범주를 골라 주세요")));
+    }
+
 }
