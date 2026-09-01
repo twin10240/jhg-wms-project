@@ -20,6 +20,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -59,6 +61,13 @@ class ReturnAnalyticsServiceTest {
     private RmaReturn 반품(Long orderId, Long productId, int qty, String reason) {
         RmaReturn r = RmaReturn.create("RK-" + orderId + "-" + productId, orderId, reason);
         r.addItem(1L, productId, qty);
+        return rmaRepo.save(r);
+    }
+
+    /** 한 반품에 상품이 여러 개 든 형태. RmaService가 요청 품목마다 addItem을 부르므로 운영에 실재한다. */
+    private RmaReturn 반품_다품목(Long orderId, String reason, Map<Long, Integer> qtyByProduct) {
+        RmaReturn r = RmaReturn.create("RK-" + orderId + "-multi", orderId, reason);
+        qtyByProduct.forEach((productId, qty) -> r.addItem(1L, productId, qty));
         return rmaRepo.save(r);
     }
 
@@ -234,4 +243,51 @@ class ReturnAnalyticsServiceTest {
             assertThat(e.category()).isNull();
         });
     }
+    // 반품 건수는 이 화면의 머리 숫자이고, 그 값은 @EntityGraph의 fetch join이 루트를 중복
+    // 제거해 준다는 데 기대고 있다. 품목이 둘이면 조인 결과가 두 행인데 반품은 한 건이다.
+    // 저장소 어디에도 다품목 반품 테스트가 없어 이 성질이 무검증이었다.
+    @Test
+    void 한_반품에_상품이_둘이어도_반품_건수는_하나다() {
+        재고(1L, "상품 1");
+        재고(2L, "상품 2");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(2L, 20, "ORDER#100", LocalDate.of(2026, 3, 10));
+        반품_다품목(100L, "둘 다 문제였어요", new LinkedHashMap<>(Map.of(1L, 3, 2L, 4)));
+
+        var breakdown = service.categoryBreakdown(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(breakdown.totalReturns()).isEqualTo(1);
+        assertThat(breakdown.unclassified()).isEqualTo(1);
+    }
+
+    // 같은 반품이라도 수량은 품목마다 다르다. 반품 전체 수량을 두 상품에 똑같이 붙이면
+    // 두 상품의 반품률이 함께 틀린다.
+    @Test
+    void 한_반품에_상품이_둘이면_수량이_상품별로_따로_붙는다() {
+        재고(1L, "상품 1");
+        재고(2L, "상품 2");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(2L, 20, "ORDER#100", LocalDate.of(2026, 3, 10));
+        반품_다품목(100L, "둘 다 문제였어요", new LinkedHashMap<>(Map.of(1L, 3, 2L, 4)));
+
+        var report = service.productReturnRates(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(report.rows())
+                .extracting(ReturnAnalyticsService.ProductReturnRate::productId,
+                            ReturnAnalyticsService.ProductReturnRate::returnedQty,
+                            ReturnAnalyticsService.ProductReturnRate::returnRate)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(1L, 3, 0.3),
+                                 org.assertj.core.groups.Tuple.tuple(2L, 4, 0.2));
+
+        // 원문 조회도 같은 품목 단위여야 한다 — 상품별로 한 건씩, 그 상품의 수량으로.
+        assertThat(service.returnReasons(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)))
+                .singleElement()
+                .extracting(ReturnAnalyticsService.ReturnReasonEntry::requestedQuantity)
+                .isEqualTo(3);
+        assertThat(service.returnReasons(2L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)))
+                .singleElement()
+                .extracting(ReturnAnalyticsService.ReturnReasonEntry::requestedQuantity)
+                .isEqualTo(4);
+    }
+
 }
