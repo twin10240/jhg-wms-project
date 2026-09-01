@@ -598,6 +598,7 @@ class WmsAdminControllerTest {
                         containsString("8.0%"),           // 반품률이 퍼센트로 렌더링된다
                         containsString("피킹·출고"),        // 소관 라벨이 붙는다
                         containsString("미분류\n      <strong>1</strong>건 /"),   // 라벨만이 아니라 건수까지 숨기지 않는다
+                        containsString("<td>미분류</td>\n          <td>미분류</td>"),  // 표 안에서도 드러난다
                         containsString("관찰 경과: 기간 종료일로부터 5일"),   // 코호트 미성숙 경고 — 관찰일수 숨기지 않는다
                         containsString("주문 연결 불가 출고 <strong>2</strong>건은 분모에서 빠졌습니다"))));  // 분모 제외분 숨기지 않는다
     }
@@ -615,6 +616,23 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/return-report"))
                 .andExpect(content().string(containsString("시작일이 종료일보다 뒤입니다.")));
+    }
+
+    // 미분류가 0이면 행을 내지 않는다. 없는 것을 0으로 적어두면 읽는 사람이 매번
+    // "이건 뭐지"를 한 번씩 거친다 — 표는 지금 있는 것만 말해야 한다.
+    @Test
+    void 반품리포트_미분류가_0이면_행을_내지_않는다() throws Exception {
+        when(returnAnalyticsService.productReturnRates(any(), any())).thenReturn(
+                new ReturnAnalyticsService.ReturnRateReport(
+                        LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), 5, List.of(), 0));
+        when(returnAnalyticsService.categoryBreakdown(any(), any())).thenReturn(
+                new ReturnAnalyticsService.CategoryBreakdown(
+                        List.of(new ReturnAnalyticsService.CategoryCount(
+                                ReturnCategory.WRONG_ITEM, ReturnOwnerArea.PICKING, 3)), 0, 3));
+
+        mockMvc.perform(get("/admin/returns/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("<td>미분류</td>"))));
     }
 
     // 기간을 매번 손으로 넣게 하면 아무도 안 본다. 기본값이 있어야 링크 한 번으로 열린다.

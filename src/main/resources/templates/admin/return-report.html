@@ -69,6 +69,14 @@
           <td th:text="${c.ownerArea.label()}">포장·운송</td>
           <td style="text-align:right" th:text="${c.count}">0</td>
         </tr>
+        <!-- 범주가 아니라 범주의 부재다. 그래도 행으로 낸다 — 표만 보는 사람에게
+             네 줄의 합(분류된 건수)이 전체인 것처럼 읽히면, 분모가 다른 두 숫자를
+             한 화면에 놓는 사고가 표 안에서 그대로 일어난다. 0건이면 낼 이유가 없다. -->
+        <tr th:if="${breakdown.unclassified > 0}">
+          <td>미분류</td>
+          <td>미분류</td>
+          <td style="text-align:right" th:text="${breakdown.unclassified}">0</td>
+        </tr>
       </tbody>
     </table>
     </div>
