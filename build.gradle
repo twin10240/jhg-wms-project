@@ -41,6 +41,27 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
+// 실제 Claude API를 부르는 평가는 기본 test에서 뺀다.
+// CI가 ./gradlew build를 돌리고 그것이 test를 부르므로, 여기서 빼지 않으면
+// 매 push마다 과금된다. 이 저장소의 첫 @Tag 사용이다.
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'eval'
+	}
+}
+
+// 분류 품질 평가 전용. 실행: ./gradlew evalTest (ANTHROPIC_API_KEY 필요)
+tasks.register('evalTest', Test) {
+	group = 'verification'
+	description = '반품 사유 분류 품질 평가 — 실제 API를 호출하며 과금된다'
+	useJUnitPlatform {
+		includeTags 'eval'
+	}
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	// 매번 실제로 돌아야 의미가 있다. Gradle이 "변경 없음"으로 건너뛰지 않게 한다.
+	outputs.upToDateWhen { false }
+	testLogging {
+		showStandardStreams = true
+	}
 }

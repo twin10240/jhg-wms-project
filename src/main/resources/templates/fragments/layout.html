@@ -19,6 +19,7 @@
     <a th:href="@{/admin/purchase-orders}" th:classappend="${active == 'purchase-orders'} ? 'active'">발주</a>
     <a th:href="@{/admin/replenishment-requests}" th:classappend="${active == 'replenishment-requests'} ? 'active'">보충 요청</a>
     <a th:href="@{/admin/returns}" th:classappend="${active == 'returns'} ? 'active'">반품</a>
+    <a th:href="@{/admin/returns/report}" th:classappend="${active == 'returnreport'} ? 'active'">반품 리포트</a>
     <a th:href="@{/admin/cycle-counts}" th:classappend="${active == 'cycle-counts'} ? 'active'">실사</a>
     <span class="nav-user" sec:authentication="name">user</span>
     <form class="nav-logout" th:action="@{/logout}" method="post">

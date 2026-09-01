@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 반품 리포트')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('returnreport')}"></nav>
+<main>
+  <h2>반품 리포트</h2>
+
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <form class="form-row" method="get" th:action="@{/admin/returns/report}">
+    <label>시작일 <input type="date" name="from" th:value="${from}" /></label>
+    <label>종료일 <input type="date" name="to" th:value="${to}" /></label>
+    <button type="submit">조회</button>
+  </form>
+
+  <div th:if="${report != null}">
+    <p>
+      기간 내 출고된 주문을 모수로 셉니다.
+      <strong th:text="'관찰 경과: 기간 종료일로부터 ' + ${report.observedDays} + '일'">관찰 경과</strong>
+      — 경과가 짧으면 반품이 아직 들어오는 중이라 반품률이 실제보다 낮게 보입니다.
+    </p>
+    <p th:if="${report.unlinkedShipRows > 0}">
+      주문 연결 불가 출고 <strong th:text="${report.unlinkedShipRows}">0</strong>건은 분모에서 빠졌습니다.
+    </p>
+
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>상품 ID</th><th>상품명</th>
+          <th style="text-align:right">출고 수량</th>
+          <th style="text-align:right">반품 수량</th>
+          <th style="text-align:right">반품률</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="row : ${report.rows}">
+          <td th:text="${row.productId}">1</td>
+          <td th:text="${row.productName}">상품 1</td>
+          <td style="text-align:right" th:text="${row.shippedQty}">100</td>
+          <td style="text-align:right" th:text="${row.returnedQty}">8</td>
+          <td style="text-align:right"
+              th:text="${#numbers.formatDecimal(row.returnRate * 100, 1, 'NONE', 1, 'POINT')} + '%'">8.0%</td>
+        </tr>
+        <tr th:if="${report.rows.isEmpty()}">
+          <td colspan="5">기간 내 주문과 연결된 출고가 없습니다.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div th:if="${breakdown != null}">
+    <h3>반품 사유 범주</h3>
+    <p>
+      분류된 반품만 범주로 나뉩니다. 미분류
+      <strong th:text="${breakdown.unclassified}">0</strong>건 /
+      전체 <strong th:text="${breakdown.totalReturns}">0</strong>건.
+    </p>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>범주</th><th>소관</th><th style="text-align:right">건수</th></tr>
+      </thead>
+      <tbody>
+        <tr th:each="c : ${breakdown.counts}">
+          <td th:text="${c.category.label()}">파손</td>
+          <td th:text="${c.ownerArea.label()}">포장·운송</td>
+          <td style="text-align:right" th:text="${c.count}">0</td>
+        </tr>
+        <!-- 범주가 아니라 범주의 부재다. 그래도 행으로 낸다 — 표만 보는 사람에게
+             네 줄의 합(분류된 건수)이 전체인 것처럼 읽히면, 분모가 다른 두 숫자를
+             한 화면에 놓는 사고가 표 안에서 그대로 일어난다. 0건이면 낼 이유가 없다. -->
+        <tr th:if="${breakdown.unclassified > 0}">
+          <td>미분류</td>
+          <td>미분류</td>
+          <td style="text-align:right" th:text="${breakdown.unclassified}">0</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</main>
+</body>
+</html>

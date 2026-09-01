@@ -5,6 +5,7 @@ import com.jhg.wms.domain.RmaStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +22,10 @@ public interface RmaReturnRepository extends JpaRepository<RmaReturn, Long> {
 
     @EntityGraph(attributePaths = "items")
     List<RmaReturn> findByStatusOrderByIdDesc(RmaStatus status);
+
+    // 코호트 분자용. CANCELLED는 돌아오지 않은 반품이라 제외한다.
+    @EntityGraph(attributePaths = "items")
+    List<RmaReturn> findByOrderIdInAndStatusNot(Collection<Long> orderIds, RmaStatus status);
 
     @EntityGraph(attributePaths = "items")
     @Override

@@ -44,4 +44,12 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
            "WHERE t.createdAt >= :from AND t.createdAt < :to GROUP BY t.productId, t.type")
     List<Object[]> sumDeltaByProductAndTypeInPeriod(@Param("from") LocalDateTime from,
                                                     @Param("to") LocalDateTime to);
+
+    // 코호트 분모용. 기존 sumDelta* 와 같은 반개구간([from, to))을 쓴다 — 경계를 다르게 하면
+    // 같은 기간을 두 방식으로 세게 되어 수불대장과 리포트의 출고량이 어긋난다.
+    @Query("SELECT t FROM InventoryTransaction t " +
+           "WHERE t.type = :type AND t.createdAt >= :from AND t.createdAt < :to")
+    List<InventoryTransaction> findByTypeInPeriod(@Param("type") InventoryTransactionType type,
+                                                  @Param("from") LocalDateTime from,
+                                                  @Param("to") LocalDateTime to);
 }
