@@ -1,5 +1,6 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.domain.Confidence;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
@@ -30,6 +31,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 반품 분석 조회. 읽기만 한다 — 재고·반품·분류를 만들지도 고치지도 않는다.
@@ -140,12 +142,13 @@ public class ReturnAnalyticsService {
 
     public CategoryBreakdown categoryBreakdown(LocalDate from, LocalDate to) {
         List<RmaReturn> returns = cohortReturns(cohort(from, to));
-        Map<Long, ReturnCategory> categoryByReturn = categoriesOf(returns);
+        Map<Long, ReturnClassification> classificationByReturn = classificationsOf(returns);
 
         Map<ReturnCategory, Integer> counts = new EnumMap<>(ReturnCategory.class);
         int unclassified = 0;
         for (RmaReturn r : returns) {
-            ReturnCategory category = categoryByReturn.get(r.getId());
+            ReturnClassification c = classificationByReturn.get(r.getId());
+            ReturnCategory category = c == null ? null : c.getCategory();
             if (category == null) unclassified++;
             else counts.merge(category, 1, Integer::sum);
         }
@@ -160,33 +163,63 @@ public class ReturnAnalyticsService {
     }
 
     /**
-     * 상품 하나의 반품 사유 원문. 이 단계의 화면은 쓰지 않는다 — 2단계에서 MCP 도구가
-     * 부를 조회다. 지금 넣는 이유는 집계와 원문 조회가 같은 코호트 정의를 공유해야 하기
-     * 때문이다. 나중에 따로 만들면 두 정의가 갈라진다.
+     * 상세 화면의 한 행. 반품 하나가 상품 둘을 담으면 행도 둘이다 — 수량이 품목마다 다르기 때문이다.
+     *
+     * category·confidence가 null이면 미분류다. 분류는 V4.0부터 붙어서 그 이전 반품에는 없다.
      */
-    public record ReturnReasonEntry(Long rmaReturnId, Long orderId, String reason,
-                                    ReturnCategory category, int requestedQuantity) {}
+    public record ReturnDetailRow(Long rmaReturnId, Long orderId, Long productId, String productName,
+                                  int requestedQuantity, String reason,
+                                  ReturnCategory category, Confidence confidence) {}
 
-    public List<ReturnReasonEntry> returnReasons(Long productId, LocalDate from, LocalDate to) {
-        List<RmaReturn> returns = cohortReturns(cohort(from, to));
-        Map<Long, ReturnCategory> categoryByReturn = categoriesOf(returns);
-
-        List<ReturnReasonEntry> entries = new ArrayList<>();
-        for (RmaReturn r : returns)
-            for (RmaReturnItem i : r.getItems())
-                if (i.getProductId().equals(productId))
-                    entries.add(new ReturnReasonEntry(r.getId(), r.getOrderId(), r.getReason(),
-                            categoryByReturn.get(r.getId()), i.getRequestedQuantity()));
-        return entries;
+    public List<ReturnDetailRow> detailsByProduct(Long productId, LocalDate from, LocalDate to) {
+        return allDetails(from, to).stream()
+                .filter(row -> row.productId().equals(productId))
+                .toList();
     }
 
-    /** 반품 → 범주. 분류가 없는 반품은 키가 없다(미분류). */
-    private Map<Long, ReturnCategory> categoriesOf(List<RmaReturn> returns) {
+    /** category가 null이면 미분류만 낸다 — 화면에서 미분류는 범주 표의 다섯 번째 행이다. */
+    public List<ReturnDetailRow> detailsByCategory(ReturnCategory category, LocalDate from, LocalDate to) {
+        return allDetails(from, to).stream()
+                .filter(row -> row.category() == category)
+                .toList();
+    }
+
+    /**
+     * 코호트의 모든 품목을 행으로 편다. 두 축이 여기서 갈라지므로 정의가 하나로 유지된다.
+     *
+     * ponytail: 전부 만들고 메모리에서 거른다. 30일 창의 반품 품목 수가 이 규모에선 작다.
+     * 한 축의 결과가 화면 한 장을 넘길 만큼 커지면 그때 저장소 쿼리로 내린다.
+     */
+    private List<ReturnDetailRow> allDetails(LocalDate from, LocalDate to) {
+        List<RmaReturn> returns = cohortReturns(cohort(from, to));
+        Map<Long, ReturnClassification> classificationByReturn = classificationsOf(returns);
+
+        Map<Long, String> names = new HashMap<>();
+        for (Inventory inv : inventoryRepository.findByProductIdIn(
+                returns.stream().flatMap(r -> r.getItems().stream())
+                        .map(RmaReturnItem::getProductId).collect(Collectors.toSet())))
+            names.put(inv.getProductId(), inv.getProductName());
+
+        List<ReturnDetailRow> rows = new ArrayList<>();
+        for (RmaReturn r : returns) {
+            ReturnClassification c = classificationByReturn.get(r.getId());
+            for (RmaReturnItem i : r.getItems())
+                rows.add(new ReturnDetailRow(r.getId(), r.getOrderId(), i.getProductId(),
+                        Objects.requireNonNullElse(names.get(i.getProductId()), "(이름 없음)"),
+                        i.getRequestedQuantity(), r.getReason(),
+                        c == null ? null : c.getCategory(),
+                        c == null ? null : c.getConfidence()));
+        }
+        return rows;
+    }
+
+    /** 반품 → 분류. 분류가 없는 반품은 키가 없다(미분류). */
+    private Map<Long, ReturnClassification> classificationsOf(List<RmaReturn> returns) {
         if (returns.isEmpty()) return Map.of();
         List<Long> ids = returns.stream().map(RmaReturn::getId).toList();
-        Map<Long, ReturnCategory> byReturn = new HashMap<>();
+        Map<Long, ReturnClassification> byReturn = new HashMap<>();
         for (ReturnClassification c : classificationRepository.findByRmaReturnIdIn(ids))
-            byReturn.put(c.getRmaReturnId(), c.getCategory());
+            byReturn.put(c.getRmaReturnId(), c);
         return byReturn;
     }
 }
