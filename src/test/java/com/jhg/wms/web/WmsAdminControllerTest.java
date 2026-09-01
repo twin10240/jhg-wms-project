@@ -688,6 +688,37 @@ class WmsAdminControllerTest {
     }
 
     @Test
+    void 범위가_다_걸리면_대조줄을_렌더한다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+        when(inventoryService.ledgerRowOf(eq(1L), any(), any())).thenReturn(java.util.Optional.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("기초").contains("100").contains("이동").contains("108");
+    }
+
+    // 범위가 없으면 기초·기말이 정의되지 않는다 — 빈 껍데기를 두지 않는다.
+    @Test
+    void 범위가_없으면_대조줄을_렌더하지_않고_조회도_하지_않는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR")).param("productId", "1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("ledger-recon");
+        verify(inventoryService, never()).ledgerRowOf(any(), any(), any());
+    }
+
+    @Test
     void 대시보드는_승인대기_실사_건수를_보여준다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of());
         when(purchaseOrderService.findAllWithItems()).thenReturn(List.of());

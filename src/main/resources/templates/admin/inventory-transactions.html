@@ -24,6 +24,15 @@
        th:href="@{/admin/inventory/transactions}">범위 해제</a>
   </p>
 
+  <!-- 드릴다운이 요약과 맞는지를 화면에서 확인한다. 아래 목록의 변동 합이 '이동'과 달라지면
+       수불대장과 상세가 다른 이야기를 하는 것이고, 그건 두 숫자를 다 못 믿게 만든다.
+       숫자는 수불대장을 만드는 buildLedger에서 그대로 나온다. -->
+  <p th:if="${ledgerRow != null}" class="hint" id="ledger-recon">
+    기초 <b th:text="${ledgerRow.opening}">100</b>
+    + 이동 <b th:text="${ledgerRow.closing - ledgerRow.opening}">8</b>
+    = 기말 <b th:text="${ledgerRow.closing}">108</b>
+  </p>
+
   <p>
     <a th:href="@{/admin/inventory/transactions(productId=${productId},from=${from},to=${to})}">전체</a>
     | <a th:href="@{/admin/inventory/transactions(type='OPENING',productId=${productId},from=${from},to=${to})}">기초</a>

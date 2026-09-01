@@ -833,4 +833,26 @@ class InventoryServiceTest {
         assertThat(service.ledgerRowOf(999L,
                 LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30))).isEmpty();
     }
+
+    // 이 기능이 성립한다는 것의 정의: 대조 줄의 '이동'과 같은 범위 트랜잭션의 변동 합이 같다.
+    // 나머지가 다 통과해도 이게 깨지면 드릴다운이 요약과 다른 이야기를 하는 것이다.
+    @Test
+    void 대조줄의_이동과_범위_트랜잭션_변동합이_같다() {
+        seedTxnAt(1L, InventoryTransactionType.OPENING, 100, LocalDateTime.of(2026, 8, 1, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 20, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.SHIP, -15, LocalDateTime.of(2026, 9, 11, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.RETURN, 3, LocalDateTime.of(2026, 9, 20, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 99, LocalDateTime.of(2026, 10, 5, 10, 0));
+        seedTxnAt(2L, InventoryTransactionType.RECEIVE, 77, LocalDateTime.of(2026, 9, 5, 10, 0));
+
+        LocalDate from = LocalDate.of(2026, 9, 1), to = LocalDate.of(2026, 9, 30);
+        var row = service.ledgerRowOf(1L, from, to).orElseThrow();
+        int deltaSum = service.findTransactions(null, 1L, from, to, PageRequest.of(0, 100))
+                .getContent().stream().mapToInt(InventoryTransaction::getDelta).sum();
+
+        assertThat(row.closing() - row.opening()).isEqualTo(deltaSum);
+        assertThat(deltaSum).isEqualTo(8);
+        assertThat(row.opening()).isEqualTo(100);
+        assertThat(row.closing()).isEqualTo(108);
+    }
 }

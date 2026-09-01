@@ -127,6 +127,10 @@ public class WmsAdminController {
         model.addAttribute("productId", productId);
         model.addAttribute("from", from);
         model.addAttribute("to", to);
+        // 셋이 다 있을 때만 기초·기말이 정의된다. 그때만 조회하고, 그때만 템플릿이 대조 줄을 낸다.
+        if (productId != null && from != null && to != null)
+            inventoryService.ledgerRowOf(productId, from, to)
+                    .ifPresent(row -> model.addAttribute("ledgerRow", row));
         return "admin/inventory-transactions";
     }
 
