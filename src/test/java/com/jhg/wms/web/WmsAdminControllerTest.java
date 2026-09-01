@@ -598,7 +598,8 @@ class WmsAdminControllerTest {
                 .andExpect(content().string(allOf(
                         containsString("8.0%"),           // 반품률이 퍼센트로 렌더링된다
                         containsString("피킹·출고"),        // 소관 라벨이 붙는다
-                        containsString("미분류\n      <strong>1</strong>건 /"),   // 라벨만이 아니라 건수까지 숨기지 않는다
+                        containsString("<strong>전체</strong>"),          // 합계 행이 표 안에 있다
+                        containsString("<strong>4</strong>"),             // 그 합계가 전체 반품 건수다
                         containsString("<td>미분류</td>"),               // 표 안에서도 드러난다
                         containsString("category=UNCLASSIFIED"),        // 미분류도 나머지 넷과 같은 링크로 열린다
                         containsString("관찰 경과: 기간 종료일로부터 5일"),   // 코호트 미성숙 경고 — 관찰일수 숨기지 않는다
