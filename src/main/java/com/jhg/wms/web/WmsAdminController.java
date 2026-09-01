@@ -128,7 +128,9 @@ public class WmsAdminController {
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         // 셋이 다 있을 때만 기초·기말이 정의된다. 그때만 조회하고, 그때만 템플릿이 대조 줄을 낸다.
-        if (productId != null && from != null && to != null)
+        // from이 to보다 뒤인 역전 범위는 buildLedger가 예외를 던진다 — 이 URL은 원래
+        // 트랜잭션 목록이 빈 채로 정상 렌더됐으므로, 대조 줄만 빼고 그 동작을 그대로 지킨다.
+        if (productId != null && from != null && to != null && !from.isAfter(to))
             inventoryService.ledgerRowOf(productId, from, to)
                     .ifPresent(row -> model.addAttribute("ledgerRow", row));
         return "admin/inventory-transactions";

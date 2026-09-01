@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.data.domain.PageImpl;
@@ -700,7 +701,14 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(html).contains("기초").contains("100").contains("이동").contains("108");
+        // 탭 라벨("기초")과 이동 줄 위 HTML 주석("이동")은 대조 줄이 통째로 사라져도
+        // 그대로 남는다 — id로 대조 줄만 뽑아 태그를 지우고 각 숫자를 라벨에 붙여 확인해야
+        // 델타(closing - opening) 계산이 실제로 검증된다.
+        Matcher recon = Pattern.compile("<p[^>]*id=\"ledger-recon\"[^>]*>(.*?)</p>", Pattern.DOTALL)
+                .matcher(html);
+        assertThat(recon.find()).as("대조 줄이 렌더돼야 한다").isTrue();
+        String reconText = recon.group(1).replaceAll("<[^>]*>", "").replaceAll("\\s+", " ").trim();
+        assertThat(reconText).isEqualTo("기초 100 + 이동 8 = 기말 108");
     }
 
     // 범위가 없으면 기초·기말이 정의되지 않는다 — 빈 껍데기를 두지 않는다.
@@ -711,6 +719,24 @@ class WmsAdminControllerTest {
 
         String html = mockMvc.perform(get("/admin/inventory/transactions")
                         .with(user("op").roles("OPERATOR")).param("productId", "1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("ledger-recon");
+        verify(inventoryService, never()).ledgerRowOf(any(), any(), any());
+    }
+
+    // from이 to보다 뒤인 역전 범위 — buildLedger가 던지는 IllegalArgumentException이
+    // 이 핸들러까지 올라오면 500이 된다. 이전에는(대조 줄 도입 전) 같은 URL이 빈 목록으로
+    // 정상 렌더됐으므로 그 동작을 그대로 지켜야 한다.
+    @Test
+    void 시작일이_종료일보다_뒤면_대조줄_없이_정상_렌더한다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-30").param("to", "2026-09-01"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
