@@ -1,8 +1,13 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.domain.Confidence;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
+import com.jhg.wms.domain.ReturnCategory;
+import com.jhg.wms.domain.ReturnClassification;
+import com.jhg.wms.domain.ReturnOwnerArea;
+import com.jhg.wms.domain.RmaDisposition;
 import com.jhg.wms.domain.RmaReturn;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.InventoryTransactionRepository;
@@ -138,5 +143,58 @@ class ReturnAnalyticsServiceTest {
         assertThat(report.rows()).hasSize(3);
         assertThat(report.rows()).extracting(ReturnAnalyticsService.ProductReturnRate::productId)
                 .containsExactly(1L, 2L, 3L);
+    }
+
+    private void 분류(Long rmaReturnId, ReturnCategory category) {
+        classificationRepo.save(ReturnClassification.create(rmaReturnId, category, Confidence.HIGH,
+                "근거", RmaDisposition.RESTOCKED, "claude-haiku-4-5-20251001", 100, 10));
+    }
+
+    @Test
+    void 범주별_건수에_소관이_함께_나온다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#101", LocalDate.of(2026, 3, 10));
+        분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+        분류(반품(101L, 1L, 1, "깨져서 왔어요").getId(), ReturnCategory.DAMAGED);
+
+        var breakdown = service.categoryBreakdown(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(breakdown.counts())
+                .extracting(ReturnAnalyticsService.CategoryCount::category,
+                            ReturnAnalyticsService.CategoryCount::ownerArea,
+                            ReturnAnalyticsService.CategoryCount::count)
+                .contains(org.assertj.core.groups.Tuple.tuple(
+                                ReturnCategory.WRONG_ITEM, ReturnOwnerArea.PICKING, 1),
+                          org.assertj.core.groups.Tuple.tuple(
+                                ReturnCategory.DAMAGED, ReturnOwnerArea.PACKAGING, 1));
+    }
+
+    // 숨기면 합계가 안 맞고, 분류된 몇 건짜리 분포를 전체의 그림으로 읽게 된다.
+    @Test
+    void 분류가_없는_반품은_미분류로_따로_센다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#101", LocalDate.of(2026, 3, 10));
+        분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+        반품(101L, 1L, 1, "그냥요");
+
+        var breakdown = service.categoryBreakdown(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(breakdown.unclassified()).isEqualTo(1);
+        assertThat(breakdown.totalReturns()).isEqualTo(2);
+    }
+
+    @Test
+    void 코호트_밖_반품은_범주_분포에_들어가지_않는다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#900", LocalDate.of(2026, 1, 10));   // 기간 밖 출고
+        분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+        분류(반품(900L, 1L, 1, "깨져서 왔어요").getId(), ReturnCategory.DAMAGED);
+
+        var breakdown = service.categoryBreakdown(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(breakdown.totalReturns()).isEqualTo(1);
     }
 }

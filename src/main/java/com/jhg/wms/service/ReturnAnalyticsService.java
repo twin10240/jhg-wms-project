@@ -3,6 +3,9 @@ package com.jhg.wms.service;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
+import com.jhg.wms.domain.ReturnCategory;
+import com.jhg.wms.domain.ReturnClassification;
+import com.jhg.wms.domain.ReturnOwnerArea;
 import com.jhg.wms.domain.RmaReturn;
 import com.jhg.wms.domain.RmaReturnItem;
 import com.jhg.wms.domain.RmaStatus;
@@ -17,6 +20,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -124,5 +128,40 @@ public class ReturnAnalyticsService {
         // 코호트가 아직 성숙하지 않았을 수 있다. 보정하지 않고 경과일을 그대로 낸다.
         long observedDays = Math.max(0, ChronoUnit.DAYS.between(to, LocalDate.now()));
         return new ReturnRateReport(from, to, (int) observedDays, rows, cohort.unlinkedShipRows());
+    }
+
+    public record CategoryCount(ReturnCategory category, ReturnOwnerArea ownerArea, int count) {}
+
+    public record CategoryBreakdown(List<CategoryCount> counts, int unclassified, int totalReturns) {}
+
+    public CategoryBreakdown categoryBreakdown(LocalDate from, LocalDate to) {
+        List<RmaReturn> returns = cohortReturns(cohort(from, to));
+        Map<Long, ReturnCategory> categoryByReturn = categoriesOf(returns);
+
+        Map<ReturnCategory, Integer> counts = new EnumMap<>(ReturnCategory.class);
+        int unclassified = 0;
+        for (RmaReturn r : returns) {
+            ReturnCategory category = categoryByReturn.get(r.getId());
+            if (category == null) unclassified++;
+            else counts.merge(category, 1, Integer::sum);
+        }
+
+        // 0건인 범주도 행을 낸다. 빠진 범주와 0건인 범주는 읽는 사람에게 다른 뜻이다.
+        List<CategoryCount> rows = new ArrayList<>();
+        for (ReturnCategory category : ReturnCategory.values())
+            rows.add(new CategoryCount(category, ReturnOwnerArea.of(category),
+                    counts.getOrDefault(category, 0)));
+
+        return new CategoryBreakdown(rows, unclassified, returns.size());
+    }
+
+    /** 반품 → 범주. 분류가 없는 반품은 키가 없다(미분류). */
+    private Map<Long, ReturnCategory> categoriesOf(List<RmaReturn> returns) {
+        if (returns.isEmpty()) return Map.of();
+        List<Long> ids = returns.stream().map(RmaReturn::getId).toList();
+        Map<Long, ReturnCategory> byReturn = new HashMap<>();
+        for (ReturnClassification c : classificationRepository.findByRmaReturnIdIn(ids))
+            byReturn.put(c.getRmaReturnId(), c.getCategory());
+        return byReturn;
     }
 }
