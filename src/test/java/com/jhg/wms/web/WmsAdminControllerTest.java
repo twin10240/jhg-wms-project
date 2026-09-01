@@ -597,7 +597,24 @@ class WmsAdminControllerTest {
                 .andExpect(content().string(allOf(
                         containsString("8.0%"),           // 반품률이 퍼센트로 렌더링된다
                         containsString("피킹·출고"),        // 소관 라벨이 붙는다
-                        containsString("미분류"))));        // 숨기지 않는다
+                        containsString("미분류"),           // 숨기지 않는다
+                        containsString("관찰 경과: 기간 종료일로부터 5일"),   // 코호트 미성숙 경고 — 관찰일수 숨기지 않는다
+                        containsString("주문 연결 불가 출고 <strong>2</strong>건은 분모에서 빠졌습니다"))));  // 분모 제외분 숨기지 않는다
+    }
+
+    // from > to면 서비스가 IllegalArgumentException을 던지고 컨트롤러는 report/breakdown에 null을 넣는다.
+    // 템플릿의 th:if null 가드만이 그 자리에서 500이 나는 걸 막아준다 — 그 가드를 지키는 테스트가 없었다.
+    @Test
+    void 반품리포트_기간이_뒤집히면_500이_아니라_에러메시지를_렌더링한다() throws Exception {
+        when(returnAnalyticsService.productReturnRates(any(), any()))
+                .thenThrow(new IllegalArgumentException("시작일이 종료일보다 뒤입니다."));
+
+        mockMvc.perform(get("/admin/returns/report")
+                        .param("from", "2026-03-31").param("to", "2026-03-01")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/return-report"))
+                .andExpect(content().string(containsString("시작일이 종료일보다 뒤입니다.")));
     }
 
     // 기간을 매번 손으로 넣게 하면 아무도 안 본다. 기본값이 있어야 링크 한 번으로 열린다.
