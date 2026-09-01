@@ -29,8 +29,8 @@
       <thead>
         <tr>
           <th>상품 ID</th><th>상품명</th>
-          <th style="text-align:right">출고</th>
-          <th style="text-align:right">반품</th>
+          <th style="text-align:right">출고 수량</th>
+          <th style="text-align:right">반품 수량</th>
           <th style="text-align:right">반품률</th>
         </tr>
       </thead>
@@ -41,7 +41,7 @@
           <td style="text-align:right" th:text="${row.shippedQty}">100</td>
           <td style="text-align:right" th:text="${row.returnedQty}">8</td>
           <td style="text-align:right"
-              th:text="${#numbers.formatDecimal(row.returnRate * 100, 1, 1)} + '%'">8.0%</td>
+              th:text="${#numbers.formatDecimal(row.returnRate * 100, 1, 'NONE', 1, 'POINT')} + '%'">8.0%</td>
         </tr>
         <tr th:if="${report.rows.isEmpty()}">
           <td colspan="5">기간 내 주문과 연결된 출고가 없습니다.</td>
@@ -65,7 +65,7 @@
       </thead>
       <tbody>
         <tr th:each="c : ${breakdown.counts}">
-          <td th:text="${c.category}">DAMAGED</td>
+          <td th:text="${c.category.label()}">파손</td>
           <td th:text="${c.ownerArea.label()}">포장·운송</td>
           <td style="text-align:right" th:text="${c.count}">0</td>
         </tr>

@@ -20,7 +20,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -134,9 +133,11 @@ class ReturnAnalyticsServiceTest {
         출고(2L, 50, "ORDER#101", LocalDate.of(2026, 3, 10));
         반품(101L, 2L, 10, "파손");
 
-        // 상품 C: 반품률 0.05 (100 출고 중 5 반품) — 가장 낮은 반품률
-        출고(3L, 100, "ORDER#102", LocalDate.of(2026, 3, 10));
-        반품(102L, 3L, 5, "파손");
+        // 상품 C: 반품률 0.05 (1000 출고 중 50 반품) — 반품률은 가장 낮은데 반품수량은 가장 많다.
+        // 두 키를 일부러 반대로 놓는다. 상관돼 있으면 주 정렬 키가 반품수량으로 바뀌어도
+        // 같은 순서가 나와 테스트가 통과한다 — 그때 리포트는 "위험한 순"이 아니라 "물량 순"이 된다.
+        출고(3L, 1000, "ORDER#102", LocalDate.of(2026, 3, 10));
+        반품(102L, 3L, 50, "파손");
 
         var report = service.productReturnRates(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
 

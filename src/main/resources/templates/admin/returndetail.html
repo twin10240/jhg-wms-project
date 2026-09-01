@@ -31,12 +31,7 @@
     <dl>
       <dt>분류</dt>
       <dd>
-        <span th:switch="${classification.category.name()}">
-          <span th:case="'DAMAGED'">파손</span>
-          <span th:case="'WRONG_ITEM'">오배송</span>
-          <span th:case="'CHANGED_MIND'">변심</span>
-          <span th:case="*">기타</span>
-        </span>
+        <span th:text="${classification.category.label()}">파손</span>
         · 신뢰도
         <span th:switch="${classification.confidence.name()}">
           <span th:case="'HIGH'">높음</span>

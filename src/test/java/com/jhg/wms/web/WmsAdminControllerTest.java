@@ -597,7 +597,7 @@ class WmsAdminControllerTest {
                 .andExpect(content().string(allOf(
                         containsString("8.0%"),           // 반품률이 퍼센트로 렌더링된다
                         containsString("피킹·출고"),        // 소관 라벨이 붙는다
-                        containsString("미분류"),           // 숨기지 않는다
+                        containsString("미분류\n      <strong>1</strong>건 /"),   // 라벨만이 아니라 건수까지 숨기지 않는다
                         containsString("관찰 경과: 기간 종료일로부터 5일"),   // 코호트 미성숙 경고 — 관찰일수 숨기지 않는다
                         containsString("주문 연결 불가 출고 <strong>2</strong>건은 분모에서 빠졌습니다"))));  // 분모 제외분 숨기지 않는다
     }

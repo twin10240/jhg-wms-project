@@ -73,6 +73,10 @@ public class ReturnAnalyticsService {
      */
     private record Cohort(Map<Long, Integer> shippedQtyByProduct, Set<Long> orderIds, int unlinkedShipRows) {}
 
+    // ponytail: 한 화면에서 코호트를 두 번 짓는다(집계 메서드마다 1회). SHIP 스캔과 반품 조회가
+    // 요청당 두 벌 돌고, productId·delta·reference만 쓰면서 엔티티를 통째로 띄운다. 지금 규모에선
+    // 싸고 두 메서드로 나눈 것이 설계의 모양이다. 30일 창이 비싸지면 projection 쿼리로 바꾸거나
+    // 두 결과를 한 번에 내는 호출로 합친다.
     private Cohort cohort(LocalDate from, LocalDate to) {
         if (from.isAfter(to)) throw new IllegalArgumentException("시작일이 종료일보다 뒤입니다.");
         List<InventoryTransaction> ships = transactionRepository.findByTypeInPeriod(
