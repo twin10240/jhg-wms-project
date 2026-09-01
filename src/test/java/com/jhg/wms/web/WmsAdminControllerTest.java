@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -564,6 +565,57 @@ class WmsAdminControllerTest {
                 "행위자가 있는 행은 사유 컬럼 다음 셀에 사용자명을 표시해야 한다");
         assertTrue(Pattern.compile("구 데이터</td>\\s*<td>—</td>").matcher(html).find(),
                 "행위자가 없는 행은 사유 컬럼 다음 셀에 —를 표시해야 한다");
+    }
+
+    @Test
+    void 이력화면이_상품과_기간을_받아_서비스에_넘긴다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("productId", 1L))
+                .andExpect(model().attribute("from", java.time.LocalDate.of(2026, 9, 1)))
+                .andExpect(model().attribute("to", java.time.LocalDate.of(2026, 9, 30)));
+
+        // Mockito는 매처를 하나라도 쓰면 전 인자를 매처로 요구한다 — null·1L도 eq()로 감싼다.
+        verify(inventoryService).findTransactions(eq(null), eq(1L),
+                eq(java.time.LocalDate.of(2026, 9, 1)), eq(java.time.LocalDate.of(2026, 9, 30)), any());
+    }
+
+    // 탭이 범위를 떨어뜨리면 유형을 누를 때마다 전역 저널로 튕겨 드릴다운이 한 번 쓰고 끝난다.
+    @Test
+    void 유형탭과_범위해제_링크가_범위를_유지하거나_턴다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 유형 탭은 범위를 실어 나른다 — 네 값이 같은 href 안에 다 있어야 한다.
+        // 페이지 어딘가에 흩어져 있는 것만으로는(다른 탭이 productId를 들고 있어도)
+        // 이 탭 하나가 범위를 놓쳤는지 구분하지 못한다.
+        assertThat(html).containsPattern(
+                "href=\"[^\"]*type=RECEIVE[^\"]*productId=1[^\"]*from=2026-09-01[^\"]*to=2026-09-30[^\"]*\"");
+        // 범위 해제는 상품·기간을 떼고 유형만 남긴다
+        assertThat(html).containsPattern("href=\"[^\"]*/admin/inventory/transactions\"[^>]*>\\s*범위 해제");
+    }
+
+    @Test
+    void 범위가_없으면_범위배지를_렌더하지_않는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("범위 해제");
     }
 
     @Test

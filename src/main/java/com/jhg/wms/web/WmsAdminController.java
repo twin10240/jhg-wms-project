@@ -110,16 +110,23 @@ public class WmsAdminController {
 
     @GetMapping("/admin/inventory/transactions")
     public String inventoryTransactions(@RequestParam(required = false) InventoryTransactionType type,
+                                        @RequestParam(required = false) Long productId,
+                                        @RequestParam(required = false) LocalDate from,
+                                        @RequestParam(required = false) LocalDate to,
                                         @RequestParam(defaultValue = "0") int page,
                                         Model model) {
         var pageable = org.springframework.data.domain.PageRequest.of(page, 20);
-        var txnPage = inventoryService.findTransactions(type, null, null, null, pageable);
+        var txnPage = inventoryService.findTransactions(type, productId, from, to, pageable);
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         model.addAttribute("transactions", txnPage.getContent());
         model.addAttribute("currentPage", txnPage.getNumber());
         model.addAttribute("totalPages", txnPage.getTotalPages());
         model.addAttribute("filterType", type);
+        // 템플릿이 탭·페이징 링크에 그대로 실어 나른다 — 없으면 유형을 누를 때마다 범위가 풀린다.
+        model.addAttribute("productId", productId);
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
         return "admin/inventory-transactions";
     }
 

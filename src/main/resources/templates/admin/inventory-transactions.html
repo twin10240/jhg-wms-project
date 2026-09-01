@@ -6,14 +6,28 @@
 <main>
   <h2>재고 트랜잭션 이력</h2>
 
+  <!-- 범위가 걸렸을 때만. 빈 껍데기를 두면 전역 저널에도 의미 없는 줄이 남는다. -->
+  <p th:if="${productId != null or from != null}" class="hint">
+    <span th:if="${productId != null}"
+          th:text="${productNames.getOrDefault(productId, '상품#' + productId)}">상품 1</span>
+    <span th:if="${from != null}"
+          th:text="' · ' + ${from} + ' ~ ' + ${to}"> · 2026-09-01 ~ 2026-09-30</span>
+    <!-- Thymeleaf 링크식은 파라미터 값이 null이어도 "type="처럼 빈 값으로 남긴다 —
+         유형이 안 걸려 있을 땐(filterType == null) 아예 유형 파라미터를 빼야 진짜 "전체"로 돌아간다. -->
+    <a th:if="${filterType != null}"
+       th:href="@{/admin/inventory/transactions(type=${filterType})}">범위 해제</a>
+    <a th:if="${filterType == null}"
+       th:href="@{/admin/inventory/transactions}">범위 해제</a>
+  </p>
+
   <p>
-    <a th:href="@{/admin/inventory/transactions}">전체</a>
-    | <a th:href="@{/admin/inventory/transactions(type='OPENING')}">기초</a>
-    | <a th:href="@{/admin/inventory/transactions(type='RECEIVE')}">입고</a>
-    | <a th:href="@{/admin/inventory/transactions(type='SHIP')}">출고</a>
-    | <a th:href="@{/admin/inventory/transactions(type='ADJUST')}">조정</a>
-    | <a th:href="@{/admin/inventory/transactions(type='RETURN')}">반품</a>
-    | <a th:href="@{/admin/inventory/transactions(type='COUNT')}">실사</a>
+    <a th:href="@{/admin/inventory/transactions(productId=${productId},from=${from},to=${to})}">전체</a>
+    | <a th:href="@{/admin/inventory/transactions(type='OPENING',productId=${productId},from=${from},to=${to})}">기초</a>
+    | <a th:href="@{/admin/inventory/transactions(type='RECEIVE',productId=${productId},from=${from},to=${to})}">입고</a>
+    | <a th:href="@{/admin/inventory/transactions(type='SHIP',productId=${productId},from=${from},to=${to})}">출고</a>
+    | <a th:href="@{/admin/inventory/transactions(type='ADJUST',productId=${productId},from=${from},to=${to})}">조정</a>
+    | <a th:href="@{/admin/inventory/transactions(type='RETURN',productId=${productId},from=${from},to=${to})}">반품</a>
+    | <a th:href="@{/admin/inventory/transactions(type='COUNT',productId=${productId},from=${from},to=${to})}">실사</a>
   </p>
   <div class="table-wrap">
   <table>
@@ -53,18 +67,18 @@
 
   <div class="paging" th:if="${totalPages > 1}">
     <a th:if="${currentPage > 0}"
-       th:href="@{/admin/inventory/transactions(type=${filterType}, page=${currentPage - 1})}">← 이전</a>
+       th:href="@{/admin/inventory/transactions(type=${filterType},productId=${productId},from=${from},to=${to},page=${currentPage - 1})}">← 이전</a>
     <th:block th:each="i : ${#numbers.sequence(0, totalPages - 1)}">
       <th:block th:if="${i == 0 or i == totalPages - 1 or (i >= currentPage - 1 and i <= currentPage + 1)}">
         <strong th:if="${i == currentPage}" th:text="${i + 1}">1</strong>
         <a th:unless="${i == currentPage}"
-           th:href="@{/admin/inventory/transactions(type=${filterType}, page=${i})}"
+           th:href="@{/admin/inventory/transactions(type=${filterType},productId=${productId},from=${from},to=${to},page=${i})}"
            th:text="${i + 1}">1</a>
       </th:block>
       <span th:if="${(i == 1 and currentPage > 2) or (i == totalPages - 2 and currentPage < totalPages - 3)}">…</span>
     </th:block>
     <a th:if="${currentPage + 1 < totalPages}"
-       th:href="@{/admin/inventory/transactions(type=${filterType}, page=${currentPage + 1})}">다음 →</a>
+       th:href="@{/admin/inventory/transactions(type=${filterType},productId=${productId},from=${from},to=${to},page=${currentPage + 1})}">다음 →</a>
   </div>
 </main>
 </body>
