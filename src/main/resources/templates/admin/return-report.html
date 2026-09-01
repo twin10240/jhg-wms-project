@@ -38,8 +38,7 @@
         <tr th:each="row : ${report.rows}"
             th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},productId=${row.productId})}">
           <td th:text="${row.productId}">1</td>
-          <td><a th:href="@{/admin/returns/report/detail(from=${from},to=${to},productId=${row.productId})}"
-                 th:text="${row.productName}">상품 1</a></td>
+          <td th:text="${row.productName}">상품 1</td>
           <td style="text-align:right" th:text="${row.shippedQty}">100</td>
           <td style="text-align:right" th:text="${row.returnedQty}">8</td>
           <td style="text-align:right"
@@ -63,8 +62,7 @@
       <tbody>
         <tr th:each="c : ${breakdown.counts}"
             th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},category=${c.category.name()})}">
-          <td><a th:href="@{/admin/returns/report/detail(from=${from},to=${to},category=${c.category.name()})}"
-                 th:text="${c.category.label()}">파손</a></td>
+          <td th:text="${c.category.label()}">파손</td>
           <td th:text="${c.ownerArea.label()}">포장·운송</td>
           <td style="text-align:right" th:text="${c.count}">0</td>
         </tr>
@@ -73,7 +71,7 @@
              한 화면에 놓는 사고가 표 안에서 그대로 일어난다. 0건이면 낼 이유가 없다. -->
         <tr th:if="${breakdown.unclassified > 0}"
             th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},category='UNCLASSIFIED')}">
-          <td><a th:href="@{/admin/returns/report/detail(from=${from},to=${to},category='UNCLASSIFIED')}">미분류</a></td>
+          <td>미분류</td>
           <td>미분류</td>
           <td style="text-align:right" th:text="${breakdown.unclassified}">0</td>
         </tr>
@@ -91,8 +89,9 @@
     </div>
   </div>
 
-  <!-- 행 전체 클릭 → 상세. 셀 안의 링크는 그대로 둔다(키보드·스크린리더 경로).
-       표가 둘이라 main 하나에 리스너를 건다. -->
+  <!-- 행 전체 클릭 → 상세. 표가 둘이라 main 하나에 리스너를 건다.
+       ponytail: 셀 링크를 두지 않기로 해서 키보드로는 상세에 갈 길이 없다.
+       필요해지면 tr에 tabindex와 Enter 핸들러를 붙인다. -->
   <script>
     document.querySelector('main').addEventListener('click', function (e) {
       var tr = e.target.closest('tr[data-href]');
