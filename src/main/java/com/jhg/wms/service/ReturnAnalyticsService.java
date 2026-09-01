@@ -155,6 +155,27 @@ public class ReturnAnalyticsService {
         return new CategoryBreakdown(rows, unclassified, returns.size());
     }
 
+    /**
+     * 상품 하나의 반품 사유 원문. 이 단계의 화면은 쓰지 않는다 — 2단계에서 MCP 도구가
+     * 부를 조회다. 지금 넣는 이유는 집계와 원문 조회가 같은 코호트 정의를 공유해야 하기
+     * 때문이다. 나중에 따로 만들면 두 정의가 갈라진다.
+     */
+    public record ReturnReasonEntry(Long rmaReturnId, Long orderId, String reason,
+                                    ReturnCategory category, int requestedQuantity) {}
+
+    public List<ReturnReasonEntry> returnReasons(Long productId, LocalDate from, LocalDate to) {
+        List<RmaReturn> returns = cohortReturns(cohort(from, to));
+        Map<Long, ReturnCategory> categoryByReturn = categoriesOf(returns);
+
+        List<ReturnReasonEntry> entries = new ArrayList<>();
+        for (RmaReturn r : returns)
+            for (RmaReturnItem i : r.getItems())
+                if (i.getProductId().equals(productId))
+                    entries.add(new ReturnReasonEntry(r.getId(), r.getOrderId(), r.getReason(),
+                            categoryByReturn.get(r.getId()), i.getRequestedQuantity()));
+        return entries;
+    }
+
     /** 반품 → 범주. 분류가 없는 반품은 키가 없다(미분류). */
     private Map<Long, ReturnCategory> categoriesOf(List<RmaReturn> returns) {
         if (returns.isEmpty()) return Map.of();

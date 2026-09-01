@@ -197,4 +197,40 @@ class ReturnAnalyticsServiceTest {
 
         assertThat(breakdown.totalReturns()).isEqualTo(1);
     }
+
+    @Test
+    void 상품의_사유_원문을_코호트_안에서만_모은다() {
+        재고(1L, "상품 1");
+        재고(2L, "상품 2");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(2L, 10, "ORDER#101", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#900", LocalDate.of(2026, 1, 10));   // 기간 밖
+        반품(100L, 1L, 1, "뚜껑이 헐거워요");
+        반품(101L, 2L, 1, "다른 상품이 왔어요");
+        반품(900L, 1L, 1, "기간 밖 반품");
+
+        var entries = service.returnReasons(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).reason()).isEqualTo("뚜껑이 헐거워요");
+        assertThat(entries.get(0).orderId()).isEqualTo(100L);
+    }
+
+    // 미분류를 빼면 원문 묶음이 분류된 것만 남아, 읽는 쪽이 전체를 봤다고 착각한다.
+    @Test
+    void 미분류_반품도_원문에_포함되고_범주는_비어_있다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#101", LocalDate.of(2026, 3, 10));
+        분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+        반품(101L, 1L, 1, "그냥요");
+
+        var entries = service.returnReasons(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(entries).hasSize(2);
+        assertThat(entries).anySatisfy(e -> {
+            assertThat(e.reason()).isEqualTo("그냥요");
+            assertThat(e.category()).isNull();
+        });
+    }
 }
