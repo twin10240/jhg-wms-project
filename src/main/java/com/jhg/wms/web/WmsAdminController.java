@@ -6,6 +6,7 @@ import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import com.jhg.wms.service.ReplenishmentRequestService;
+import com.jhg.wms.service.ReturnAnalyticsService;
 import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -28,6 +29,7 @@ public class WmsAdminController {
     private final ReplenishmentRequestService replenishmentRequestService;
     private final RmaService rmaService;
     private final CycleCountService cycleCountService;
+    private final ReturnAnalyticsService returnAnalyticsService;
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -159,6 +161,26 @@ public class WmsAdminController {
         model.addAttribute("from", from);
         model.addAttribute("to", to);
         return "admin/inventory-ledger";
+    }
+
+    @GetMapping("/admin/returns/report")
+    public String returnReport(@RequestParam(required = false) LocalDate from,
+                               @RequestParam(required = false) LocalDate to,
+                               Model model) {
+        // 기간을 매번 손으로 넣게 하면 아무도 안 본다. 링크 한 번으로 열려야 한다.
+        if (to == null) to = LocalDate.now();
+        if (from == null) from = to.minusDays(30);
+        try {
+            model.addAttribute("report", returnAnalyticsService.productReturnRates(from, to));
+            model.addAttribute("breakdown", returnAnalyticsService.categoryBreakdown(from, to));
+        } catch (IllegalArgumentException e) {
+            model.addAttribute("report", null);
+            model.addAttribute("breakdown", null);
+            model.addAttribute("errorMessage", e.getMessage());
+        }
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        return "admin/return-report";
     }
 
     @GetMapping("/admin/purchase-orders")

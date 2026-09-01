@@ -8,6 +8,8 @@ import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.ReplenishmentRequestService;
 import com.jhg.wms.service.RmaService;
 import com.jhg.wms.service.CycleCountService;
+import com.jhg.wms.service.ReturnAnalyticsService;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -29,6 +31,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -50,6 +53,7 @@ class WmsAdminControllerTest {
     @MockitoBean ReplenishmentRequestService replenishmentRequestService;
     @MockitoBean RmaService rmaService;
     @MockitoBean CycleCountService cycleCountService;
+    @MockitoBean ReturnAnalyticsService returnAnalyticsService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
@@ -574,5 +578,40 @@ class WmsAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("pendingCycleCountCount", 2L))
                 .andExpect(content().string(containsString("실사 승인 대기")));
+    }
+
+    @Test
+    void 반품리포트_화면이_반품률과_범주_분포를_렌더링한다() throws Exception {
+        var report = new ReturnAnalyticsService.ReturnRateReport(
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31), 5,
+                List.of(new ReturnAnalyticsService.ProductReturnRate(1L, "상품 1", 100, 8, 0.08)), 2);
+        var breakdown = new ReturnAnalyticsService.CategoryBreakdown(
+                List.of(new ReturnAnalyticsService.CategoryCount(
+                        ReturnCategory.WRONG_ITEM, ReturnOwnerArea.PICKING, 3)), 1, 4);
+        when(returnAnalyticsService.productReturnRates(any(), any())).thenReturn(report);
+        when(returnAnalyticsService.categoryBreakdown(any(), any())).thenReturn(breakdown);
+
+        mockMvc.perform(get("/admin/returns/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/return-report"))
+                .andExpect(content().string(allOf(
+                        containsString("8.0%"),           // 반품률이 퍼센트로 렌더링된다
+                        containsString("피킹·출고"),        // 소관 라벨이 붙는다
+                        containsString("미분류"))));        // 숨기지 않는다
+    }
+
+    // 기간을 매번 손으로 넣게 하면 아무도 안 본다. 기본값이 있어야 링크 한 번으로 열린다.
+    @Test
+    void 반품리포트_기간을_안_주면_최근_30일이_기본이다() throws Exception {
+        when(returnAnalyticsService.productReturnRates(any(), any())).thenReturn(
+                new ReturnAnalyticsService.ReturnRateReport(
+                        LocalDate.now().minusDays(30), LocalDate.now(), 0, List.of(), 0));
+        when(returnAnalyticsService.categoryBreakdown(any(), any())).thenReturn(
+                new ReturnAnalyticsService.CategoryBreakdown(List.of(), 0, 0));
+
+        mockMvc.perform(get("/admin/returns/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk());
+
+        verify(returnAnalyticsService).productReturnRates(LocalDate.now().minusDays(30), LocalDate.now());
     }
 }
