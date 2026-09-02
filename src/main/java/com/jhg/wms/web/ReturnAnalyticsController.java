@@ -113,10 +113,16 @@ public class ReturnAnalyticsController {
                 .body("필수 파라미터 '" + e.getParameterName() + "'가 없습니다.");
     }
 
-    /** 위와 같은 이유로 직접 잡는다. 날짜 파싱 실패(from·to)가 대상이다. */
+    /**
+     * 위와 같은 이유로 직접 잡는다. 날짜(from·to)와 상품 ID(productId)가 대상이다.
+     *
+     * 기대 타입을 보고 문구를 가른다 — 상품 ID에 "YYYY-MM-DD여야 한다"고 답하면
+     * 모델이 상품 ID 자리에 날짜를 넣는다. 고치라는 말이 틀리면 없느니만 못하다.
+     */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<String> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String expected = e.getRequiredType() == LocalDate.class ? "YYYY-MM-DD 날짜" : "정수";
         return ResponseEntity.badRequest()
-                .body("파라미터 '" + e.getName() + "'의 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
+                .body("파라미터 '" + e.getName() + "'의 형식이 올바르지 않습니다. " + expected + " 형식이어야 합니다.");
     }
 }

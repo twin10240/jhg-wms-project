@@ -223,6 +223,17 @@ class ReturnAnalyticsControllerTest {
     }
 
     @Test
+    void 상품ID_형식_오류는_날짜가_아니라_정수를_요구한다() throws Exception {
+        // 실기동 curl에서 잡힌 결함이다. productId에 "YYYY-MM-DD여야 한다"고 답하면
+        // 모델이 상품 ID 자리에 날짜를 넣는다 — 고치라는 말이 틀리면 없느니만 못하다.
+        mockMvc.perform(get("/api/analytics/return-details/product/abc")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("파라미터 'productId'의 형식이 올바르지 않습니다. 정수 형식이어야 합니다."));
+    }
+
+    @Test
     void 결과가_비어도_200이다() throws Exception {
         // 빈 결과와 오류를 섞으면 모델이 "반품이 없다"를 실패로 읽거나 그 반대가 된다.
         when(returnAnalyticsService.detailsByProduct(99L, FROM, TO)).thenReturn(List.of());
