@@ -42,6 +42,9 @@ uv run pytest -q     # 테스트
 uv run python -m wms_mcp.server       # 서버 (stdio — 보통은 Claude Code가 띄웁니다)
 ```
 
+첫 실행은 `uv sync`가 Python 3.13과 패키지 약 41개를 내려받으므로 느립니다 — Claude Code가
+처음 이 서버에 붙는 순간도 그만큼 걸립니다.
+
 ## 연결
 
 저장소 루트의 `.mcp.json`이 등록을 담고 있습니다. `WMS_USER`·`WMS_PASSWORD`를

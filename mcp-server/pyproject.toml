@@ -1,7 +1,7 @@
 [project]
 name = "mcp-server"
 version = "0.1.0"
-description = "Add your description here"
+description = "WMS 반품 분석 REST를 부르는 읽기 전용 MCP 서버 (stdio)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

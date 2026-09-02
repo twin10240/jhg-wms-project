@@ -58,6 +58,8 @@ def return_details_by_product(product_id: int, from_date: str, to_date: str) -> 
 
     반품 하나가 상품 둘을 담으면 행이 둘이다 — 행 수는 반품 수가 아니라 품목 수다.
     category·confidence가 null이면 미분류다. 날짜는 YYYY-MM-DD.
+    존재하지 않는 product_id도 오류가 아니라 빈 목록을 반환한다 — 이 도구는 상품 존재를
+    확인하지 않는다. "반품 없음"으로 보고하기 전에 product_id 오타부터 의심할 것.
     """
     return _guard(lambda: client.get_details_by_product(product_id, from_date, to_date))
 
