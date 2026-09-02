@@ -39,7 +39,7 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 
 ```bash
 uv run pytest -q     # 테스트
-uv run wms-mcp       # 서버 (stdio — 보통은 Claude Code가 띄웁니다)
+uv run python -m wms_mcp.server       # 서버 (stdio — 보통은 Claude Code가 띄웁니다)
 ```
 
 ## 연결

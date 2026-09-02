@@ -9,8 +9,8 @@ dependencies = [
     "mcp>=2.1.1",
 ]
 
-[project.scripts]
-wms-mcp = "wms_mcp.server:main"
+# [project.scripts]를 두지 않는다. uv init --no-package로 만든 가상 프로젝트는 설치되지 않아
+# 진입점이 venv에 생기지 않는다(uv run wms-mcp → Failed to spawn). python -m으로 띄운다.
 
 [dependency-groups]
 dev = [

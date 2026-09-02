@@ -2,7 +2,7 @@
   "mcpServers": {
     "wms": {
       "command": "uv",
-      "args": ["run", "--directory", "mcp-server", "wms-mcp"],
+      "args": ["run", "--directory", "mcp-server", "python", "-m", "wms_mcp.server"],
       "env": {
         "WMS_BASE_URL": "http://localhost:8081",
         "WMS_USER": "${WMS_USER}",
