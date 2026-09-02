@@ -380,7 +380,9 @@ Claude에게 반품 보고서를 쓰게 하려고 부르는 내부 표면입니�
   반품률 정의가 갈라지지 않습니다.
 
 이 넷을 부르는 것은 `mcp-server/`의 Python MCP 서버입니다(별도 프로세스, stdio).
-Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — WMS 안에는 LLM 호출이 없습니다.
+Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — **이 분석 경로에는** LLM 호출이 없습니다
+(반품 사유 자동 분류가 WMS 안에서 Claude API를 부르는 것은 별개 경로입니다 — 위
+[반품 사유 자동 분류(V4.0)](#반품-사유-자동-분류-v40) 참고).
 자세한 내용은 [`mcp-server/README.md`](mcp-server/README.md).
 
 ### OMS 재고보충 통지 (S3, 채널3)
