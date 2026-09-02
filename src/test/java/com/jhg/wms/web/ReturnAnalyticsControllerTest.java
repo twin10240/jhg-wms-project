@@ -98,7 +98,9 @@ class ReturnAnalyticsControllerTest {
         mockMvc.perform(get("/api/analytics/product-return-rates")
                         .with(httpBasic("wms", "wms"))
                         .param("to", "2026-08-31"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                // 본문은 평문이고 모델이 스스로 고칠 수 있어야 한다 — 어느 파라미터가 필요한지 이름을 박는다.
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("from")));
     }
 
     @Test
@@ -181,7 +183,11 @@ class ReturnAnalyticsControllerTest {
         mockMvc.perform(get("/api/analytics/return-details/product/11")
                         .with(httpBasic("wms", "wms"))
                         .param("from", "2026-8-1").param("to", "2026-08-31"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                // 파라미터 이름과 기대 형식(YYYY-MM-DD)을 본문에 박아 재시도 없이 스스로 고치게 한다.
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("from"),
+                        org.hamcrest.Matchers.containsString("YYYY-MM-DD"))));
     }
 
     @Test
@@ -205,7 +211,15 @@ class ReturnAnalyticsControllerTest {
         mockMvc.perform(get("/api/analytics/return-details/category/NOPE")
                         .with(httpBasic("wms", "wms"))
                         .param("from", "2026-08-01").param("to", "2026-08-31"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                // FQCN("No enum constant com.jhg...")을 그대로 흘리지 않는다 — 받는 다섯 값을 이름으로 준다.
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("com.jhg")),
+                        org.hamcrest.Matchers.containsString("DAMAGED"),
+                        org.hamcrest.Matchers.containsString("WRONG_ITEM"),
+                        org.hamcrest.Matchers.containsString("CHANGED_MIND"),
+                        org.hamcrest.Matchers.containsString("OTHER"),
+                        org.hamcrest.Matchers.containsString("UNCLASSIFIED"))));
     }
 
     @Test

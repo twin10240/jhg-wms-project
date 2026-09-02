@@ -4,12 +4,14 @@ import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.service.ReturnAnalyticsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -72,8 +74,20 @@ public class ReturnAnalyticsController {
             @PathVariable String category,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        ReturnCategory parsed = "UNCLASSIFIED".equals(category) ? null : ReturnCategory.valueOf(category);
+        ReturnCategory parsed = "UNCLASSIFIED".equals(category) ? null : parseCategory(category);
         return returnAnalyticsService.detailsByCategory(parsed, from, to);
+    }
+
+    // ReturnCategory.valueOf의 기본 메시지("No enum constant com.jhg...")는 FQCN을 흘린다.
+    // 받는 값 다섯 개를 이름으로 준다 — 모델이 여기서 바로 고칠 수 있어야 한다.
+    private static ReturnCategory parseCategory(String category) {
+        try {
+            return ReturnCategory.valueOf(category);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "알 수 없는 category '" + category
+                            + "'. 다음 중 하나여야 합니다: DAMAGED, WRONG_ITEM, CHANGED_MIND, OTHER, UNCLASSIFIED");
+        }
     }
 
     /**
@@ -86,5 +100,23 @@ public class ReturnAnalyticsController {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(e.getMessage());
+    }
+
+    /**
+     * 필수 파라미터 누락(from·to)은 기본적으로 DefaultHandlerExceptionResolver가 sendError로
+     * 처리한다 — MockMvc에서는 빈 본문, 실배포에서는 서블릿 ERROR 재디스패치를 거쳐 Boot의
+     * BasicErrorController가 JSON을 낸다. 둘 다 이 표면의 평문 계약을 어긴다. 여기서 직접 잡는다.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<String> handleMissingParam(MissingServletRequestParameterException e) {
+        return ResponseEntity.badRequest()
+                .body("필수 파라미터 '" + e.getParameterName() + "'가 없습니다.");
+    }
+
+    /** 위와 같은 이유로 직접 잡는다. 날짜 파싱 실패(from·to)가 대상이다. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<String> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.badRequest()
+                .body("파라미터 '" + e.getName() + "'의 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다.");
     }
 }
