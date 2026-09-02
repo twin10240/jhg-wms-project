@@ -16,10 +16,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -180,5 +182,42 @@ class ReturnAnalyticsControllerTest {
                         .with(httpBasic("wms", "wms"))
                         .param("from", "2026-8-1").param("to", "2026-08-31"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 역전된_범위는_400이고_500이_아니다() throws Exception {
+        // 서비스의 cohort()가 실제로 던지는 예외다. 매핑이 없으면 500이 되고,
+        // 모델은 "내 인자가 틀렸다"와 "창고가 고장났다"를 구분하지 못한다.
+        doThrow(new IllegalArgumentException("시작일이 종료일보다 뒤입니다."))
+                .when(returnAnalyticsService).productReturnRates(TO, FROM);
+
+        mockMvc.perform(get("/api/analytics/product-return-rates")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-31").param("to", "2026-08-01"))
+                .andExpect(status().isBadRequest())
+                // 본문은 평문이다(README의 기존 API 오류 계약). 무엇을 고쳐야 할지 읽혀야 한다.
+                .andExpect(content().string("시작일이 종료일보다 뒤입니다."));
+    }
+
+    @Test
+    void 알_수_없는_범주_이름은_400이다() throws Exception {
+        // ReturnCategory.valueOf가 IllegalArgumentException을 던진다. 같은 핸들러가 받는다.
+        mockMvc.perform(get("/api/analytics/return-details/category/NOPE")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 결과가_비어도_200이다() throws Exception {
+        // 빈 결과와 오류를 섞으면 모델이 "반품이 없다"를 실패로 읽거나 그 반대가 된다.
+        when(returnAnalyticsService.detailsByProduct(99L, FROM, TO)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/analytics/return-details/product/99")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
     }
 }

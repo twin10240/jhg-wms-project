@@ -3,6 +3,8 @@ package com.jhg.wms.web;
 import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.service.ReturnAnalyticsService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -72,5 +74,17 @@ public class ReturnAnalyticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         ReturnCategory parsed = "UNCLASSIFIED".equals(category) ? null : ReturnCategory.valueOf(category);
         return returnAnalyticsService.detailsByCategory(parsed, from, to);
+    }
+
+    /**
+     * 400이지 500이 아니다. 역전된 기간(서비스의 cohort())과 알 수 없는 범주 이름
+     * (ReturnCategory.valueOf)이 여기로 온다.
+     *
+     * 이 구분이 MCP 서버에서 커진다 — 모델이 "내가 인자를 잘못 줬다"와 "창고가 고장났다"를
+     * 구분할 수 있어야 스스로 고친다. 본문은 평문이다(README의 기존 API 오류 계약).
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleBadRequest(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
     }
 }

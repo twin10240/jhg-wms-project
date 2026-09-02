@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 395개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
+| 테스트 | 427개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -354,6 +354,26 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
 | `WMS_AI_MODEL` | `claude-haiku-4-5` | 짧은 단일 호출이라 Haiku로 충분 |
 | `wms.ai.max-tokens` | `1024` | 모델을 상위 계열로 바꾸면 함께 올릴 것 |
 | `wms.ai.timeout` | `20s` | SDK 기본 10분을 줄임 |
+
+### 반품 분석 조회 (V6.0) — 내부 도구용, OMS 채널 아님
+
+**이 넷은 S1~S7 채널이 아닙니다.** OMS는 부르지 않습니다. 별도 프로세스로 뜨는 MCP 서버가
+Claude에게 반품 보고서를 쓰게 하려고 부르는 내부 표면입니다. 인증은 다른 `/api/**`와 같은
+서비스 계정 Basic입니다.
+
+| 엔드포인트 | 내용 |
+|---|---|
+| `GET /api/analytics/product-return-rates?from&to` | 상품별 출고·반품·반품률, 관찰 경과일, 주문 연결 불가 출고 수 |
+| `GET /api/analytics/return-categories?from&to` | 범주별 건수와 소관, 미분류 수, 전체 수 |
+| `GET /api/analytics/return-details/product/{productId}?from&to` | 그 상품 반품의 사유 원문·범주·신뢰도 |
+| `GET /api/analytics/return-details/category/{category}?from&to` | 그 범주 반품 목록. `{category}`에 `UNCLASSIFIED` 허용 |
+
+- **`from`·`to`는 필수입니다.** 기본값이 없습니다 — 보고서는 분모가 무엇인지 분명해야 합니다.
+  날짜는 ISO(`2026-08-01`). 누락·형식 오류·역전된 범위는 **400**이고 본문은 평문입니다.
+- **전부 읽기 전용입니다.** 반품 사유는 고객이 쓴 자유 텍스트이고 그것이 모델 컨텍스트로
+  들어갑니다. 쓰기 표면이 섞이면 고객이 창고 데이터를 건드릴 경로가 생깁니다.
+- 계산은 `ReturnAnalyticsService`가 합니다. 이 REST는 위임만 하므로 화면과 보고서의
+  반품률 정의가 갈라지지 않습니다.
 
 ### OMS 재고보충 통지 (S3, 채널3)
 
