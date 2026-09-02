@@ -82,4 +82,4 @@ jobs:
 
       - name: Run tests
         working-directory: mcp-server
-        run: uv run pytest -q
+        run: uv run --locked pytest -q

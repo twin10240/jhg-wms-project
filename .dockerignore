@@ -11,4 +11,5 @@ bin
 spy.log
 HELP.md
 docs
+mcp-server
 *.zip
