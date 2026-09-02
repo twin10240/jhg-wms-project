@@ -40,6 +40,22 @@ def test_null_범주를_그대로_통과시킨다(monkeypatch):
     assert "category" in result[0]
 
 
+def test_카테고리의_경로_순회_문자를_퍼센트_인코딩한다(monkeypatch):
+    # category는 모델이 채우는 문자열이다. "../../../actuator/env" 같은 값이 URL 경로에
+    # 그대로 섞이면 이 서버가 부르는 URL 넷 바깥으로 나갈 수 있다.
+    captured = {}
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = request.url
+        return httpx.Response(200, json=[], request=request)
+    monkeypatch.setattr(client, "_build_client",
+                        lambda: httpx.Client(transport=httpx.MockTransport(handler),
+                                             base_url="http://wms.test"))
+
+    client.get_details_by_category("../../../actuator/env", "2026-08-01", "2026-08-31")
+
+    assert captured["url"].path.startswith("/api/analytics/return-details/category/")
+
+
 def test_날짜_형식이_틀리면_WMS를_부르기도_전에_거절한다(monkeypatch):
     def explode():
         raise AssertionError("WMS를 부르면 안 된다 — 경계에서 걸러야 왕복이 줄고 메시지가 정확하다")
@@ -94,6 +110,7 @@ def test_자격증명이_없으면_소켓을_열기_전에_거절한다(monkeypa
 
 def test_클라이언트가_베이스URL과_자격증명을_제대로_싣는다(monkeypatch):
     # (user, password) 순서가 뒤바뀌거나 base_url을 빠뜨려도 다른 테스트는 전부 통과한다.
+    # httpx._auth 내부 필드에 의존한다 — httpx 업그레이드로 깨질 수 있다.
     import base64
 
     monkeypatch.setenv("WMS_USER", "wms-user")
@@ -117,3 +134,12 @@ def test_클라이언트가_베이스URL과_자격증명을_제대로_싣는다(
         assert password == "wms-secret"
     finally:
         http.close()
+
+
+def test_client는_GET_외의_HTTP_메서드를_쓰지_않는다():
+    # "읽기 전용은 이 서버가 부르는 URL 넷이 지키는 것" — 한 번 그렙한 결론을 테스트로 고정한다.
+    import pathlib
+
+    source = pathlib.Path(client.__file__).read_text()
+    for verb in ("post", "put", "patch", "delete"):
+        assert f"http.{verb}(" not in source, f"http.{verb}(가 client.py에 있다"

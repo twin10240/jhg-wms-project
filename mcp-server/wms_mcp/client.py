@@ -8,6 +8,7 @@ MCP를 import하지 않는다 — 이 계층의 실질적인 로직은 오류 �
 
 import os
 from datetime import date
+from urllib.parse import quote
 
 import httpx
 
@@ -39,10 +40,12 @@ def _check_date(name: str, value: str) -> None:
         raise WmsError(f"{name}는 YYYY-MM-DD 형식이어야 합니다: {value!r}") from None
 
 
-def _get(path: str, from_date: str, to_date: str, **extra):
+# ponytail: 창 크기 무제한. 모델이 from=2020-01-01을 부르면 사유 원문이 통째로 컨텍스트에
+# 들어간다. 실제 보고서를 몇 번 써 보고 토큰이 문제가 되면 그때 상한을 둔다(응답 행 수 기준).
+def _get(path: str, from_date: str, to_date: str):
     _check_date("from_date", from_date)
     _check_date("to_date", to_date)
-    params = {"from": from_date, "to": to_date, **extra}   # from은 파이썬 예약어라 여기서 바꾼다
+    params = {"from": from_date, "to": to_date}   # from은 파이썬 예약어라 여기서 바꾼다
     try:
         with _build_client() as http:
             response = http.get(path, params=params)
@@ -56,7 +59,7 @@ def _get(path: str, from_date: str, to_date: str, **extra):
         raise WmsError("WMS 인증에 실패했습니다. 환경변수 WMS_USER·WMS_PASSWORD를 확인하세요.")
     if response.status_code == 400:
         # WMS가 이미 모델이 읽을 수 있는 평문을 준다. 뭉개지 않고 그대로 싣는다.
-        raise WmsError(response.text.strip())
+        raise WmsError(response.text.strip() or "WMS가 요청을 거절했습니다(400).")
     if response.status_code != 200:
         raise WmsError(f"WMS가 {response.status_code}를 냈습니다: {response.text.strip()[:200]}")
     return response.json()
@@ -75,4 +78,6 @@ def get_details_by_product(product_id: int, from_date: str, to_date: str) -> lis
 
 
 def get_details_by_category(category: str, from_date: str, to_date: str) -> list:
-    return _get(f"/api/analytics/return-details/category/{category}", from_date, to_date)
+    # category는 모델이 채우는 문자열이다. 퍼센트 인코딩 없이 넣으면 "../"로 이 서버가
+    # 부르는 URL 넷 바깥(같은 자격증명이 유효한 임의 /api 경로)으로 나갈 수 있다.
+    return _get(f"/api/analytics/return-details/category/{quote(category, safe='')}", from_date, to_date)
