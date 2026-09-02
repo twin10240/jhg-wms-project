@@ -219,7 +219,7 @@ class ReturnAnalyticsServiceTest {
         반품(101L, 2L, 1, "다른 상품이 왔어요");
         반품(900L, 1L, 1, "기간 밖 반품");
 
-        var entries = service.returnReasons(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+        var entries = service.detailsByProduct(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(entries).hasSize(1);
         assertThat(entries.get(0).reason()).isEqualTo("뚜껑이 헐거워요");
@@ -235,7 +235,7 @@ class ReturnAnalyticsServiceTest {
         분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
         반품(101L, 1L, 1, "그냥요");
 
-        var entries = service.returnReasons(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+        var entries = service.detailsByProduct(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
 
         assertThat(entries).hasSize(2);
         assertThat(entries).anySatisfy(e -> {
@@ -280,14 +280,68 @@ class ReturnAnalyticsServiceTest {
                                  org.assertj.core.groups.Tuple.tuple(2L, 4, 0.2));
 
         // 원문 조회도 같은 품목 단위여야 한다 — 상품별로 한 건씩, 그 상품의 수량으로.
-        assertThat(service.returnReasons(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)))
+        assertThat(service.detailsByProduct(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)))
                 .singleElement()
-                .extracting(ReturnAnalyticsService.ReturnReasonEntry::requestedQuantity)
+                .extracting(ReturnAnalyticsService.ReturnDetailRow::requestedQuantity)
                 .isEqualTo(3);
-        assertThat(service.returnReasons(2L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)))
+        assertThat(service.detailsByProduct(2L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31)))
                 .singleElement()
-                .extracting(ReturnAnalyticsService.ReturnReasonEntry::requestedQuantity)
+                .extracting(ReturnAnalyticsService.ReturnDetailRow::requestedQuantity)
                 .isEqualTo(4);
+    }
+
+    @Test
+    void 범주_축은_그_범주의_반품만_낸다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#101", LocalDate.of(2026, 3, 10));
+        분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+        분류(반품(101L, 1L, 1, "깨져서 왔어요").getId(), ReturnCategory.DAMAGED);
+
+        var rows = service.detailsByCategory(ReturnCategory.WRONG_ITEM,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(rows).singleElement()
+                .extracting(ReturnAnalyticsService.ReturnDetailRow::reason)
+                .isEqualTo("다른 색이 왔어요");
+    }
+
+    // 미분류를 별도 메서드로 두지 않고 category=null로 받는다. 화면에서 미분류는
+    // 범주 표의 다섯 번째 행이라, 같은 링크 구조로 열려야 한다.
+    @Test
+    void 범주_축에_null을_주면_미분류만_낸다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        출고(1L, 10, "ORDER#101", LocalDate.of(2026, 3, 10));
+        분류(반품(100L, 1L, 1, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+        반품(101L, 1L, 1, "그냥요");
+
+        var rows = service.detailsByCategory(null,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.reason()).isEqualTo("그냥요");
+            assertThat(row.category()).isNull();
+            assertThat(row.confidence()).isNull();
+        });
+    }
+
+    // 신뢰도를 내는 이유는 1회차 평가가 "confidence가 제 역할을 하는가"에 답하지 못했기
+    // 때문이다. 틀린 분류가 실제로 LOW를 받았는지 화면에서 보여야 운영 데이터로 답한다.
+    @Test
+    void 분류된_반품은_신뢰도와_상품명을_함께_낸다() {
+        재고(1L, "상품 1");
+        출고(1L, 10, "ORDER#100", LocalDate.of(2026, 3, 10));
+        분류(반품(100L, 1L, 2, "다른 색이 왔어요").getId(), ReturnCategory.WRONG_ITEM);
+
+        var rows = service.detailsByProduct(1L, LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.productName()).isEqualTo("상품 1");
+            assertThat(row.category()).isEqualTo(ReturnCategory.WRONG_ITEM);
+            assertThat(row.confidence()).isEqualTo(Confidence.HIGH);
+            assertThat(row.requestedQuantity()).isEqualTo(2);
+        });
     }
 
 }

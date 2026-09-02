@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 389개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
+| 테스트 | 395개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -398,6 +398,7 @@ REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)
 | `/admin/returns/{id}` | 반품 상세 — 품목별 요청·승인 수량과 처분 | 인증 |
 | `/admin/returns/{id}/receive`·`/complete`·`/cancel` (POST) | 반품 입고 처리 · 검수 완료 · 취소 | **MANAGER** |
 | `/admin/returns/report` | 반품 리포트 — 코호트 반품률(기간 내 출고 대비), 범주별 분포와 소관, 미분류 건수 | 인증 |
+| `/admin/returns/report/detail` | 반품 상세 — 리포트 표의 한 칸(상품 또는 범주·미분류)에 든 반품들, 사유 원문·신뢰도 포함 | 인증 |
 | `/admin/cycle-counts` | 재고 실사 — 세션 목록·진행률, 상태 필터 | 인증 |
 | `/admin/cycle-counts/new` | 대상 상품 선택 후 실사 시작 | 인증 |
 | `/admin/cycle-counts/{id}` | 실사 상세 — 실물 수량 입력·제출 | 인증 |

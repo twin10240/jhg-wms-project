@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('WMS 반품 상세')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav('returnreport')}"></nav>
+<main>
+  <h2>반품 상세 <span th:if="${title != null}" th:text="'— ' + ${title}">— 미분류</span></h2>
+
+  <div th:replace="~{fragments/layout :: flash}"></div>
+
+  <p>
+    <a th:href="@{/admin/returns/report(from=${from},to=${to})}">← 반품 리포트로</a>
+    <span th:text="'(' + ${from} + ' ~ ' + ${to} + ')'">(기간)</span>
+  </p>
+
+  <p th:if="${errorMessage != null}" th:text="${errorMessage}">상품이나 범주를 골라 주세요.</p>
+
+  <div class="table-wrap" th:if="${rows != null}">
+  <table>
+    <thead>
+      <tr>
+        <th>반품</th><th>주문</th><th>상품</th>
+        <th style="text-align:right">수량</th>
+        <th>사유</th><th>범주</th><th>신뢰도</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="row : ${rows}">
+        <td><a th:href="@{'/admin/returns/' + ${row.rmaReturnId}}" th:text="${row.rmaReturnId}">1</a></td>
+        <td th:text="${row.orderId}">100</td>
+        <td th:text="${row.productName}">상품 1</td>
+        <td style="text-align:right" th:text="${row.requestedQuantity}">1</td>
+        <td th:text="${#strings.isEmpty(row.reason) ? '(사유 없음)' : row.reason}">사유</td>
+        <td th:text="${row.category == null ? '미분류' : row.category.label()}">미분류</td>
+        <td th:switch="${row.confidence == null ? 'NONE' : row.confidence.name()}">
+          <span th:case="'HIGH'">높음</span>
+          <span th:case="'MEDIUM'">보통</span>
+          <span th:case="'LOW'">낮음</span>
+          <span th:case="*">—</span>
+        </td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(rows)}">
+        <td colspan="7">해당하는 반품이 없습니다.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</main>
+</body>
+</html>

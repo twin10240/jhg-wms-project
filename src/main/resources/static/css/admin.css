@@ -67,6 +67,7 @@ th { background: #eef0f4; font-weight: 600; font-size: .9em; text-transform: upp
 tbody tr:nth-child(even) { background: #fafbfc; }
 tbody tr:hover { background: #f0f4ff; }
 tbody tr[data-href] { cursor: pointer; }
+tfoot td { background: #eef0f4; border-top: 2px solid var(--color-border); }
 tr.soldout td { background: #fdecea; }
 
 /* ---------- Forms ---------- */

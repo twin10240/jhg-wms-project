@@ -35,7 +35,8 @@
         </tr>
       </thead>
       <tbody>
-        <tr th:each="row : ${report.rows}">
+        <tr th:each="row : ${report.rows}"
+            th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},productId=${row.productId})}">
           <td th:text="${row.productId}">1</td>
           <td th:text="${row.productName}">상품 1</td>
           <td style="text-align:right" th:text="${row.shippedQty}">100</td>
@@ -53,18 +54,14 @@
 
   <div th:if="${breakdown != null}">
     <h3>반품 사유 범주</h3>
-    <p>
-      분류된 반품만 범주로 나뉩니다. 미분류
-      <strong th:text="${breakdown.unclassified}">0</strong>건 /
-      전체 <strong th:text="${breakdown.totalReturns}">0</strong>건.
-    </p>
     <div class="table-wrap">
     <table>
       <thead>
         <tr><th>범주</th><th>소관</th><th style="text-align:right">건수</th></tr>
       </thead>
       <tbody>
-        <tr th:each="c : ${breakdown.counts}">
+        <tr th:each="c : ${breakdown.counts}"
+            th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},category=${c.category.name()})}">
           <td th:text="${c.category.label()}">파손</td>
           <td th:text="${c.ownerArea.label()}">포장·운송</td>
           <td style="text-align:right" th:text="${c.count}">0</td>
@@ -72,15 +69,37 @@
         <!-- 범주가 아니라 범주의 부재다. 그래도 행으로 낸다 — 표만 보는 사람에게
              네 줄의 합(분류된 건수)이 전체인 것처럼 읽히면, 분모가 다른 두 숫자를
              한 화면에 놓는 사고가 표 안에서 그대로 일어난다. 0건이면 낼 이유가 없다. -->
-        <tr th:if="${breakdown.unclassified > 0}">
+        <tr th:if="${breakdown.unclassified > 0}"
+            th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},category='UNCLASSIFIED')}">
           <td>미분류</td>
           <td>미분류</td>
           <td style="text-align:right" th:text="${breakdown.unclassified}">0</td>
         </tr>
       </tbody>
+      <tfoot>
+        <!-- 위 문장으로 적던 "미분류 N건 / 전체 M건"을 표 안으로 옮겼다. 미분류는 이미
+             행이고, 전체는 여기서 나온다 — 표만 보고도 분모가 맞는지 확인할 수 있다. -->
+        <tr>
+          <td><strong>전체</strong></td>
+          <td>—</td>
+          <td style="text-align:right"><strong th:text="${breakdown.totalReturns}">0</strong></td>
+        </tr>
+      </tfoot>
     </table>
     </div>
   </div>
+
+  <!-- 행 전체 클릭 → 상세. 표가 둘이라 main 하나에 리스너를 건다.
+       ponytail: 셀 링크를 두지 않기로 해서 키보드로는 상세에 갈 길이 없다.
+       필요해지면 tr에 tabindex와 Enter 핸들러를 붙인다. -->
+  <script>
+    document.querySelector('main').addEventListener('click', function (e) {
+      var tr = e.target.closest('tr[data-href]');
+      if (!tr || e.target.closest('a')) return;
+      if (window.getSelection().toString()) return;   // 텍스트 드래그 복사 중이면 이동하지 않는다
+      location.href = tr.dataset.href;
+    });
+  </script>
 </main>
 </body>
 </html>
