@@ -363,13 +363,17 @@ Claude에게 반품 보고서를 쓰게 하려고 부르는 내부 표면입니�
 
 | 엔드포인트 | 내용 |
 |---|---|
-| `GET /api/analytics/product-return-rates?from&to` | 상품별 출고·반품·반품률, 관찰 경과일, 주문 연결 불가 출고 수 |
-| `GET /api/analytics/return-categories?from&to` | 범주별 건수와 소관, 미분류 수, 전체 수 |
+| `GET /api/analytics/product-return-rates?from&to` | 상품별 출고·반품·반품률, 관찰 경과일, 주문 연결 불가 출고 수. 행은 반품률 내림차순(동률이면 반품 수량 내림차순) |
+| `GET /api/analytics/return-categories?from&to` | 범주별 건수와 소관, 미분류 수, 전체 수. `ReturnCategory` 네 값이 0건이어도 전부 나온다(enum 순서) — 빠진 범주와 0건인 범주는 다른 뜻이다 |
 | `GET /api/analytics/return-details/product/{productId}?from&to` | 그 상품 반품의 사유 원문·범주·신뢰도 |
 | `GET /api/analytics/return-details/category/{category}?from&to` | 그 범주 반품 목록. `{category}`에 `UNCLASSIFIED` 허용 |
 
 - **`from`·`to`는 필수입니다.** 기본값이 없습니다 — 보고서는 분모가 무엇인지 분명해야 합니다.
-  날짜는 ISO(`2026-08-01`). 누락·형식 오류·역전된 범위는 **400**이고 본문은 평문입니다.
+  날짜는 ISO(`2026-08-01`). 누락·형식 오류·역전된 범위·알 수 없는 `category`는 **400**이고 본문은
+  평문입니다. 누락은 어느 파라미터가 필요한지, 형식 오류는 `YYYY-MM-DD`가 필요하다는 것을 본문에
+  직접 담습니다 — 컨트롤러의 전용 `@ExceptionHandler`가 처리하며(Spring 기본 핸들링에 맡기면
+  MockMvc는 빈 본문, 실배포는 서블릿 ERROR 재디스패치를 거쳐 JSON이 나가 이 계약을 어깁니다),
+  기본 프레임워크 메시지에 의존하지 않습니다.
 - **전부 읽기 전용입니다.** 반품 사유는 고객이 쓴 자유 텍스트이고 그것이 모델 컨텍스트로
   들어갑니다. 쓰기 표면이 섞이면 고객이 창고 데이터를 건드릴 경로가 생깁니다.
 - 계산은 `ReturnAnalyticsService`가 합니다. 이 REST는 위임만 하므로 화면과 보고서의
@@ -434,7 +438,7 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 
 | 체인 | 경로 | 인증 | 대상 | CSRF |
 |------|------|------|------|------|
-| `@Order(1)` | `/api/**` | HTTP Basic — 서비스 계정(`WMS_BASIC_USER`/`WMS_BASIC_PASSWORD`) | OMS 서버간 호출 | 예외 |
+| `@Order(1)` | `/api/**` | HTTP Basic — 서비스 계정(`WMS_BASIC_USER`/`WMS_BASIC_PASSWORD`) | OMS 서버간 호출 + 내부 MCP 서버(V6.0, `/api/analytics/**`) | 예외 |
 | `@Order(2)` | `/`·`/admin/**` | **폼 로그인** — DB 유저(`WmsUser`, BCrypt) | 사람(운영자·관리자) | 활성 |
 
 - **`/api/**`는 인증 실패 시 401을 직접 응답합니다**(`HttpStatusEntryPoint`) — 폼 로그인 리다이렉트(302)로 새면 호출자가 "성공"으로 오인하기 때문입니다. 실제로 OMS 쪽에서 같은 원인의 302 버그를 겪어, 이 동작을 **실서블릿 통합 테스트로 고정**해두었습니다(MockMvc는 서블릿의 `/error` 재디스패치를 재현하지 못함).
@@ -521,10 +525,11 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 - **서비스 통합**(`@DataJpaTest`) — `InventoryServiceTest` / `PurchaseOrderServiceTest` / `ReplenishmentRequestServiceTest` / `RmaServiceTest`
   - 원장 재구성 불변식(Σ delta == onHand), 발주 취소 시 연결 요청 종결·재고 불변, 목록 정렬 검증
   - 수불대장 기말 항등식, 반품 접수 검증·멱등·누적 반품량·처분별 재고 반영(RESTOCKED만 증가)
-- **MockMvc 슬라이스** — `InventoryControllerTest` / `ShipmentControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest` / `RmaControllerTest` / `RmaAdminControllerTest`
+- **MockMvc 슬라이스** — `InventoryControllerTest` / `ShipmentControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest` / `RmaControllerTest` / `RmaAdminControllerTest` / `ReturnAnalyticsControllerTest`
   - 롤 경계(OPERATOR가 MANAGER 액션 호출 시 403), 화면 렌더링(한글 상태·상품명·참조) 포함
   - 반품 API 상태 코드 계약(201/200/409/400/404/401), 검수 폼 기본값 부재, DB 장애 시 503(리다이렉트 루프 아님)
   - 송장 조회 계약(200/404/401, `deliveredAt`이 생략이 아니라 `null`로 직렬화), 배송 완료·재통지 액션과 배송 대기 탭
+  - 분석 REST 넷의 직렬화·401·빈 결과 200·잘못된 인자 400(본문 내용까지) 계약
 - **보안 통합**(`@SpringBootTest(RANDOM_PORT)`) — `SecurityChainIntegrationTest`
   - `/api/**` 미인증 **401 유지**(302 아님), Basic 200, 폼 로그인 왕복. MockMvc가 재현 못 하는 실서블릿 `/error` 재디스패치를 검증
 - **OMS 통지 클라이언트**(`@RestClientTest`) — `OmsReplenishmentNotifierTest` / `OmsDeliveryNotifierTest`
