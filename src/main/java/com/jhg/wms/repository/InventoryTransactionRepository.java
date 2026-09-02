@@ -20,9 +20,6 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
     List<InventoryTransaction> findTop200ByOrderByIdDesc();
     List<InventoryTransaction> findTop200ByTypeOrderByIdDesc(InventoryTransactionType type);
 
-    Page<InventoryTransaction> findByOrderByIdDesc(Pageable pageable);
-    Page<InventoryTransaction> findByTypeOrderByIdDesc(InventoryTransactionType type, Pageable pageable);
-
     /**
      * 관리자 화면 드릴다운용 — 유형·상품·기간 조합.
      *

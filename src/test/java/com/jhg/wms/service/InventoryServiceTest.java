@@ -805,14 +805,34 @@ class InventoryServiceTest {
     }
 
     // 범위를 안 걸면 전건이 나와야 한다 — 날짜를 넓은 경계로 대체하는 처리가 조용히 걸러내면 안 된다.
+    // 코드가 쓰는 경계는 1970/9999다. 2020/2030처럼 그보다 훨씬 좁은 값으로 심으면, 이 테스트는
+    // NO_LOWER_BOUND/NO_UPPER_BOUND가 세기 단위로 넓다는 사실이 아니라 "웬만큼 넓다"만 확인하게
+    // 되어 그 상수가 실수로 좁아져도 못 잡는다. 1971/2999로 그 상수 자체를 겨눈다.
     @Test
     void 범위를_안_걸면_전건이_나온다() {
-        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(2020, 1, 1, 0, 0));
-        seedTxnAt(2L, InventoryTransactionType.SHIP, -4, LocalDateTime.of(2030, 12, 31, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(1971, 1, 1, 0, 0));
+        seedTxnAt(2L, InventoryTransactionType.SHIP, -4, LocalDateTime.of(2999, 12, 31, 0, 0));
 
         var page = service.findTransactions(null, null, null, null, PageRequest.of(0, 20));
 
         assertThat(page.getContent()).hasSize(2);
+    }
+
+    // search(...)는 이 리포지토리에서 @Query + Pageable을 쓰는 첫 메서드다 — 나머지 페이징
+    // 메서드는 전부 파생 쿼리라 Spring Data가 카운트 쿼리를 알아서 만든다. @Query를 쓰면
+    // Spring Data가 JPQL에서 카운트 쿼리를 유도해야 하는데, 지금까지 모든 픽스처가 한 페이지
+    // 안에 들어가 PageableExecutionUtils가 카운트 실행 자체를 건너뛰어 왔다 — 21건을 심어
+    // 두 페이지로 나눠 그 카운트 쿼리를 실제 PostgreSQL에 대해 처음 실행시킨다.
+    @Test
+    void 페이지를_넘는_건수는_카운트_쿼리로_totalPages를_계산한다() {
+        for (int i = 0; i < 21; i++)
+            seedTxnAt(1L, InventoryTransactionType.RECEIVE, 1, LocalDateTime.of(2026, 9, 3, 10, i));
+
+        var page = service.findTransactions(null, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getTotalElements()).isEqualTo(21);
+        assertThat(page.getTotalPages()).isEqualTo(2);
     }
 
     @Test

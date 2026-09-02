@@ -9,6 +9,7 @@ import com.jhg.wms.service.ReplenishmentRequestService;
 import com.jhg.wms.service.ReturnAnalyticsService;
 import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class WmsAdminController {
@@ -131,8 +133,13 @@ public class WmsAdminController {
         // from이 to보다 뒤인 역전 범위는 buildLedger가 예외를 던진다 — 이 URL은 원래
         // 트랜잭션 목록이 빈 채로 정상 렌더됐으므로, 대조 줄만 빼고 그 동작을 그대로 지킨다.
         if (productId != null && from != null && to != null && !from.isAfter(to))
-            inventoryService.ledgerRowOf(productId, from, to)
-                    .ifPresent(row -> model.addAttribute("ledgerRow", row));
+            try {
+                inventoryService.ledgerRowOf(productId, from, to)
+                        .ifPresent(row -> model.addAttribute("ledgerRow", row));
+            } catch (RuntimeException e) {
+                // 대조 줄은 부가 정보다 — 목록은 이미 조회됐으므로 여기서 화면 전체를 잃지 않는다.
+                log.warn("대조 줄 계산 실패(무시): productId={} from={} to={}", productId, from, to, e);
+            }
         return "admin/inventory-transactions";
     }
 

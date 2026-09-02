@@ -711,6 +711,52 @@ class WmsAdminControllerTest {
         assertThat(reconText).isEqualTo("기초 100 + 이동 8 = 기말 108");
     }
 
+    // 대조 줄은 기간 전체 기준인데, 유형 탭을 누르면 아래 목록은 그 유형만 남는다 — 줄이 그대로면
+    // "요약과 상세가 어긋난다"는 이 기능이 막으려는 바로 그 오해를 사용자가 보게 된다.
+    @Test
+    void 유형이_걸리면_대조줄에_기간_전체_기준_안내가_붙는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+        when(inventoryService.ledgerRowOf(eq(1L), any(), any())).thenReturn(java.util.Optional.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30")
+                        .param("type", "RECEIVE"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher recon = Pattern.compile("<p[^>]*id=\"ledger-recon\"[^>]*>(.*?)</p>", Pattern.DOTALL)
+                .matcher(html);
+        assertThat(recon.find()).as("대조 줄이 렌더돼야 한다").isTrue();
+        String reconText = recon.group(1).replaceAll("<[^>]*>", "").replaceAll("\\s+", " ").trim();
+        assertThat(reconText).contains("기간 전체 기준(아래 목록은 유형·페이지로 잘려 있습니다)");
+    }
+
+    // search(...)의 카운트 쿼리가 도는지는 서비스 테스트가 확인한다 — 여기서는 그 결과(45건,
+    // 3페이지)를 받았을 때 "다음 →" 링크가 유형·상품·기간을 놓치지 않는지를 본다. 페이지 어딘가에
+    // 흩어져 있는 것만으로는(다른 탭·다른 페이지 링크가 같은 토큰을 들고 있어도) 이 링크 하나가
+    // 값을 놓쳤는지 구분하지 못하므로, "다음" 앵커의 href 속성값 하나로 범위를 좁혀 확인한다.
+    @Test
+    void 다음_페이지_링크가_유형_상품_기간을_모두_싣는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(1, 20), 45));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("type", "RECEIVE").param("productId", "1")
+                        .param("from", "2026-09-01").param("to", "2026-09-30")
+                        .param("page", "1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher nextLink = Pattern.compile("<a[^>]*href=\"([^\"]*)\"[^>]*>\\s*다음").matcher(html);
+        assertThat(nextLink.find()).as("다음 페이지 링크가 렌더돼야 한다").isTrue();
+        String href = nextLink.group(1);
+        assertThat(href).containsPattern("type=RECEIVE.*productId=1.*from=2026-09-01.*to=2026-09-30");
+    }
+
     // 범위가 없으면 기초·기말이 정의되지 않는다 — 빈 껍데기를 두지 않는다.
     @Test
     void 범위가_없으면_대조줄을_렌더하지_않고_조회도_하지_않는다() throws Exception {

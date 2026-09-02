@@ -98,8 +98,10 @@
   </div>
 
   <!-- 행 전체 클릭 → 그 상품·그 기간의 이동내역.
-       셀 링크를 두지 않아 키보드로는 갈 길이 없다(반품 리포트와 같은 상태).
-       필요해지면 두 화면의 tr에 tabindex와 Enter 핸들러를 함께 붙인다. -->
+       셀 링크를 두지 않아 키보드로는 갈 길이 없다. 이 클릭 방식을 공유하는 returns.html·
+       cycle-counts.html은 둘 다 ID 셀에 <a>를 남겨 키보드 접근을 지켜뒀다 — 이 화면이
+       그 전례에서 벗어난 예외다. 반품 리포트는 이 브랜치 기준으로 행 클릭 자체가 없다.
+       필요해지면 이 tr에 tabindex와 Enter 핸들러를 붙인다(비범위로 미룸 — 스펙 참고). -->
   <script>
     document.querySelector('main').addEventListener('click', function (e) {
       var tr = e.target.closest('tr[data-href]');
