@@ -1,13 +1,16 @@
 package com.jhg.wms.web;
 
+import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.service.ReturnAnalyticsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 반품 분석 조회 REST. V6.0b의 Python MCP 서버가 이것을 부른다.
@@ -46,5 +49,28 @@ public class ReturnAnalyticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return returnAnalyticsService.categoryBreakdown(from, to);
+    }
+
+    @GetMapping("/return-details/product/{productId}")
+    public List<ReturnAnalyticsService.ReturnDetailRow> detailsByProduct(
+            @PathVariable Long productId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return returnAnalyticsService.detailsByProduct(productId, from, to);
+    }
+
+    /**
+     * UNCLASSIFIED는 ReturnCategory enum에 없는 값이다. 그래도 이 이름으로 받는 이유는
+     * 범주 다섯 칸이 전부 같은 URL 모양으로 열리게 하기 위해서다 — 미분류만 다른 경로를
+     * 쓰면 호출자가 분기를 하나 더 가져야 하고, 그 분기가 조용히 어긋난다.
+     * 화면(WmsAdminController.returnReportDetail)이 같은 규약을 쓴다.
+     */
+    @GetMapping("/return-details/category/{category}")
+    public List<ReturnAnalyticsService.ReturnDetailRow> detailsByCategory(
+            @PathVariable String category,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        ReturnCategory parsed = "UNCLASSIFIED".equals(category) ? null : ReturnCategory.valueOf(category);
+        return returnAnalyticsService.detailsByCategory(parsed, from, to);
     }
 }

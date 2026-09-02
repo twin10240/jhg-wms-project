@@ -2,6 +2,7 @@ package com.jhg.wms.web;
 
 import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
+import com.jhg.wms.domain.Confidence;
 import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.ReturnOwnerArea;
 import com.jhg.wms.service.ReturnAnalyticsService;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -94,6 +96,89 @@ class ReturnAnalyticsControllerTest {
         mockMvc.perform(get("/api/analytics/product-return-rates")
                         .with(httpBasic("wms", "wms"))
                         .param("to", "2026-08-31"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 상품_상세를_그대로_낸다() throws Exception {
+        var row = new ReturnAnalyticsService.ReturnDetailRow(
+                203L, 5001L, 11L, "상품 11", 2, "송장은 제 이름인데 다른 물건이 왔어요",
+                ReturnCategory.WRONG_ITEM, Confidence.MEDIUM);
+        when(returnAnalyticsService.detailsByProduct(11L, FROM, TO)).thenReturn(List.of(row));
+
+        mockMvc.perform(get("/api/analytics/return-details/product/11")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rmaReturnId").value(203))
+                .andExpect(jsonPath("$[0].orderId").value(5001))
+                .andExpect(jsonPath("$[0].productId").value(11))
+                .andExpect(jsonPath("$[0].productName").value("상품 11"))
+                .andExpect(jsonPath("$[0].requestedQuantity").value(2))
+                // 사유 원문이 이 도구의 존재 이유다. 빠지면 모델이 해석할 것이 없다.
+                .andExpect(jsonPath("$[0].reason").value("송장은 제 이름인데 다른 물건이 왔어요"))
+                .andExpect(jsonPath("$[0].category").value("WRONG_ITEM"))
+                .andExpect(jsonPath("$[0].confidence").value("MEDIUM"));
+    }
+
+    @Test
+    void 미분류_행은_category와_confidence가_null이다() throws Exception {
+        // 분류는 V4.0부터 붙어서 그 이전 반품에는 없다. null이 사라지면 모델이 미분류를 못 센다.
+        var row = new ReturnAnalyticsService.ReturnDetailRow(
+                140L, 4002L, 9L, "상품 9", 1, "V2-0 재신청", null, null);
+        when(returnAnalyticsService.detailsByProduct(9L, FROM, TO)).thenReturn(List.of(row));
+
+        mockMvc.perform(get("/api/analytics/return-details/product/9")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].category").doesNotExist())
+                .andExpect(jsonPath("$[0].confidence").doesNotExist())
+                .andExpect(jsonPath("$[0].reason").value("V2-0 재신청"));
+    }
+
+    @Test
+    void 범주_상세를_그대로_낸다() throws Exception {
+        var row = new ReturnAnalyticsService.ReturnDetailRow(
+                211L, 5010L, 17L, "상품 17", 1, "박스가 찌그러져 왔습니다",
+                ReturnCategory.DAMAGED, Confidence.HIGH);
+        when(returnAnalyticsService.detailsByCategory(ReturnCategory.DAMAGED, FROM, TO))
+                .thenReturn(List.of(row));
+
+        mockMvc.perform(get("/api/analytics/return-details/category/DAMAGED")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rmaReturnId").value(211))
+                .andExpect(jsonPath("$[0].category").value("DAMAGED"))
+                .andExpect(jsonPath("$[0].confidence").value("HIGH"));
+    }
+
+    @Test
+    void UNCLASSIFIED는_null_범주로_위임된다() throws Exception {
+        // enum에 없는 값이다. 그래도 이 이름으로 받는 이유는 다섯 칸이 같은 URL 모양으로
+        // 열려야 모델이 분기 없이 순회할 수 있기 때문이다.
+        var row = new ReturnAnalyticsService.ReturnDetailRow(
+                140L, 4002L, 9L, "상품 9", 1, "통합검증", null, null);
+        when(returnAnalyticsService.detailsByCategory(null, FROM, TO)).thenReturn(List.of(row));
+
+        mockMvc.perform(get("/api/analytics/return-details/category/UNCLASSIFIED")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-08-01").param("to", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rmaReturnId").value(140))
+                .andExpect(jsonPath("$[0].category").doesNotExist());
+
+        // 응답만 보면 "빈 목록"과 구분이 안 된다. 위임 인자가 null인지 직접 못박는다.
+        verify(returnAnalyticsService).detailsByCategory(null, FROM, TO);
+    }
+
+    @Test
+    void 날짜_형식이_틀리면_400이다() throws Exception {
+        // 모델이 스스로 고칠 수 있어야 한다 — 500이면 무엇을 고쳐야 할지 알 수 없다.
+        mockMvc.perform(get("/api/analytics/return-details/product/11")
+                        .with(httpBasic("wms", "wms"))
+                        .param("from", "2026-8-1").param("to", "2026-08-31"))
                 .andExpect(status().isBadRequest());
     }
 }
