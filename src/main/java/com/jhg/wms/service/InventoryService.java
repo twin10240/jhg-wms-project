@@ -311,11 +311,29 @@ public class InventoryService {
                 : transactionRepository.findTop200ByTypeOrderByIdDesc(type);
     }
 
-    /** 페이징 이력 조회. */
+    // 범위가 없을 때 날짜에 넣는 경계. PostgreSQL이 null 날짜 파라미터의 타입을 추론하지 못해
+    // (:from IS NULL OR ...) 형태가 깨지므로, 조회는 항상 실값 두 개를 받는다.
+    // 이 시스템에 있을 수 없는 시각이라 결과를 거르지 않는다.
+    private static final LocalDateTime NO_LOWER_BOUND = LocalDateTime.of(1970, 1, 1, 0, 0);
+    private static final LocalDateTime NO_UPPER_BOUND = LocalDateTime.of(9999, 12, 31, 0, 0);
+
+    /** 페이징 이력 조회. 상품·기간은 선택이고, 기간은 buildLedger와 같은 반개구간이다. */
     public org.springframework.data.domain.Page<InventoryTransaction> findTransactions(
-            InventoryTransactionType type, org.springframework.data.domain.Pageable pageable) {
-        return type == null
-                ? transactionRepository.findByOrderByIdDesc(pageable)
-                : transactionRepository.findByTypeOrderByIdDesc(type, pageable);
+            InventoryTransactionType type, Long productId, LocalDate from, LocalDate to,
+            org.springframework.data.domain.Pageable pageable) {
+        return transactionRepository.search(type, productId,
+                from == null ? NO_LOWER_BOUND : from.atStartOfDay(),
+                to == null ? NO_UPPER_BOUND : to.plusDays(1).atStartOfDay(),
+                pageable);
+    }
+
+    /**
+     * 한 상품의 수불 행. buildLedger를 그대로 불러 골라낸다 —
+     * 계산식을 새로 짜면 수불대장과 대조 줄이 서로 다른 코드가 되어 언젠가 어긋난다.
+     */
+    public Optional<LedgerRow> ledgerRowOf(Long productId, LocalDate from, LocalDate to) {
+        return buildLedger(from, to).stream()
+                .filter(row -> row.productId().equals(productId))
+                .findFirst();
     }
 }

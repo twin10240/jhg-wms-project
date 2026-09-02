@@ -20,8 +20,23 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
     List<InventoryTransaction> findTop200ByOrderByIdDesc();
     List<InventoryTransaction> findTop200ByTypeOrderByIdDesc(InventoryTransactionType type);
 
-    Page<InventoryTransaction> findByOrderByIdDesc(Pageable pageable);
-    Page<InventoryTransaction> findByTypeOrderByIdDesc(InventoryTransactionType type, Pageable pageable);
+    /**
+     * 관리자 화면 드릴다운용 — 유형·상품·기간 조합.
+     *
+     * 날짜에 (:from IS NULL OR ...) 를 쓰지 않는다. PostgreSQL이 null 파라미터의 타입을
+     * 추론하지 못해 "could not determine data type of parameter" 로 깨진다(실측).
+     * 호출부가 범위 없음을 넓은 경계 값으로 바꿔 넘긴다.
+     */
+    @Query("SELECT t FROM InventoryTransaction t " +
+           "WHERE (:type IS NULL OR t.type = :type) " +
+           "AND (:productId IS NULL OR t.productId = :productId) " +
+           "AND t.createdAt >= :from AND t.createdAt < :to " +
+           "ORDER BY t.id DESC")
+    Page<InventoryTransaction> search(@Param("type") InventoryTransactionType type,
+                                      @Param("productId") Long productId,
+                                      @Param("from") LocalDateTime from,
+                                      @Param("to") LocalDateTime to,
+                                      Pageable pageable);
 
     // 기존 배포분 백필: type이 없는 구 조정행을 ADJUST로 채운다.
     // clearAutomatically: 벌크 UPDATE는 영속성 컨텍스트를 거치지 않아, 이미 로드된 관리 엔티티는 이후 조회에서도

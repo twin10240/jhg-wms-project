@@ -3,6 +3,7 @@ package com.jhg.wms.service;
 import com.jhg.wms.client.OmsDeliveryNotifier;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
+import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.domain.Reservation;
 import com.jhg.wms.domain.ReservationStatus;
@@ -15,8 +16,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -749,5 +754,125 @@ class InventoryServiceTest {
 
         assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}");
         assertThat(repo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(4);   // 재고 불변
+    }
+
+    // ── 드릴다운 조회 ────────────────────────────────────────────
+
+    /** createdAt은 of()가 now()로 박으므로, 기간 경계를 시험하려면 심어서 넣어야 한다. */
+    private void seedTxnAt(Long productId, InventoryTransactionType type, int delta, LocalDateTime at) {
+        var txn = InventoryTransaction.of(productId, type, delta, 0, delta, null, null, "test");
+        ReflectionTestUtils.setField(txn, "createdAt", at);
+        adjustmentRepo.save(txn);
+    }
+
+    @Test
+    void 상품으로_좁히면_다른_상품은_안_나온다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(2L, InventoryTransactionType.RECEIVE, 20, LocalDateTime.of(2026, 9, 3, 10, 0));
+
+        var page = service.findTransactions(null, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(InventoryTransaction::getProductId)
+                .containsOnly(1L);
+    }
+
+    // 반개구간 [from 00:00, to+1일 00:00). buildLedger와 같은 경계여야 수불대장과 상세가 맞는다.
+    @Test
+    void 종료일_당일은_포함하고_다음날은_제외한다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 1, LocalDateTime.of(2026, 9, 30, 23, 59));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 2, LocalDateTime.of(2026, 10, 1, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 3, LocalDateTime.of(2026, 8, 31, 23, 59));
+
+        var page = service.findTransactions(null, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(InventoryTransaction::getDelta)
+                .containsExactlyInAnyOrder(1);
+    }
+
+    @Test
+    void 유형과_상품과_기간을_함께_건다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.SHIP, -4, LocalDateTime.of(2026, 9, 5, 10, 0));
+        seedTxnAt(2L, InventoryTransactionType.SHIP, -7, LocalDateTime.of(2026, 9, 5, 10, 0));
+
+        var page = service.findTransactions(InventoryTransactionType.SHIP, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(InventoryTransaction::getDelta)
+                .containsExactly(-4);
+    }
+
+    // 범위를 안 걸면 전건이 나와야 한다 — 날짜를 넓은 경계로 대체하는 처리가 조용히 걸러내면 안 된다.
+    // 코드가 쓰는 경계는 1970/9999다. 2020/2030처럼 그보다 훨씬 좁은 값으로 심으면, 이 테스트는
+    // NO_LOWER_BOUND/NO_UPPER_BOUND가 세기 단위로 넓다는 사실이 아니라 "웬만큼 넓다"만 확인하게
+    // 되어 그 상수가 실수로 좁아져도 못 잡는다. 1971/2999로 그 상수 자체를 겨눈다.
+    @Test
+    void 범위를_안_걸면_전건이_나온다() {
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 10, LocalDateTime.of(1971, 1, 1, 0, 0));
+        seedTxnAt(2L, InventoryTransactionType.SHIP, -4, LocalDateTime.of(2999, 12, 31, 0, 0));
+
+        var page = service.findTransactions(null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).hasSize(2);
+    }
+
+    // search(...)는 이 리포지토리에서 @Query + Pageable을 쓰는 첫 메서드다 — 나머지 페이징
+    // 메서드는 전부 파생 쿼리라 Spring Data가 카운트 쿼리를 알아서 만든다. @Query를 쓰면
+    // Spring Data가 JPQL에서 카운트 쿼리를 유도해야 하는데, 지금까지 모든 픽스처가 한 페이지
+    // 안에 들어가 PageableExecutionUtils가 카운트 실행 자체를 건너뛰어 왔다 — 21건을 심어
+    // 두 페이지로 나눠 그 카운트 쿼리를 실제 PostgreSQL에 대해 처음 실행시킨다.
+    @Test
+    void 페이지를_넘는_건수는_카운트_쿼리로_totalPages를_계산한다() {
+        for (int i = 0; i < 21; i++)
+            seedTxnAt(1L, InventoryTransactionType.RECEIVE, 1, LocalDateTime.of(2026, 9, 3, 10, i));
+
+        var page = service.findTransactions(null, 1L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), PageRequest.of(0, 20));
+
+        assertThat(page.getTotalElements()).isEqualTo(21);
+        assertThat(page.getTotalPages()).isEqualTo(2);
+    }
+
+    @Test
+    void 한_상품의_수불행을_꺼낸다() {
+        seedTxnAt(1L, InventoryTransactionType.OPENING, 100, LocalDateTime.of(2026, 8, 1, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 20, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.SHIP, -15, LocalDateTime.of(2026, 9, 11, 10, 0));
+
+        var row = service.ledgerRowOf(1L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30))
+                .orElseThrow();
+
+        assertThat(row.opening()).isEqualTo(100);
+        assertThat(row.closing()).isEqualTo(105);
+    }
+
+    @Test
+    void 트랜잭션이_전혀_없는_상품은_수불행이_없다() {
+        assertThat(service.ledgerRowOf(999L,
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30))).isEmpty();
+    }
+
+    // 이 기능이 성립한다는 것의 정의: 대조 줄의 '이동'과 같은 범위 트랜잭션의 변동 합이 같다.
+    // 나머지가 다 통과해도 이게 깨지면 드릴다운이 요약과 다른 이야기를 하는 것이다.
+    @Test
+    void 대조줄의_이동과_범위_트랜잭션_변동합이_같다() {
+        seedTxnAt(1L, InventoryTransactionType.OPENING, 100, LocalDateTime.of(2026, 8, 1, 0, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 20, LocalDateTime.of(2026, 9, 3, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.SHIP, -15, LocalDateTime.of(2026, 9, 11, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.RETURN, 3, LocalDateTime.of(2026, 9, 20, 10, 0));
+        seedTxnAt(1L, InventoryTransactionType.RECEIVE, 99, LocalDateTime.of(2026, 10, 5, 10, 0));
+        seedTxnAt(2L, InventoryTransactionType.RECEIVE, 77, LocalDateTime.of(2026, 9, 5, 10, 0));
+
+        LocalDate from = LocalDate.of(2026, 9, 1), to = LocalDate.of(2026, 9, 30);
+        var row = service.ledgerRowOf(1L, from, to).orElseThrow();
+        int deltaSum = service.findTransactions(null, 1L, from, to, PageRequest.of(0, 100))
+                .getContent().stream().mapToInt(InventoryTransaction::getDelta).sum();
+
+        assertThat(row.closing() - row.opening()).isEqualTo(deltaSum);
+        assertThat(deltaSum).isEqualTo(8);
+        assertThat(row.opening()).isEqualTo(100);
+        assertThat(row.closing()).isEqualTo(108);
     }
 }

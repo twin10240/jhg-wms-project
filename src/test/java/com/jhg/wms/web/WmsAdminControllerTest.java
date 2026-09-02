@@ -22,11 +22,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -71,7 +73,8 @@ class WmsAdminControllerTest {
 
     @Test
     void 이력화면에_transactions_모델이_담긴다() throws Exception {
-        when(inventoryService.findTransactions(eq(null), any())).thenReturn(new PageImpl<>(List.of()));
+        when(inventoryService.findTransactions(eq(null), eq(null), eq(null), eq(null), any()))
+                .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
                 .andExpect(status().isOk())
@@ -82,7 +85,7 @@ class WmsAdminControllerTest {
     @Test
     void 이력화면_트랜잭션_유형_필터가_동작한다() throws Exception {
         InventoryTransaction receive = InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 10, 0, 10, "PO#1", null, null);
-        when(inventoryService.findTransactions(eq(InventoryTransactionType.RECEIVE), any()))
+        when(inventoryService.findTransactions(eq(InventoryTransactionType.RECEIVE), eq(null), eq(null), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(receive)));
 
         mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")).param("type", "RECEIVE"))
@@ -94,7 +97,7 @@ class WmsAdminControllerTest {
     @Test
     void 이력화면은_상품명_한글유형_한글참조를_표시한다() throws Exception {
         when(inventoryService.findAllRows()).thenReturn(List.of(new InventoryRowResponse(1L, "상품 1", 10, 0, 10)));
-        when(inventoryService.findTransactions(eq(null), any())).thenReturn(new PageImpl<>(List.of(
+        when(inventoryService.findTransactions(eq(null), eq(null), eq(null), eq(null), any())).thenReturn(new PageImpl<>(List.of(
                 InventoryTransaction.of(1L, InventoryTransactionType.SHIP, -2, 12, 10, "ORDER#52", null, null),
                 InventoryTransaction.of(1L, InventoryTransactionType.RECEIVE, 5, 10, 15, "PO#7", null, null))));
 
@@ -509,6 +512,41 @@ class WmsAdminControllerTest {
     }
 
     @Test
+    void 수불대장_상품행은_상품과_기간을_실은_링크를_들고_있다() throws Exception {
+        when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+        when(inventoryService.findInvariantViolations(any())).thenReturn(List.of());
+
+        String html = mockMvc.perform(get("/admin/inventory/ledger")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains(
+                "data-href=\"/admin/inventory/transactions?productId=1&amp;from=2026-09-01&amp;to=2026-09-30\"");
+    }
+
+    // 합계 행은 상품이 아니다 — 눌리면 productId 없는 링크로 떨어진다.
+    @Test
+    void 수불대장_합계행에는_링크가_붙지_않는다() throws Exception {
+        when(inventoryService.buildLedger(any(), any())).thenReturn(List.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+        when(inventoryService.findInvariantViolations(any())).thenReturn(List.of());
+
+        String html = mockMvc.perform(get("/admin/inventory/ledger")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        java.util.regex.Matcher tfoot = java.util.regex.Pattern
+                .compile("<tfoot.*?</tfoot>", java.util.regex.Pattern.DOTALL).matcher(html);
+        assertThat(tfoot.find()).as("tfoot 합계 블록이 렌더돼야 한다").isTrue();
+        assertThat(tfoot.group()).doesNotContain("data-href");
+    }
+
+    @Test
     void 수불대장_기간이_뒤집히면_500이_아니라_에러메시지를_렌더링한다() throws Exception {
         when(inventoryService.buildLedger(any(), any()))
                 .thenThrow(new IllegalArgumentException("시작일이 종료일보다 뒤입니다."));
@@ -550,7 +588,7 @@ class WmsAdminControllerTest {
                 1L, InventoryTransactionType.ADJUST, 3, 10, 13, null, "파손 정정", "manager");
         InventoryTransaction legacy = InventoryTransaction.of(
                 1L, InventoryTransactionType.ADJUST, 1, 13, 14, null, "구 데이터", null);
-        when(inventoryService.findTransactions(eq(null), any()))
+        when(inventoryService.findTransactions(eq(null), eq(null), eq(null), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(withActor, legacy)));
 
         String html = mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR")))
@@ -564,6 +602,193 @@ class WmsAdminControllerTest {
                 "행위자가 있는 행은 사유 컬럼 다음 셀에 사용자명을 표시해야 한다");
         assertTrue(Pattern.compile("구 데이터</td>\\s*<td>—</td>").matcher(html).find(),
                 "행위자가 없는 행은 사유 컬럼 다음 셀에 —를 표시해야 한다");
+    }
+
+    @Test
+    void 이력화면이_상품과_기간을_받아_서비스에_넘긴다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/admin/inventory/transactions").with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("productId", 1L))
+                .andExpect(model().attribute("from", java.time.LocalDate.of(2026, 9, 1)))
+                .andExpect(model().attribute("to", java.time.LocalDate.of(2026, 9, 30)));
+
+        // Mockito는 매처를 하나라도 쓰면 전 인자를 매처로 요구한다 — null·1L도 eq()로 감싼다.
+        verify(inventoryService).findTransactions(eq(null), eq(1L),
+                eq(java.time.LocalDate.of(2026, 9, 1)), eq(java.time.LocalDate.of(2026, 9, 30)), any());
+    }
+
+    // 탭이 범위를 떨어뜨리면 유형을 누를 때마다 전역 저널로 튕겨 드릴다운이 한 번 쓰고 끝난다.
+    @Test
+    void 유형탭과_범위해제_링크가_범위를_유지하거나_턴다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 유형 탭은 범위를 실어 나른다 — 네 값이 같은 href 안에 다 있어야 한다.
+        // 페이지 어딘가에 흩어져 있는 것만으로는(다른 탭이 productId를 들고 있어도)
+        // 이 탭 하나가 범위를 놓쳤는지 구분하지 못한다.
+        assertThat(html).containsPattern(
+                "href=\"[^\"]*type=RECEIVE[^\"]*productId=1[^\"]*from=2026-09-01[^\"]*to=2026-09-30[^\"]*\"");
+        // 범위 해제는 상품·기간을 떼고 유형만 남긴다
+        assertThat(html).containsPattern("href=\"[^\"]*/admin/inventory/transactions\"[^>]*>\\s*범위 해제");
+    }
+
+    @Test
+    void 범위가_없으면_범위배지를_렌더하지_않는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("범위 해제");
+    }
+
+    // to만 걸려도 findTransactions는 null인 from 쪽만 넓은 경계로 채우고 to는 그대로 좁은 경계로
+    // 쓴다 — 결과가 실제로 좁혀지는데 배지가 없으면 사용자는 걸린 필터를 보지도, 끄지도 못한다.
+    @Test
+    void 이력화면이_종료일만_걸려도_범위배지를_렌더한다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("범위 해제");
+        assertThat(html).contains("2026-09-30 까지");
+    }
+
+    @Test
+    void 이력화면이_시작일만_걸리면_null을_문자열로_찍지_않는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("from", "2026-09-01"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("2026-09-01 이후");
+        // SpEL의 +는 null 피연산자를 문자열 "null"로 이어붙인다 — from만 있을 때 화면에
+        // '~ null'이 그대로 찍히는 회귀는 위 텍스트 확인만으로는 못 잡으므로 따로 확인한다.
+        assertThat(html).doesNotContain("~ null");
+    }
+
+    @Test
+    void 범위가_다_걸리면_대조줄을_렌더한다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+        when(inventoryService.ledgerRowOf(eq(1L), any(), any())).thenReturn(java.util.Optional.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 탭 라벨("기초")과 이동 줄 위 HTML 주석("이동")은 대조 줄이 통째로 사라져도
+        // 그대로 남는다 — id로 대조 줄만 뽑아 태그를 지우고 각 숫자를 라벨에 붙여 확인해야
+        // 델타(closing - opening) 계산이 실제로 검증된다.
+        Matcher recon = Pattern.compile("<p[^>]*id=\"ledger-recon\"[^>]*>(.*?)</p>", Pattern.DOTALL)
+                .matcher(html);
+        assertThat(recon.find()).as("대조 줄이 렌더돼야 한다").isTrue();
+        String reconText = recon.group(1).replaceAll("<[^>]*>", "").replaceAll("\\s+", " ").trim();
+        assertThat(reconText).isEqualTo("기초 100 + 이동 8 = 기말 108");
+    }
+
+    // 대조 줄은 기간 전체 기준인데, 유형 탭을 누르면 아래 목록은 그 유형만 남는다 — 줄이 그대로면
+    // "요약과 상세가 어긋난다"는 이 기능이 막으려는 바로 그 오해를 사용자가 보게 된다.
+    @Test
+    void 유형이_걸리면_대조줄에_기간_전체_기준_안내가_붙는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+        when(inventoryService.ledgerRowOf(eq(1L), any(), any())).thenReturn(java.util.Optional.of(
+                new InventoryService.LedgerRow(1L, "상품 1", 100, 0, 20, 3, -15, 0, 0, 108)));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-01").param("to", "2026-09-30")
+                        .param("type", "RECEIVE"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher recon = Pattern.compile("<p[^>]*id=\"ledger-recon\"[^>]*>(.*?)</p>", Pattern.DOTALL)
+                .matcher(html);
+        assertThat(recon.find()).as("대조 줄이 렌더돼야 한다").isTrue();
+        String reconText = recon.group(1).replaceAll("<[^>]*>", "").replaceAll("\\s+", " ").trim();
+        assertThat(reconText).contains("기간 전체 기준(아래 목록은 유형·페이지로 잘려 있습니다)");
+    }
+
+    // search(...)의 카운트 쿼리가 도는지는 서비스 테스트가 확인한다 — 여기서는 그 결과(45건,
+    // 3페이지)를 받았을 때 "다음 →" 링크가 유형·상품·기간을 놓치지 않는지를 본다. 페이지 어딘가에
+    // 흩어져 있는 것만으로는(다른 탭·다른 페이지 링크가 같은 토큰을 들고 있어도) 이 링크 하나가
+    // 값을 놓쳤는지 구분하지 못하므로, "다음" 앵커의 href 속성값 하나로 범위를 좁혀 확인한다.
+    @Test
+    void 다음_페이지_링크가_유형_상품_기간을_모두_싣는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(1, 20), 45));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("type", "RECEIVE").param("productId", "1")
+                        .param("from", "2026-09-01").param("to", "2026-09-30")
+                        .param("page", "1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher nextLink = Pattern.compile("<a[^>]*href=\"([^\"]*)\"[^>]*>\\s*다음").matcher(html);
+        assertThat(nextLink.find()).as("다음 페이지 링크가 렌더돼야 한다").isTrue();
+        String href = nextLink.group(1);
+        assertThat(href).containsPattern("type=RECEIVE.*productId=1.*from=2026-09-01.*to=2026-09-30");
+    }
+
+    // 범위가 없으면 기초·기말이 정의되지 않는다 — 빈 껍데기를 두지 않는다.
+    @Test
+    void 범위가_없으면_대조줄을_렌더하지_않고_조회도_하지_않는다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR")).param("productId", "1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("ledger-recon");
+        verify(inventoryService, never()).ledgerRowOf(any(), any(), any());
+    }
+
+    // from이 to보다 뒤인 역전 범위 — buildLedger가 던지는 IllegalArgumentException이
+    // 이 핸들러까지 올라오면 500이 된다. 이전에는(대조 줄 도입 전) 같은 URL이 빈 목록으로
+    // 정상 렌더됐으므로 그 동작을 그대로 지켜야 한다.
+    @Test
+    void 시작일이_종료일보다_뒤면_대조줄_없이_정상_렌더한다() throws Exception {
+        when(inventoryService.findTransactions(any(), any(), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        String html = mockMvc.perform(get("/admin/inventory/transactions")
+                        .with(user("op").roles("OPERATOR"))
+                        .param("productId", "1").param("from", "2026-09-30").param("to", "2026-09-01"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).doesNotContain("ledger-recon");
+        verify(inventoryService, never()).ledgerRowOf(any(), any(), any());
     }
 
     @Test

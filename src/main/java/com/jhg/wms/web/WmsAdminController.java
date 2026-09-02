@@ -9,6 +9,7 @@ import com.jhg.wms.service.ReplenishmentRequestService;
 import com.jhg.wms.service.ReturnAnalyticsService;
 import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class WmsAdminController {
@@ -110,16 +112,34 @@ public class WmsAdminController {
 
     @GetMapping("/admin/inventory/transactions")
     public String inventoryTransactions(@RequestParam(required = false) InventoryTransactionType type,
+                                        @RequestParam(required = false) Long productId,
+                                        @RequestParam(required = false) LocalDate from,
+                                        @RequestParam(required = false) LocalDate to,
                                         @RequestParam(defaultValue = "0") int page,
                                         Model model) {
         var pageable = org.springframework.data.domain.PageRequest.of(page, 20);
-        var txnPage = inventoryService.findTransactions(type, pageable);
+        var txnPage = inventoryService.findTransactions(type, productId, from, to, pageable);
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         model.addAttribute("transactions", txnPage.getContent());
         model.addAttribute("currentPage", txnPage.getNumber());
         model.addAttribute("totalPages", txnPage.getTotalPages());
         model.addAttribute("filterType", type);
+        // 템플릿이 탭·페이징 링크에 그대로 실어 나른다 — 없으면 유형을 누를 때마다 범위가 풀린다.
+        model.addAttribute("productId", productId);
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        // 셋이 다 있을 때만 기초·기말이 정의된다. 그때만 조회하고, 그때만 템플릿이 대조 줄을 낸다.
+        // from이 to보다 뒤인 역전 범위는 buildLedger가 예외를 던진다 — 이 URL은 원래
+        // 트랜잭션 목록이 빈 채로 정상 렌더됐으므로, 대조 줄만 빼고 그 동작을 그대로 지킨다.
+        if (productId != null && from != null && to != null && !from.isAfter(to))
+            try {
+                inventoryService.ledgerRowOf(productId, from, to)
+                        .ifPresent(row -> model.addAttribute("ledgerRow", row));
+            } catch (RuntimeException e) {
+                // 대조 줄은 부가 정보다 — 목록은 이미 조회됐으므로 여기서 화면 전체를 잃지 않는다.
+                log.warn("대조 줄 계산 실패(무시): productId={} from={} to={}", productId, from, to, e);
+            }
         return "admin/inventory-transactions";
     }
 
