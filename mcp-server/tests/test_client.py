@@ -80,3 +80,40 @@ def test_연결_실패를_빈_결과와_구분한다(monkeypatch):
     with pytest.raises(client.WmsError) as e:
         client.get_return_rates("2026-08-01", "2026-08-31")
     assert "연결" in str(e.value)
+
+
+def test_자격증명이_없으면_소켓을_열기_전에_거절한다(monkeypatch):
+    # _build_client의 실제 본문을 도는 유일한 테스트다. 나머지는 이 함수를 통째로 갈아끼운다.
+    monkeypatch.delenv("WMS_USER", raising=False)
+    monkeypatch.delenv("WMS_PASSWORD", raising=False)
+
+    with pytest.raises(client.WmsError) as e:
+        client.get_return_rates("2026-08-01", "2026-08-31")
+    assert "WMS_USER" in str(e.value)
+
+
+def test_클라이언트가_베이스URL과_자격증명을_제대로_싣는다(monkeypatch):
+    # (user, password) 순서가 뒤바뀌거나 base_url을 빠뜨려도 다른 테스트는 전부 통과한다.
+    import base64
+
+    monkeypatch.setenv("WMS_USER", "wms-user")
+    monkeypatch.setenv("WMS_PASSWORD", "wms-secret")
+
+    http = client._build_client()
+    try:
+        # base_url 검증
+        assert str(http.base_url) == client.BASE_URL
+
+        # timeout 검증
+        assert http.timeout.read == client.TIMEOUT
+
+        # 자격증명 순서 검증: BasicAuth의 미리 계산된 헤더를 검사한다.
+        auth_header = http._auth._auth_header
+        assert auth_header.startswith("Basic ")
+        encoded = auth_header[6:]
+        decoded = base64.b64decode(encoded).decode('utf-8')
+        user, password = decoded.split(':', 1)
+        assert user == "wms-user"
+        assert password == "wms-secret"
+    finally:
+        http.close()
