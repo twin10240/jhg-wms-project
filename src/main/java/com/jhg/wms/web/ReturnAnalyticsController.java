@@ -3,15 +3,11 @@ package com.jhg.wms.web;
 import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.service.ReturnAnalyticsService;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -34,6 +30,8 @@ import java.util.List;
  * 소비자: mcp-server/wms_mcp/client.py가 이 넷의 URL 리터럴과 from·to 파라미터 이름을
  * 그대로 하드코딩해 부른다. 여기서 경로·파라미터 이름을 바꾸면 그쪽도 같이 고쳐야 한다
  * (Java 테스트는 이 불일치를 잡지 못한다).
+ *
+ * <p>400 평문 오류 계약은 {@link AnalyticsErrorAdvice}가 담당한다.
  */
 @RestController
 @RequestMapping("/api/analytics")
@@ -92,41 +90,5 @@ public class ReturnAnalyticsController {
                     "알 수 없는 category '" + category
                             + "'. 다음 중 하나여야 합니다: DAMAGED, WRONG_ITEM, CHANGED_MIND, OTHER, UNCLASSIFIED");
         }
-    }
-
-    /**
-     * 400이지 500이 아니다. 역전된 기간(서비스의 cohort())과 알 수 없는 범주 이름
-     * (ReturnCategory.valueOf)이 여기로 온다.
-     *
-     * 이 구분이 MCP 서버에서 커진다 — 모델이 "내가 인자를 잘못 줬다"와 "창고가 고장났다"를
-     * 구분할 수 있어야 스스로 고친다. 본문은 평문이다(README의 기존 API 오류 계약).
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleBadRequest(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(e.getMessage());
-    }
-
-    /**
-     * 필수 파라미터 누락(from·to)은 기본적으로 DefaultHandlerExceptionResolver가 sendError로
-     * 처리한다 — MockMvc에서는 빈 본문, 실배포에서는 서블릿 ERROR 재디스패치를 거쳐 Boot의
-     * BasicErrorController가 JSON을 낸다. 둘 다 이 표면의 평문 계약을 어긴다. 여기서 직접 잡는다.
-     */
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<String> handleMissingParam(MissingServletRequestParameterException e) {
-        return ResponseEntity.badRequest()
-                .body("필수 파라미터 '" + e.getParameterName() + "'가 없습니다.");
-    }
-
-    /**
-     * 위와 같은 이유로 직접 잡는다. 날짜(from·to)와 상품 ID(productId)가 대상이다.
-     *
-     * 기대 타입을 보고 문구를 가른다 — 상품 ID에 "YYYY-MM-DD여야 한다"고 답하면
-     * 모델이 상품 ID 자리에 날짜를 넣는다. 고치라는 말이 틀리면 없느니만 못하다.
-     */
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<String> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
-        String expected = e.getRequiredType() == LocalDate.class ? "YYYY-MM-DD 날짜" : "정수";
-        return ResponseEntity.badRequest()
-                .body("파라미터 '" + e.getName() + "'의 형식이 올바르지 않습니다. " + expected + " 형식이어야 합니다.");
     }
 }
