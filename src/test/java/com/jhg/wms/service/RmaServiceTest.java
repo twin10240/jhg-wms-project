@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 @DataJpaTest
 class RmaServiceTest {
@@ -53,8 +54,8 @@ class RmaServiceTest {
             if (inventoryRepo.findByProductId(pid).isEmpty())
                 inventoryRepo.save(Inventory.create(pid, qty + 10));
         });
-        inventoryService.reserveAll(orderId, items);
-        inventoryService.shipAll(orderId, items);
+        inventoryService.reserveAll(keyOf(orderId), orderId, items);
+        inventoryService.shipAll(keyOf(orderId), items);
     }
 
     private CreateRmaRequest req(String key, long orderId, String reason,
@@ -109,7 +110,7 @@ class RmaServiceTest {
     @Test
     void 미출고_주문이면_거부() {
         inventoryRepo.save(Inventory.create(1L, 10));
-        inventoryService.reserveAll(100L, Map.of(1L, 5));
+        inventoryService.reserveAll(keyOf(100L), 100L, Map.of(1L, 5));
         assertThatThrownBy(() -> rmaService.createReturn(
                 req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 1))))
                 .isInstanceOf(IllegalArgumentException.class)

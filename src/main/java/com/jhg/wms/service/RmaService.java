@@ -31,7 +31,10 @@ public class RmaService {
     public CreateResult createReturn(CreateRmaRequest request) {
         validateCreateRequest(request);
 
-        Reservation reservation = reservationRepository.findByOrderIdWithLock(request.orderId())
+        // orderId는 유일하지 않다(OMS DB 초기화로 재사용). 반품은 가장 최근 주문을 대상으로 본다.
+        // 반품 요청이 주문의 requestKey를 함께 싣게 되면 이 조회는 requestKey 단건으로 바뀐다.
+        Reservation reservation = reservationRepository.findByOrderIdLatestFirstWithLock(request.orderId())
+                .stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "예약이 없습니다. orderId=" + request.orderId()));
 

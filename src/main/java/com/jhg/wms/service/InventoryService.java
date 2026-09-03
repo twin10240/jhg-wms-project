@@ -81,9 +81,9 @@ public class InventoryService {
     }
 
     /** 재고 쓰기(reserve/ship/release) 공통 입구 검증. 모든 경로가 통과하는 유일 지점. */
-    private static void validateWriteRequest(Long orderId, Map<Long, Integer> qtyByProductId) {
-        if (orderId == null)
-            throw new IllegalArgumentException("orderId는 필수입니다.");
+    private static void validateWriteRequest(UUID requestKey, Map<Long, Integer> qtyByProductId) {
+        if (requestKey == null)
+            throw new IllegalArgumentException("requestKey는 필수입니다.");
         if (qtyByProductId == null || qtyByProductId.isEmpty())
             throw new IllegalArgumentException("품목이 없습니다.");
         qtyByProductId.forEach((pid, qty) -> {
@@ -95,19 +95,25 @@ public class InventoryService {
     }
 
     /**
-     * 전부-아니면-실패 예약. orderId 멱등: 같은 주문 + 같은 품목 재요청은 현재 상태 그대로 반환.
-     * 같은 orderId인데 품목·수량이 다르면 409 — OMS·WMS DB가 따로 초기화돼 orderId가 재사용되면
-     * 과거 예약이 현재 주문의 예약으로 오인된다. 상태는 보지 않는다(SHIPPED·RELEASED도 동일하게 거부).
+     * 전부-아니면-실패 예약. <b>requestKey 멱등</b>: 같은 키 + 같은 품목 재요청은 현재 상태 그대로 반환.
+     * 같은 requestKey인데 품목·수량이 다르면 409. 상태는 보지 않는다(SHIPPED·RELEASED도 동일하게 거부).
+     *
+     * <p>키가 orderId가 아닌 이유: OMS DB가 초기화되면 orderId 시퀀스가 1부터 다시 발급된다.
+     * 그때 품목까지 우연히 같으면(로컬에서 같은 테스트 주문 재실행) 옛 예약이 신규 주문의 예약으로
+     * 조용히 반환돼, 재고는 잡히지 않았는데 OMS만 성공으로 믿는 상태가 됐다. requestKey는
+     * OMS가 주문마다 새로 만드는 UUID라 세대가 달라지면 반드시 다르다.
      */
     @Transactional
-    public boolean reserveAll(Long orderId, Map<Long, Integer> qtyByProductId) {
-        validateWriteRequest(orderId, qtyByProductId);
-        Reservation existing = reservationRepository.findByOrderId(orderId).orElse(null);
+    public boolean reserveAll(UUID requestKey, Long orderId, Map<Long, Integer> qtyByProductId) {
+        validateWriteRequest(requestKey, qtyByProductId);
+        if (orderId == null)
+            throw new IllegalArgumentException("orderId는 필수입니다.");
+        Reservation existing = reservationRepository.findByRequestKey(requestKey).orElse(null);
         if (existing != null) {
             Map<Long, Integer> ledger = existing.getQtyByProductId();
             if (!ledger.equals(qtyByProductId))
-                throw new IllegalStateException("orderId 예약 원장 불일치 — 같은 orderId의 기존 예약과 요청 품목이 다릅니다."
-                        + " orderId=" + orderId + ", 기존원장=" + new TreeMap<>(ledger)
+                throw new IllegalStateException("requestKey 예약 원장 불일치 — 같은 requestKey의 기존 예약과 요청 품목이 다릅니다."
+                        + " requestKey=" + requestKey + ", 기존원장=" + new TreeMap<>(ledger)
                         + ", 요청=" + new TreeMap<>(qtyByProductId));
             return existing.getStatus() != ReservationStatus.RELEASED;
         }
@@ -120,7 +126,7 @@ public class InventoryService {
             if (inv == null || inv.getAvailableQty() < e.getValue()) return false;
         }
         qtyByProductId.forEach((pid, qty) -> byId.get(pid).reserve(qty));
-        reservationRepository.save(Reservation.reserve(orderId, qtyByProductId));
+        reservationRepository.save(Reservation.reserve(requestKey, orderId, qtyByProductId));
         return true;
     }
 
@@ -131,13 +137,13 @@ public class InventoryService {
      * SHIPPED + 송장이 채워진 상태를 보고 같은 값을 반환한다.
      */
     @Transactional
-    public ShipResponse shipAll(Long orderId, Map<Long, Integer> qtyByProductId) {
-        validateWriteRequest(orderId, qtyByProductId);
+    public ShipResponse shipAll(UUID requestKey, Map<Long, Integer> qtyByProductId) {
+        validateWriteRequest(requestKey, qtyByProductId);
         // 잠금 조회로 바꾼다 — 두 요청이 동시에 오면 둘 다 SHIPPED 검사를 통과해 송장이 두 장 나온다.
-        Reservation reservation = reservationRepository.findByOrderIdWithLock(orderId)
-                .orElseThrow(() -> new IllegalStateException("예약이 없어 출고할 수 없습니다. orderId=" + orderId));
+        Reservation reservation = reservationRepository.findByRequestKeyWithLock(requestKey)
+                .orElseThrow(() -> new IllegalStateException("예약이 없어 출고할 수 없습니다. requestKey=" + requestKey));
         if (reservation.getStatus() == ReservationStatus.RELEASED)
-            throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. orderId=" + orderId);
+            throw new IllegalStateException("해제된 예약은 출고할 수 없습니다. requestKey=" + requestKey);
 
         if (reservation.getStatus() != ReservationStatus.SHIPPED) {
             // 호출자 요청 수량이 아니라 예약 원장(SSOT)을 재생한다 — 수량 오염·누락행 침묵 스킵 차단.
@@ -153,7 +159,7 @@ public class InventoryService {
                 inv.ship(qty);
                 transactionRepository.save(InventoryTransaction.of(
                     pid, InventoryTransactionType.SHIP, -qty, before, inv.getOnHandQty(),
-                    "ORDER#" + orderId, null, actorProvider.current()));
+                    "ORDER#" + reservation.getOrderId(), null, actorProvider.current()));
             });
             reservation.ship();
         }
@@ -173,32 +179,33 @@ public class InventoryService {
      * @return 이번 호출이 배송 완료를 처음 기록했으면 true, 이미 기록돼 있어 통지만 재발송했으면 false
      */
     @Transactional
-    public boolean markDelivered(Long orderId) {
-        Reservation reservation = reservationRepository.findByOrderIdWithLock(orderId)
-                .orElseThrow(() -> new IllegalStateException("예약이 없어 배송 완료할 수 없습니다. orderId=" + orderId));
+    public boolean markDelivered(UUID requestKey) {
+        Reservation reservation = reservationRepository.findByRequestKeyWithLock(requestKey)
+                .orElseThrow(() -> new IllegalStateException("예약이 없어 배송 완료할 수 없습니다. requestKey=" + requestKey));
         if (reservation.getStatus() != ReservationStatus.SHIPPED)
-            throw new IllegalStateException("출고된 주문만 배송 완료할 수 있습니다. orderId=" + orderId);
+            throw new IllegalStateException("출고된 주문만 배송 완료할 수 있습니다. requestKey=" + requestKey);
         if (reservation.getTrackingNumber() == null)
-            throw new IllegalStateException("송장이 없어 배송 완료할 수 없습니다. orderId=" + orderId);
+            throw new IllegalStateException("송장이 없어 배송 완료할 수 없습니다. requestKey=" + requestKey);
 
         boolean firstTime = reservation.getDeliveredAt() == null;
         if (firstTime)
             reservation.deliver(Instant.now());
-        omsDeliveryNotifier.notifyAfterCommit(orderId, reservation.getDeliveredAt());
+        // 콜백에 두 값을 다 싣는다 — OMS는 requestKey로 주문을 특정하고, orderId는 사람이 읽는 참조다.
+        omsDeliveryNotifier.notifyAfterCommit(requestKey, reservation.getOrderId(), reservation.getDeliveredAt());
         return firstTime;
     }
 
     /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. 출고된 예약은 해제 거부(반쪽 상태 오염 방지). */
     @Transactional
-    public void releaseAll(Long orderId, Map<Long, Integer> qtyByProductId) {
-        validateWriteRequest(orderId, qtyByProductId);
+    public void releaseAll(UUID requestKey, Map<Long, Integer> qtyByProductId) {
+        validateWriteRequest(requestKey, qtyByProductId);
         // shipAll과 동일하게 잠금 조회를 쓴다 — ship/release 경합이 Inventory의 @Version이 패자를
         // 튕겨내는 우연(현재 flush 순서가 reservation을 inventory보다 먼저 반영하는 것)에 기대지 않고,
         // 락 순서가 명시적으로 결정되도록 한다.
-        reservationRepository.findByOrderIdWithLock(orderId).ifPresent(r -> {
+        reservationRepository.findByRequestKeyWithLock(requestKey).ifPresent(r -> {
             if (r.getStatus() == ReservationStatus.RELEASED) return;
             if (r.getStatus() == ReservationStatus.SHIPPED)
-                throw new IllegalStateException("출고된 예약은 해제할 수 없습니다. orderId=" + orderId);
+                throw new IllegalStateException("출고된 예약은 해제할 수 없습니다. requestKey=" + requestKey);
             applyFromLedger(r.getQtyByProductId(), Inventory::release);
             r.release();
         });
@@ -218,10 +225,10 @@ public class InventoryService {
 
     /**
      * 송장 조회(읽기 전용). 송장이 발급되지 않은 예약과 없는 예약은 똑같이 비어 있는 결과다.
-     * 잠금 없는 findByOrderId를 쓴다 — 아무것도 쓰지 않으므로 다른 요청을 막을 이유가 없다.
+     * 잠금 없는 findByRequestKey를 쓴다 — 아무것도 쓰지 않으므로 다른 요청을 막을 이유가 없다.
      */
-    public Optional<ShipmentResponse> findShipment(Long orderId) {
-        return reservationRepository.findByOrderId(orderId)
+    public Optional<ShipmentResponse> findShipment(UUID requestKey) {
+        return reservationRepository.findByRequestKey(requestKey)
                 .filter(r -> r.getTrackingNumber() != null)
                 .map(ShipmentResponse::from);
     }

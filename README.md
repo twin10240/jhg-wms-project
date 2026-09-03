@@ -69,7 +69,7 @@
 | S4 | 양방향 | 회복탄력성 — 타임아웃 · best-effort · 보상 스윕 |
 | S5 | 양방향 | 반품(RMA) — OMS가 접수 `POST /api/returns`, WMS가 입고·검수 결과 통지 `POST /api/return-status-events` |
 | S6 | WMS → OMS | 배송 완료 통지 `POST /api/delivery-events` — 창고가 기록하면 OMS 주문이 `DELIVERED`로 전이 |
-| S7 | OMS → WMS | 송장 조회 `GET /api/shipments/{orderId}` — OMS가 자기 송장·배송 상태의 불일치를 확인·복구 |
+| S7 | OMS → WMS | 송장 조회 `GET /api/shipments/{requestKey}` — OMS가 자기 송장·배송 상태의 불일치를 확인·복구 |
 
 보충 흐름: OMS가 백오더로 부족을 감지 → WMS에 **보충 요청** → WMS 관리자가 **승인 → 발주 생성 → 입고** → 재고 증가 → S3로 OMS에 통지 → OMS가 백오더 승격. (상세: 아래 [보충 요청과 발주](#보충-요청과-발주) · [OMS 재고보충 통지](#oms-재고보충-통지-s3-채널3) 절)
 
@@ -138,15 +138,15 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 |--------|-----|------|
 | GET | `/api/inventory/availability?productIds=1,2,3` | 가용수량 맵 반환 (OMS 채널1 연동) |
 | GET | `/api/inventory/rows` | 전체 재고 목록 (관리자) |
-| GET | `/api/shipments/{orderId}` | 송장·배송 상태 조회 (읽기 전용) |
+| GET | `/api/shipments/{requestKey}` | 송장·배송 상태 조회 (읽기 전용) |
 
 ### 주문 이행 재고 쓰기
 
 | Method | URL | Body | 설명 |
 |--------|-----|------|------|
-| POST | `/api/inventory/reserve` | `{"orderId":1,"items":{"1":3,"2":1}}` | 예약 (멱등) |
-| POST | `/api/inventory/ship` | `{"orderId":1,"items":{"1":3,"2":1}}` | 출고 |
-| POST | `/api/inventory/release` | `{"orderId":1,"items":{"1":3,"2":1}}` | 예약 해제 |
+| POST | `/api/inventory/reserve` | `{"requestKey":"UUID","orderId":1,"items":{"1":3,"2":1}}` | 예약 (`requestKey` 멱등) |
+| POST | `/api/inventory/ship` | `{"requestKey":"UUID","items":{"1":3,"2":1}}` | 출고 |
+| POST | `/api/inventory/release` | `{"requestKey":"UUID","items":{"1":3,"2":1}}` | 예약 해제 |
 
 #### 출고 응답 — 송장 (V3.1)
 
@@ -154,20 +154,23 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 
 ```json
 {
+  "requestKey": "3f2a9c14-8b7e-4d21-9f60-0c5a1e7b4d33",
   "orderId": 202,
   "carrierCode": "MOCK",
   "carrierName": "테스트택배",
-  "trackingNumber": "MOCK-202-20260827063000",
+  "trackingNumber": "MOCK-202-20260827063000-3f2a9c14",
   "issuedAt": "2026-08-27T06:30:00.123456Z"
 }
 ```
 
-- **송장번호 규칙**: `MOCK-{orderId}-{yyyyMMddHHmmss}`. 시각은 **UTC**이며 `issuedAt`과 같은 순간(초 단위)입니다.
+- **송장번호 규칙**: `MOCK-{orderId}-{yyyyMMddHHmmss}-{requestKey 앞 8자}`. 시각은 **UTC**이며 `issuedAt`과 같은 순간(초 단위)입니다.
+  뒤의 8자가 없으면 재사용된 `orderId`가 같은 초에 출고될 때 같은 문자열이 나와 유니크 제약에 걸립니다.
 - **주문당 1건**: `Reservation`이 주문당 1행이라 송장도 하나뿐입니다. 재호출해도 재고를 다시 깎지 않고
   송장도 재발급하지 않으며, **최초에 발급한 같은 송장을 반환**합니다.
 - **이 기능 이전에 출고된 주문**은 송장이 없습니다. 재호출하면 재고는 그대로 두고 송장만 발급합니다.
 - **`trackingNumber`를 키로 쓰지 마세요.** 발급 시각이 들어가므로 WMS DB가 초기화되면 같은 주문이
-  다른 번호를 받습니다. **상관관계는 `orderId`로** 잡고 `trackingNumber`는 표시용으로 저장하세요.
+  다른 번호를 받습니다. **상관관계는 `requestKey`로** 잡고 `trackingNumber`는 표시용으로 저장하세요.
+  `orderId`도 키가 아닙니다 — OMS DB가 초기화되면 재사용됩니다.
 - `status` 필드는 없습니다 — 성공 응답은 항상 `SHIPPED`이고 나머지는 HTTP 오류입니다.
 - **`issuedAt`은 초 미만(마이크로초) 정밀도를 가집니다** — 실제 값은 `Instant.now()`에서 만들어지고
   DB `timestamp(6)`을 그대로 왕복합니다. 위 예시의 `.123456`처럼 소수점 이하 자릿수가 매번 달라지므로,
@@ -178,11 +181,11 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 
 | 코드 | 조건 |
 |---|---|
-| `400` | 형식 검증 실패 — `orderId` 누락, 품목 없음, 수량 0 이하 |
+| `400` | 형식 검증 실패 — `requestKey` 누락, `orderId` 누락(reserve만), 품목 없음, 수량 0 이하 |
 | `409` | 예약 없음, 해제된 예약 출고 시도 |
 
 **성공(200) 응답은 JSON이지만, 오류(400/409) 응답은 JSON이 아니라 일반 텍스트(plain text) 메시지
-본문입니다.** 예: `예약이 없어 출고할 수 없습니다. orderId=5001`. JSON 디코더를 상태 코드와
+본문입니다.** 예: `예약이 없어 출고할 수 없습니다. requestKey=3f2a9c14-...`. JSON 디코더를 상태 코드와
 무관하게 본문에 바로 적용하면 409(영구적 비즈니스 충돌)가 디코드 오류로 오분류돼 재시도 루프에
 빠질 수 있습니다 — **상태 코드로 먼저 분기한 뒤에 파싱하세요.**
 
@@ -198,15 +201,16 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 OMS가 자기 쪽 송장·배송 상태와 대조해 불일치를 복구하기 위한 **읽기 전용** 엔드포인트입니다.
 
 ```
-GET /api/shipments/{orderId}
+GET /api/shipments/{requestKey}
 ```
 
 ```json
 {
+  "requestKey": "3f2a9c14-8b7e-4d21-9f60-0c5a1e7b4d33",
   "orderId": 202,
   "carrierCode": "MOCK",
   "carrierName": "테스트택배",
-  "trackingNumber": "MOCK-202-20260827063000",
+  "trackingNumber": "MOCK-202-20260827063000-3f2a9c14",
   "issuedAt": "2026-08-27T06:30:00.123456Z",
   "deliveredAt": "2026-08-28T01:00:00.123456Z"
 }
@@ -218,7 +222,7 @@ GET /api/shipments/{orderId}
 - **아무것도 바꾸지 않습니다**: 조회는 재고·예약·송장·배송 상태를 건드리지 않고, 송장 재발급이나 출고 처리도 하지 않습니다. 몇 번을 호출해도 같은 값입니다.
 - **출고 응답(`POST /api/inventory/ship`) 계약은 그대로입니다** — 그쪽에는 `deliveredAt`이 없습니다(출고 시점에는 항상 null이고, 이미 OMS가 파싱 중인 계약을 바꾸지 않기 위해 별도 응답으로 둡니다).
 - `issuedAt`·`deliveredAt` 모두 **마이크로초 정밀도**입니다 — 초 단위 고정 패턴 파서 대신 `Instant.parse` 등 ISO-8601 instant 파서를 쓰세요.
-- **`trackingNumber`를 키로 쓰지 마세요** — WMS DB가 초기화되면 같은 주문이 다른 번호를 받습니다. 상관관계는 `orderId`입니다.
+- **`trackingNumber`도 `orderId`도 키가 아닙니다** — 전자는 WMS DB 초기화로, 후자는 OMS DB 초기화로 바뀝니다. 상관관계는 `requestKey`입니다.
 
 ### 재고 상태 흐름
 
@@ -404,7 +408,7 @@ Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — **이 분�
 
 ### OMS 배송 완료 통지 (S6)
 
-창고가 `/admin/reservations`에서 **배송 완료**를 누르면 `Reservation.deliveredAt`을 남기고, `OmsDeliveryNotifier`가 커밋 후 OMS `POST /api/delivery-events` 에 `{"orderId":202,"deliveredAt":"2026-08-28T01:00:00.123456Z"}` 를 보냅니다 — OMS가 `Delivery`를 `DELIVERED`로 올립니다. OMS는 이 상태에서만 고객 반품 신청을 허용하므로, 반품 흐름이 열리는 시점이기도 합니다.
+창고가 `/admin/reservations`에서 **배송 완료**를 누르면 `Reservation.deliveredAt`을 남기고, `OmsDeliveryNotifier`가 커밋 후 OMS `POST /api/delivery-events` 에 `{"requestKey":"3f2a9c14-...","orderId":202,"deliveredAt":"2026-08-28T01:00:00.123456Z"}` 를 보냅니다 — OMS가 `Delivery`를 `DELIVERED`로 올립니다. OMS는 이 상태에서만 고객 반품 신청을 허용하므로, 반품 흐름이 열리는 시점이기도 합니다.
 
 - **대상**: `SHIPPED`이고 송장이 발급된 예약만. 출고 전이거나 송장이 없으면 거부합니다.
 - **작업 큐**: 대시보드의 `배송 대기`(출고 완료 & 배송 완료 미기록) 수치가 예약 화면의 같은 탭으로 연결됩니다.
@@ -423,7 +427,7 @@ Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — **이 분�
 | `/admin/inventory/transactions` | 재고 트랜잭션 이력 — 유형 필터(기초/입고/출고/조정/반품), 상품명·변경 전→후·참조(`발주 #N`/`주문 #N`/`RMA #N`)·사유 표시, 20건씩 페이징 | 인증 |
 | `/admin/inventory/ledger` | 수불대장 — 기간별 상품당 기초·기초설정·입고·반품·출고·조정·실사·기말 집계(원장에서 유도) | 인증 |
 | `/admin/reservations` | 예약 현황 — 상태 필터와 **배송 대기** 탭, 주문별 상품·수량, 송장번호, 배송 완료 여부 표시 | 인증 |
-| `/admin/reservations/{orderId}/deliver` (POST) | 배송 완료 기록 + OMS 통지 (출고·송장 발급된 주문만) | 인증 |
+| `/admin/reservations/{requestKey}/deliver` (POST) | 배송 완료 기록 + OMS 통지 (출고·송장 발급된 주문만) | 인증 |
 | `/admin/purchase-orders` | 발주 목록(`ORDERED`/`PARTIALLY_RECEIVED`/`RECEIVED`/`CANCELLED` 필터) — 미완료를 발주일시 오래된 순으로, 종료된 건은 뒤로 | 인증 |
 | `/admin/purchase-orders` (POST) | 발주 생성(다품목) | **MANAGER** |
 | `/admin/purchase-orders/{poId}` | 발주 상세 — 품목별 발주량·입고량·잔량, 입고 처리(여러 번 나눠 입고) | 인증 |
@@ -457,17 +461,33 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 - 롤은 `OPERATOR`/`MANAGER` 두 가지이며 DB에서 로드합니다. **서버가 최종 권위**(`hasRole`)이고, 화면의 버튼 숨김은 보조 수단입니다 — 권한 없는 경로로 직접 POST해도 403입니다.
 - 자격증명 변경 시 OMS 쪽 변수도 함께 바꿀 것(안 그러면 OMS→WMS 전면 401).
 
-### 예약 멱등성
+### 예약 멱등성 — 키는 `requestKey`다
 
-`Reservation` 엔티티가 `orderId`에 `UNIQUE` 제약을 가집니다.
-동일 `orderId` 재요청은 **품목·수량이 기존 예약 원장과 완전히 같을 때만** 멱등 처리하고,
+`Reservation` 엔티티가 **`requestKey`에 `UNIQUE` 제약**을 가집니다. `requestKey`는 OMS가
+주문을 만들 때 발급하는 UUID이며, 예약·출고·해제·송장조회·배송콜백 전 구간의 유일한 연동 키입니다.
+동일 `requestKey` 재요청은 **품목·수량이 기존 예약 원장과 완전히 같을 때만** 멱등 처리하고,
 현재 상태(`RESERVED/SHIPPED/RELEASED`)를 그대로 반환합니다.
 **다르면 `409`로 거부하고 예약·재고를 건드리지 않습니다.**
 
-`orderId`는 OMS가 발급하는 값이라 WMS가 유일성을 보장할 수 없습니다. OMS DB만 초기화하면
-주문 번호가 1부터 다시 시작하는데 WMS에는 같은 번호의 예약이 남아 있어, 키 존재만 보고 멱등
-처리하면 **과거 예약이 현재 주문의 예약으로 오인됩니다**(실제로 겪은 사고 — 아래 회복탄력성 표).
-멱등키만으로는 부족하고 요청 내용까지 함께 봐야 하는 이유입니다.
+`orderId`는 **키가 아닙니다.** OMS DB의 시퀀스라 초기화하면 1부터 다시 발급되고, 그때 WMS에 남은
+옛 예약과 신규 주문이 같은 번호를 갖습니다. 화면·로그·수불대장 참조(`ORDER#{orderId}`)용으로만
+저장하며 `UNIQUE` 제약이 없습니다 — `RmaResponse`의 `rmaId`와 같은 규칙입니다.
+
+**왜 바꿨나.** 이전에는 `orderId`가 키였고, 재사용된 번호는 "기존 원장과 품목 비교 → 다르면 409"로
+막았습니다. 그런데 **품목·수량까지 같으면**(로컬에서 같은 테스트 주문을 재실행하면 흔합니다)
+409조차 나지 않고 옛 예약이 신규 주문의 것으로 조용히 반환됐습니다. 그 결과:
+
+- `reserveAll`이 재고를 한 톨도 잡지 않은 채 `true`를 반환 → OMS만 예약 성공으로 믿음(재고 과다확약)
+- 이어진 `shipAll`은 이미 `SHIPPED`라 차감을 건너뛰고 **옛 주문의 송장번호를 반환**
+
+즉 409로 막히는 불편이 아니라 **조용한 오답**이었습니다. `requestKey`는 세대가 다르면 반드시
+다르므로 이 경로가 구조적으로 사라집니다. 회귀는 `ReservationRequestKeyTest`가 고정합니다.
+
+> **기존 DB 마이그레이션 필요.** `ddl-auto: update`는 기존 `UNIQUE` 제약을 제거하지 못하고,
+> 행이 있는 테이블에 `NOT NULL` 컬럼을 추가하지도 못합니다. 이미 운영 중인 DB는
+> [`docs/wms-reservation-request-key-migration.sql`](docs/wms-reservation-request-key-migration.sql)을
+> 한 번 실행하세요(반복 실행 안전). dev DB는 2026-09-03 적용 완료(334행 백필).
+> 백필된 `request_key`는 임의 UUID라 OMS가 과거 예약을 다시 주소 잡을 수 없습니다 — 의도된 동작입니다.
 
 개발 DB를 초기화할 때 OMS·WMS를 함께 리셋하는 절차는
 [`docs/oms-wms-manual-verification.md`](docs/oms-wms-manual-verification.md)에 있습니다.
@@ -484,8 +504,8 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 | **DB 장애 중 관리자 화면 접근** | 조회는 503 화면을 직접 렌더 — 목록으로 되돌리지 않음 | 목록·대시보드가 자기 자신으로 리다이렉트하는 무한 루프 차단 |
 | **상대가 응답 없이 매달림(hang)** | RestClient 타임아웃 (connect 1s / read 2s) | 스레드가 묶이지 않고 수 초 내 복귀 |
 | **타임아웃으로 생긴 반쪽 상태** | `shipAll`은 RELEASED 예약 출고를, `releaseAll`은 SHIPPED 예약 해제를 **거부** | `reservedQty` 음수 같은 재고 오염 차단 |
-| **중복 요청 · 재시도** | 예약은 `orderId` UNIQUE로 멱등, 보충 요청은 `requestKey`로 멱등, 통지는 사실 전달이라 자연 멱등 | 재시도해도 수량이 두 번 반영되지 않음 |
-| **`orderId` 재사용(양쪽 DB 개별 초기화)** | 기존 예약 원장과 요청 품목을 비교해 다르면 `409` — 상태는 보지 않음(`SHIPPED`·`RELEASED`도 동일) | 과거 예약을 현재 주문으로 오인해 조용히 성공 처리하던 경로 차단 |
+| **중복 요청 · 재시도** | 예약·보충 요청 모두 `requestKey`로 멱등, 통지는 사실 전달이라 자연 멱등 | 재시도해도 수량이 두 번 반영되지 않음 |
+| **`orderId` 재사용(양쪽 DB 개별 초기화)** | 연동 키가 `orderId`가 아니라 OMS가 주문마다 새로 만드는 `requestKey`(UUID) — 세대가 다르면 키도 다르므로 애초에 만나지 않음 | 과거 예약을 현재 주문으로 오인하는 경로가 구조적으로 사라짐 |
 | **자격증명 오설정으로 조용한 전면 실패** | 운영 프로파일은 자격증명에 **기본값 없음** → 누락·공백이면 기동 실패(fail-fast) | `wms/wms` 같은 기본값으로 운영에 뜨는 사고 차단 |
 | **인증 실패가 성공으로 오인** | `/api/**`는 인증 실패 시 **401을 직접 응답**(폼 로그인 302로 새지 않게) | 호출자가 로그인 페이지를 200으로 받아 "성공"으로 착각하는 문제 차단 |
 

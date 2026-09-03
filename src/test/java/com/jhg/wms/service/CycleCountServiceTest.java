@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 @DataJpaTest
 class CycleCountServiceTest {
@@ -238,7 +239,7 @@ class CycleCountServiceTest {
     void 한_품목이라도_반영_불가면_아무것도_반영하지_않는다() {
         seed(1L, 15);
         seed(2L, 10);
-        inventoryService.reserveAll(77L, Map.of(2L, 8));   // 상품2는 8개가 예약된 상태
+        inventoryService.reserveAll(keyOf(77L), 77L, Map.of(2L, 8));   // 상품2는 8개가 예약된 상태
         flush();
         CycleCount c = service.open(List.of(1L, 2L), "실사");
         flush();

@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 @DataJpaTest
 class InventoryServiceTest {
@@ -56,7 +57,7 @@ class InventoryServiceTest {
     @Test
     void reserveAll_전상품_가용하면_예약하고_true() {
         seed(1L, 10); seed(2L, 5);
-        boolean result = service.reserveAll(99L, Map.of(1L, 3, 2L, 4));
+        boolean result = service.reserveAll(keyOf(99L), 99L, Map.of(1L, 3, 2L, 4));
         assertThat(result).isTrue();
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(3);
         assertThat(repo.findByProductIdIn(List.of(2L)).get(0).getReservedQty()).isEqualTo(4);
@@ -65,7 +66,7 @@ class InventoryServiceTest {
     @Test
     void reserveAll_하나라도_부족하면_아무것도_예약않고_false() {
         seed(1L, 10); seed(2L, 2);
-        boolean result = service.reserveAll(99L, Map.of(1L, 3, 2L, 5));
+        boolean result = service.reserveAll(keyOf(99L), 99L, Map.of(1L, 3, 2L, 5));
         assertThat(result).isFalse();
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
         assertThat(repo.findByProductIdIn(List.of(2L)).get(0).getReservedQty()).isEqualTo(0);
@@ -74,8 +75,8 @@ class InventoryServiceTest {
     @Test
     void shipAll_예약후_출고하면_보유와_예약이_줄어든다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4);
         assertThat(after.getReservedQty()).isEqualTo(0);
@@ -84,8 +85,8 @@ class InventoryServiceTest {
     @Test
     void releaseAll_예약후_해제하면_예약분이_복구된다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.releaseAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.releaseAll(keyOf(99L), Map.of(1L, 6));
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getReservedQty()).isEqualTo(0);
         assertThat(after.getOnHandQty()).isEqualTo(10);
@@ -96,7 +97,7 @@ class InventoryServiceTest {
     @Test
     void reserveAll_음수_수량은_거부하고_예약을_변경하지_않는다() {
         seed(1L, 10);
-        assertThatThrownBy(() -> service.reserveAll(99L, Map.of(1L, -5)))
+        assertThatThrownBy(() -> service.reserveAll(keyOf(99L), 99L, Map.of(1L, -5)))
                 .isInstanceOf(IllegalArgumentException.class);
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getReservedQty()).isEqualTo(0); // 음수 예약이 reservedQty를 깎아 가용을 부풀리면 안 됨
@@ -105,23 +106,23 @@ class InventoryServiceTest {
     @Test
     void reserveAll_0_수량은_거부한다() {
         seed(1L, 10);
-        assertThatThrownBy(() -> service.reserveAll(99L, Map.of(1L, 0)))
+        assertThatThrownBy(() -> service.reserveAll(keyOf(99L), 99L, Map.of(1L, 0)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void shipAll_음수_수량은_거부한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, -3)))
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        assertThatThrownBy(() -> service.shipAll(keyOf(99L), Map.of(1L, -3)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void releaseAll_음수_수량은_거부한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        assertThatThrownBy(() -> service.releaseAll(99L, Map.of(1L, -3)))
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        assertThatThrownBy(() -> service.releaseAll(keyOf(99L), Map.of(1L, -3)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -183,7 +184,7 @@ class InventoryServiceTest {
     @Test
     void findAllRows_예약수량과_가용수량을_포함한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 3));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 3));
         var rows = service.findAllRows();
         assertThat(rows.get(0).onHandQty()).isEqualTo(10);
         assertThat(rows.get(0).reservedQty()).isEqualTo(3);
@@ -209,8 +210,8 @@ class InventoryServiceTest {
     @Test
     void reserveAll_같은_orderId_재호출은_이중예약_없이_true() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        boolean second = service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        boolean second = service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
         assertThat(second).isTrue();
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(6);
     }
@@ -233,28 +234,28 @@ class InventoryServiceTest {
     }
 
     @Test
-    void reserveAll_같은_orderId_다른_상품이면_409용_예외를_던지고_불변이다() {
-        // OMS 주문 52는 상품1×1·상품2×2인데 WMS에는 상품2×1짜리 과거 예약 52가 남은 상황.
+    void reserveAll_같은_requestKey_다른_상품이면_409용_예외를_던지고_불변이다() {
+        // 같은 requestKey로 다른 품목이 온 상황 — 재시도가 아니라 계약 위반이므로 거부한다.
         seed(1L, 10); seed(2L, 10);
-        service.reserveAll(52L, Map.of(2L, 1));
+        service.reserveAll(keyOf(52L), 52L, Map.of(2L, 1));
 
-        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 1, 2L, 2)))
+        assertThatThrownBy(() -> service.reserveAll(keyOf(52L), 52L, Map.of(1L, 1, 2L, 2)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("예약 원장 불일치")
-                .hasMessageContaining("orderId=52");
+                .hasMessageContaining("requestKey=" + keyOf(52L));
 
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
         assertThat(repo.findByProductIdIn(List.of(2L)).get(0).getReservedQty()).isEqualTo(1);
-        assertThat(reservationRepo.findByOrderId(52L).orElseThrow().getQtyByProductId())
+        assertThat(reservationRepo.findByRequestKey(keyOf(52L)).orElseThrow().getQtyByProductId())
                 .isEqualTo(Map.of(2L, 1));
     }
 
     @Test
     void reserveAll_같은_orderId_같은_상품_다른_수량이면_예외를_던지고_불변이다() {
         seed(1L, 10);
-        service.reserveAll(52L, Map.of(1L, 1));
+        service.reserveAll(keyOf(52L), 52L, Map.of(1L, 1));
 
-        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 3)))
+        assertThatThrownBy(() -> service.reserveAll(keyOf(52L), 52L, Map.of(1L, 3)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("예약 원장 불일치");
 
@@ -264,10 +265,10 @@ class InventoryServiceTest {
     @Test
     void reserveAll_기존이_SHIPPED여도_품목이_다르면_예외다() {
         seed(1L, 10); seed(2L, 10);
-        service.reserveAll(52L, Map.of(2L, 1));
-        service.shipAll(52L, Map.of(2L, 1));
+        service.reserveAll(keyOf(52L), 52L, Map.of(2L, 1));
+        service.shipAll(keyOf(52L), Map.of(2L, 1));
 
-        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 1)))
+        assertThatThrownBy(() -> service.reserveAll(keyOf(52L), 52L, Map.of(1L, 1)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("예약 원장 불일치");
 
@@ -279,10 +280,10 @@ class InventoryServiceTest {
     @Test
     void reserveAll_기존이_RELEASED여도_품목이_다르면_예외다() {
         seed(1L, 10); seed(2L, 10);
-        service.reserveAll(52L, Map.of(2L, 1));
-        service.releaseAll(52L, Map.of(2L, 1));
+        service.reserveAll(keyOf(52L), 52L, Map.of(2L, 1));
+        service.releaseAll(keyOf(52L), Map.of(2L, 1));
 
-        assertThatThrownBy(() -> service.reserveAll(52L, Map.of(1L, 1)))
+        assertThatThrownBy(() -> service.reserveAll(keyOf(52L), 52L, Map.of(1L, 1)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("예약 원장 불일치");
 
@@ -293,9 +294,9 @@ class InventoryServiceTest {
     @Test
     void shipAll_이미_출고됐으면_노옵() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6)); // 두 번째: no-op, 예외 없음
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6)); // 두 번째: no-op, 예외 없음
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4); // 한 번만 차감됨
     }
@@ -305,10 +306,10 @@ class InventoryServiceTest {
     @Test
     void findShipment_발급된_송장과_배송상태를_돌려준다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        ShipResponse shipped = service.shipAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        ShipResponse shipped = service.shipAll(keyOf(99L), Map.of(1L, 6));
 
-        ShipmentResponse inTransit = service.findShipment(99L).orElseThrow();
+        ShipmentResponse inTransit = service.findShipment(keyOf(99L)).orElseThrow();
         assertThat(inTransit.orderId()).isEqualTo(99L);
         assertThat(inTransit.carrierCode()).isEqualTo("MOCK");
         assertThat(inTransit.carrierName()).isEqualTo("테스트택배");
@@ -316,37 +317,37 @@ class InventoryServiceTest {
         assertThat(inTransit.issuedAt()).isEqualTo(shipped.issuedAt());
         assertThat(inTransit.deliveredAt()).isNull();          // 배송 중
 
-        service.markDelivered(99L);
-        assertThat(service.findShipment(99L).orElseThrow().deliveredAt())
-                .isEqualTo(reservationRepo.findByOrderId(99L).orElseThrow().getDeliveredAt());
+        service.markDelivered(keyOf(99L));
+        assertThat(service.findShipment(keyOf(99L)).orElseThrow().deliveredAt())
+                .isEqualTo(reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow().getDeliveredAt());
     }
 
     @Test
     void findShipment_예약이_없거나_송장이_미발급이면_비어있다() {
-        assertThat(service.findShipment(404L)).isEmpty();       // 예약 없음
+        assertThat(service.findShipment(keyOf(404L))).isEmpty();       // 예약 없음
 
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));                 // 출고 전 = 송장 미발급
-        assertThat(service.findShipment(99L)).isEmpty();
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));                 // 출고 전 = 송장 미발급
+        assertThat(service.findShipment(keyOf(99L))).isEmpty();
     }
 
     @Test
     void findShipment_여러_번_조회해도_아무것도_바꾸지_않는다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
-        service.markDelivered(99L);
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
+        service.markDelivered(keyOf(99L));
         long txnsBefore = adjustmentRepo.count();
 
-        ShipmentResponse first = service.findShipment(99L).orElseThrow();
-        service.findShipment(99L);
-        ShipmentResponse third = service.findShipment(99L).orElseThrow();
+        ShipmentResponse first = service.findShipment(keyOf(99L)).orElseThrow();
+        service.findShipment(keyOf(99L));
+        ShipmentResponse third = service.findShipment(keyOf(99L)).orElseThrow();
 
         assertThat(third).isEqualTo(first);                     // 송장·발급시각·배송시각 그대로
         Inventory inv = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(inv.getOnHandQty()).isEqualTo(4);
         assertThat(inv.getReservedQty()).isEqualTo(0);
-        assertThat(reservationRepo.findByOrderId(99L).orElseThrow().getStatus())
+        assertThat(reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow().getStatus())
                 .isEqualTo(ReservationStatus.SHIPPED);
         assertThat(adjustmentRepo.count()).isEqualTo(txnsBefore);
     }
@@ -356,16 +357,16 @@ class InventoryServiceTest {
     @Test
     void markDelivered_시각을_남기고_OMS에_통지하되_재고는_건드리지_않는다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
         long txnsBefore = adjustmentRepo.count();
 
-        assertThat(service.markDelivered(99L)).isTrue();   // 최초 기록
+        assertThat(service.markDelivered(keyOf(99L))).isTrue();   // 최초 기록
 
-        Reservation r = reservationRepo.findByOrderId(99L).orElseThrow();
+        Reservation r = reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow();
         assertThat(r.getDeliveredAt()).isNotNull();
         assertThat(r.getStatus()).isEqualTo(ReservationStatus.SHIPPED);   // 상태는 그대로 — 세 군데 SHIPPED 분기를 안 건드린다
-        verify(deliveryNotifier).notifyAfterCommit(99L, r.getDeliveredAt());
+        verify(deliveryNotifier).notifyAfterCommit(keyOf(99L), 99L, r.getDeliveredAt());
 
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4);                    // 출고 때 깎인 그대로
@@ -376,23 +377,23 @@ class InventoryServiceTest {
     @Test
     void markDelivered_재호출은_시각을_덮어쓰지_않고_통지만_재발송한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
-        service.markDelivered(99L);
-        Instant first = reservationRepo.findByOrderId(99L).orElseThrow().getDeliveredAt();
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
+        service.markDelivered(keyOf(99L));
+        Instant first = reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow().getDeliveredAt();
 
-        assertThat(service.markDelivered(99L)).isFalse();   // 통지만 재발송
+        assertThat(service.markDelivered(keyOf(99L))).isFalse();   // 통지만 재발송
 
-        assertThat(reservationRepo.findByOrderId(99L).orElseThrow().getDeliveredAt()).isEqualTo(first);
-        verify(deliveryNotifier, times(2)).notifyAfterCommit(99L, first);  // 통지 유실 시 재클릭이 복구 경로
+        assertThat(reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow().getDeliveredAt()).isEqualTo(first);
+        verify(deliveryNotifier, times(2)).notifyAfterCommit(keyOf(99L), 99L, first);  // 통지 유실 시 재클릭이 복구 경로
     }
 
     @Test
     void markDelivered_출고전_예약은_거부한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
 
-        assertThatThrownBy(() -> service.markDelivered(99L))
+        assertThatThrownBy(() -> service.markDelivered(keyOf(99L)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("출고된 주문만");
         verifyNoInteractions(deliveryNotifier);
@@ -401,13 +402,13 @@ class InventoryServiceTest {
     @Test
     void markDelivered_송장이_없으면_거부한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
         // 송장 발급 이전에 출고된 기존 주문 재현 — shipAll을 거치지 않고 상태만 SHIPPED로 만든다.
-        Reservation r = reservationRepo.findByOrderId(99L).orElseThrow();
+        Reservation r = reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow();
         r.ship();
         em.flush();
 
-        assertThatThrownBy(() -> service.markDelivered(99L))
+        assertThatThrownBy(() -> service.markDelivered(keyOf(99L)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("송장이 없어");
         verifyNoInteractions(deliveryNotifier);
@@ -415,7 +416,7 @@ class InventoryServiceTest {
 
     @Test
     void markDelivered_예약이_없으면_거부한다() {
-        assertThatThrownBy(() -> service.markDelivered(404L))
+        assertThatThrownBy(() -> service.markDelivered(keyOf(404L)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("예약이 없어");
         verifyNoInteractions(deliveryNotifier);
@@ -424,7 +425,7 @@ class InventoryServiceTest {
     @Test
     void releaseAll_예약없으면_노옵() {
         seed(1L, 10);
-        service.releaseAll(99L, Map.of(1L, 6)); // 예약 없이 해제 → no-op, 예외 없음
+        service.releaseAll(keyOf(99L), Map.of(1L, 6)); // 예약 없이 해제 → no-op, 예외 없음
         assertThat(repo.findByProductIdIn(List.of(1L)).get(0).getReservedQty()).isEqualTo(0);
     }
 
@@ -433,10 +434,10 @@ class InventoryServiceTest {
         // 취소 release가 처리됐는데 응답만 타임아웃난 반쪽 상태에서 출고가 들어온 시나리오 —
         // 가드 없으면 reservedQty가 음수로 내려가 가용수량이 부풀려진다(침묵 오염).
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.releaseAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.releaseAll(keyOf(99L), Map.of(1L, 6));
 
-        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
+        assertThatThrownBy(() -> service.shipAll(keyOf(99L), Map.of(1L, 6)))
                 .isInstanceOf(IllegalStateException.class);
 
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
@@ -449,10 +450,10 @@ class InventoryServiceTest {
         // 출고가 처리됐는데 응답만 타임아웃난 반쪽 상태에서 취소가 들어온 시나리오 —
         // 가드 없으면 reservedQty가 음수로 내려가 가용수량이 부풀려진다(shipAll 가드의 대칭).
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
 
-        assertThatThrownBy(() -> service.releaseAll(99L, Map.of(1L, 6)))
+        assertThatThrownBy(() -> service.releaseAll(keyOf(99L), Map.of(1L, 6)))
                 .isInstanceOf(IllegalStateException.class);
 
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
@@ -462,8 +463,8 @@ class InventoryServiceTest {
 
     @Test
     void findAllReservations_ID_역순으로_반환한다() {
-        reservationRepo.save(Reservation.reserve(1L, Map.of(1L, 1)));
-        reservationRepo.save(Reservation.reserve(2L, Map.of(1L, 1)));
+        reservationRepo.save(Reservation.reserve(keyOf(1L), 1L, Map.of(1L, 1)));
+        reservationRepo.save(Reservation.reserve(keyOf(2L), 2L, Map.of(1L, 1)));
         var list = service.findAllReservations();
         assertThat(list).hasSize(2);
         assertThat(list.get(0).getOrderId()).isEqualTo(2L);
@@ -480,14 +481,14 @@ class InventoryServiceTest {
         seed(1L, 5);
 
         // 첫 번째 예약: 성공
-        boolean first = service.reserveAll(1L, Map.of(1L, 3));
+        boolean first = service.reserveAll(keyOf(1L), 1L, Map.of(1L, 3));
         assertThat(first).isTrue();
         Inventory after1st = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after1st.getReservedQty()).isEqualTo(3);
         assertThat(after1st.getAvailableQty()).isEqualTo(2); // 5 - 3 = 2
 
         // 두 번째 예약: 실패 (가용 2 < 요청 3)
-        boolean second = service.reserveAll(2L, Map.of(1L, 3));
+        boolean second = service.reserveAll(keyOf(2L), 2L, Map.of(1L, 3));
         assertThat(second).isFalse();
         Inventory after2nd = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after2nd.getReservedQty()).isEqualTo(3); // 변경 없음
@@ -502,7 +503,7 @@ class InventoryServiceTest {
         // → 둘 다 예약 안 함
         seed(1L, 5); seed(2L, 2);
 
-        boolean result = service.reserveAll(99L, Map.of(1L, 3, 2L, 4));
+        boolean result = service.reserveAll(keyOf(99L), 99L, Map.of(1L, 3, 2L, 4));
         assertThat(result).isFalse();
 
         Inventory inv1 = repo.findByProductIdIn(List.of(1L)).get(0);
@@ -516,8 +517,8 @@ class InventoryServiceTest {
     @Test
     void reserveAll_예약수량을_원장에_저장한다() {
         seed(1L, 10); seed(2L, 5);
-        service.reserveAll(99L, Map.of(1L, 3, 2L, 4));
-        var reservation = reservationRepo.findByOrderId(99L).orElseThrow();
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 3, 2L, 4));
+        var reservation = reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow();
         assertThat(reservation.getQtyByProductId())
                 .containsExactlyInAnyOrderEntriesOf(Map.of(1L, 3, 2L, 4));
     }
@@ -526,8 +527,8 @@ class InventoryServiceTest {
     void shipAll_호출자가_잘못된_수량을_보내도_원장수량으로_출고한다() {
         // SSOT: 예약은 6이었으므로, 출고 요청이 9로 와도 원장의 6만 차감해야 한다(수량 오염 차단).
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 9));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 9));
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4);   // 10 - 6
         assertThat(after.getReservedQty()).isEqualTo(0); // 6 - 6
@@ -536,8 +537,8 @@ class InventoryServiceTest {
     @Test
     void releaseAll_호출자가_잘못된_수량을_보내도_원장수량으로_해제한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.releaseAll(99L, Map.of(1L, 2));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.releaseAll(keyOf(99L), Map.of(1L, 2));
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getReservedQty()).isEqualTo(0); // 6 - 6 (요청 2가 아님)
         assertThat(after.getOnHandQty()).isEqualTo(10);
@@ -547,10 +548,10 @@ class InventoryServiceTest {
     void shipAll_원장_상품의_재고행이_사라졌으면_침묵스킵대신_예외() {
         // 예약 후 재고 행이 사라진 비정상 상태 — 예약은 SHIPPED로 넘기고 재고는 안 깎는 침묵 누수를 막는다.
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
         repo.deleteAll();
 
-        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
+        assertThatThrownBy(() -> service.shipAll(keyOf(99L), Map.of(1L, 6)))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -559,8 +560,8 @@ class InventoryServiceTest {
     @Test
     void shipAll_출고하면_SHIP_트랜잭션이_상품당_남는다() {
         seed(1L, 10); seed(2L, 5);
-        service.reserveAll(77L, Map.of(1L, 3, 2L, 2));
-        service.shipAll(77L, Map.of(1L, 3, 2L, 2));
+        service.reserveAll(keyOf(77L), 77L, Map.of(1L, 3, 2L, 2));
+        service.shipAll(keyOf(77L), Map.of(1L, 3, 2L, 2));
         var ships = adjustmentRepo.findAllByOrderByIdDesc().stream()
                 .filter(t -> t.getType() == com.jhg.wms.domain.InventoryTransactionType.SHIP).toList();
         assertThat(ships).hasSize(2);
@@ -575,8 +576,8 @@ class InventoryServiceTest {
         seed(1L, 0);
         service.applyDelta(1L, 100, InventoryTransactionType.OPENING, null, null); // 100
         service.applyDelta(1L, 50, InventoryTransactionType.RECEIVE, "PO#1", null); // 150
-        service.reserveAll(10L, Map.of(1L, 30));
-        service.shipAll(10L, Map.of(1L, 30));                                       // 120
+        service.reserveAll(keyOf(10L), 10L, Map.of(1L, 30));
+        service.shipAll(keyOf(10L), Map.of(1L, 30));                                       // 120
         service.adjust(1L, -5, "파손");                                            // 115
 
         int deltaSum = adjustmentRepo.findAllByOrderByIdDesc().stream()
@@ -690,8 +691,8 @@ class InventoryServiceTest {
     @Test
     void 출고도_행위자를_남긴다() {
         seed(1L, 10);
-        service.reserveAll(1L, Map.of(1L, 3));
-        service.shipAll(1L, Map.of(1L, 3));
+        service.reserveAll(keyOf(1L), 1L, Map.of(1L, 3));
+        service.shipAll(keyOf(1L), Map.of(1L, 3));
 
         assertThat(adjustmentRepo.findAll())
                 .filteredOn(t -> t.getType() == InventoryTransactionType.SHIP)
@@ -702,24 +703,24 @@ class InventoryServiceTest {
     @Test
     void shipAll_출고하면_MOCK_송장을_발급한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
 
-        ShipResponse res = service.shipAll(99L, Map.of(1L, 6));
+        ShipResponse res = service.shipAll(keyOf(99L), Map.of(1L, 6));
 
         assertThat(res.orderId()).isEqualTo(99L);
         assertThat(res.carrierCode()).isEqualTo("MOCK");
         assertThat(res.carrierName()).isEqualTo("테스트택배");
-        assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}");
+        assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}-[0-9a-f]{8}");
         assertThat(res.issuedAt()).isNotNull();
     }
 
     @Test
     void shipAll_재호출해도_같은_송장을_주고_재고는_한_번만_줄어든다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
 
-        ShipResponse first = service.shipAll(99L, Map.of(1L, 6));
-        ShipResponse again = service.shipAll(99L, Map.of(1L, 6));
+        ShipResponse first = service.shipAll(keyOf(99L), Map.of(1L, 6));
+        ShipResponse again = service.shipAll(keyOf(99L), Map.of(1L, 6));
 
         assertThat(again.trackingNumber()).isEqualTo(first.trackingNumber());
         assertThat(again.issuedAt()).isEqualTo(first.issuedAt());
@@ -729,30 +730,30 @@ class InventoryServiceTest {
     @Test
     void shipAll_재고행이_없어_실패하면_송장도_생기지_않는다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
         // 예약 후 재고 행이 사라진 상태 — 출고 루프가 예외를 던지고 송장 발급에 도달하지 못한다.
         repo.delete(repo.findByProductId(1L).orElseThrow());
         em.flush();
 
-        assertThatThrownBy(() -> service.shipAll(99L, Map.of(1L, 6)))
+        assertThatThrownBy(() -> service.shipAll(keyOf(99L), Map.of(1L, 6)))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(reservationRepo.findByOrderId(99L).orElseThrow().getTrackingNumber()).isNull();
+        assertThat(reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow().getTrackingNumber()).isNull();
     }
 
     @Test
     void shipAll_이미_출고됐지만_송장이_없으면_송장만_보완한다() {
         seed(1L, 10);
-        service.reserveAll(99L, Map.of(1L, 6));
-        service.shipAll(99L, Map.of(1L, 6));
+        service.reserveAll(keyOf(99L), 99L, Map.of(1L, 6));
+        service.shipAll(keyOf(99L), Map.of(1L, 6));
         // 이 기능 이전에 출고된 주문 재현 — 송장 세 필드를 모두 비운다.
         em.createQuery("UPDATE Reservation r SET r.trackingNumber = null, r.carrierCode = null, "
                 + "r.issuedAt = null WHERE r.orderId = 99").executeUpdate();
         em.clear();
 
-        ShipResponse res = service.shipAll(99L, Map.of(1L, 6));
+        ShipResponse res = service.shipAll(keyOf(99L), Map.of(1L, 6));
 
-        assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}");
+        assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}-[0-9a-f]{8}");
         assertThat(repo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(4);   // 재고 불변
     }
 

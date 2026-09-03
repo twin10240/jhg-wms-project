@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 // InventoryControllerTest와 같은 이유로 DbUserDetailsService 목빈이 필요하다(webChain 로딩용).
 @WebMvcTest(ShipmentController.class)
@@ -33,11 +34,12 @@ class ShipmentControllerTest {
 
     @Test
     void 송장이_발급된_주문은_모든_필드를_반환한다() throws Exception {
-        when(inventoryService.findShipment(202L)).thenReturn(Optional.of(new ShipmentResponse(
-                202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, DELIVERED_AT)));
+        when(inventoryService.findShipment(keyOf(202L))).thenReturn(Optional.of(new ShipmentResponse(
+                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, DELIVERED_AT)));
 
-        mockMvc.perform(get("/api/shipments/202").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-0000000000ca").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requestKey").value("00000000-0000-0000-0000-0000000000ca"))
                 .andExpect(jsonPath("$.orderId").value(202))
                 .andExpect(jsonPath("$.carrierCode").value("MOCK"))
                 .andExpect(jsonPath("$.carrierName").value("테스트택배"))
@@ -49,10 +51,10 @@ class ShipmentControllerTest {
 
     @Test
     void 배송_중이면_deliveredAt은_null이다() throws Exception {
-        when(inventoryService.findShipment(202L)).thenReturn(Optional.of(new ShipmentResponse(
-                202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, null)));
+        when(inventoryService.findShipment(keyOf(202L))).thenReturn(Optional.of(new ShipmentResponse(
+                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, null)));
 
-        mockMvc.perform(get("/api/shipments/202").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-0000000000ca").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
                 // 필드가 빠지는 게 아니라 null로 나간다 — OMS가 키 존재 여부로 분기하지 않아도 된다.
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"deliveredAt\":null")))
@@ -61,15 +63,15 @@ class ShipmentControllerTest {
 
     @Test
     void 예약이_없거나_송장_미발급이면_404다() throws Exception {
-        when(inventoryService.findShipment(404L)).thenReturn(Optional.empty());
+        when(inventoryService.findShipment(keyOf(404L))).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/shipments/404").with(httpBasic("wms", "wms")))
+        mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-000000000194").with(httpBasic("wms", "wms")))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void 인증이_없으면_401이고_서비스를_부르지_않는다() throws Exception {
-        mockMvc.perform(get("/api/shipments/202"))
+        mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-0000000000ca"))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(inventoryService);

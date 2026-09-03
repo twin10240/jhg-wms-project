@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 @DisplayName("동시 예약이 가용수량을 넘지 못한다 (오버셀 방지)")
 class InventoryConcurrencyTest extends ConcurrencySupport {
@@ -24,7 +25,7 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         seedInventory(pid, 5);
 
         RaceResult result = race(2, i ->
-                inventoryService.reserveAll(ORDER_BASE + i, Map.of(pid, 3)));
+                inventoryService.reserveAll(keyOf(ORDER_BASE + i), ORDER_BASE + i, Map.of(pid, 3)));
 
         assertThat(result.succeeded()).isEqualTo(1);
         assertThat(reservedOf(pid)).isEqualTo(3);
@@ -37,7 +38,7 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         seedInventory(pid, 10);
 
         RaceResult result = race(5, i ->
-                inventoryService.reserveAll(ORDER_BASE + 10 + i, Map.of(pid, 3)));
+                inventoryService.reserveAll(keyOf(ORDER_BASE + 10 + i), ORDER_BASE + 10 + i, Map.of(pid, 3)));
 
         // 몇 건이 성공하느냐는 스케줄링에 따라 흔들린다(실측 1~2건). 그래서 고정 단언 대신
         // 상한(불변 조건)과 하한(최소 성공)을 함께 둔다. 상한만 두면 succeeded()==0에서
@@ -64,7 +65,7 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         long pid = PID_BASE + 3;
         long orderId = ORDER_BASE + 20;
         seedInventory(pid, 10);
-        inventoryService.reserveAll(orderId, Map.of(pid, 4));
+        inventoryService.reserveAll(keyOf(orderId), orderId, Map.of(pid, 4));
 
         // 두 스레드가 받은 송장번호를 모은다. 주의: 잠금을 없애도 이 값 자체는 갈라지지 않는다 —
         // 진 스레드는 재고 감소 루프에서 Inventory의 @Version 충돌로 ObjectOptimisticLockingFailureException을
@@ -72,7 +73,7 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         // 잠금 해제를 실제로 잡아내는 건 바로 아래 succeeded()==2다 — 이 테스트의 힘은 거기서 나온다.
         Set<String> trackingNumbers = ConcurrentHashMap.newKeySet();
         RaceResult result = race(2, i -> {
-            trackingNumbers.add(inventoryService.shipAll(orderId, Map.of(pid, 4)).trackingNumber());
+            trackingNumbers.add(inventoryService.shipAll(keyOf(orderId), Map.of(pid, 4)).trackingNumber());
             return true;
         });
 
@@ -94,8 +95,8 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         long pid = PID_BASE + 4;
         long orderId = ORDER_BASE + 30;
         seedInventory(pid, 10);
-        inventoryService.reserveAll(orderId, Map.of(pid, 4));
-        inventoryService.shipAll(orderId, Map.of(pid, 4));   // SHIPPED + 송장 발급 완료 상태로 만든다
+        inventoryService.reserveAll(keyOf(orderId), orderId, Map.of(pid, 4));
+        inventoryService.shipAll(keyOf(orderId), Map.of(pid, 4));   // SHIPPED + 송장 발급 완료 상태로 만든다
 
         // 이 기능 이전에 출고된 주문(트래킹 없는 SHIPPED)을 재현한다 — 송장 세 필드를 모두 비운다.
         // 벌크 JPQL UPDATE는 테스트 트랜잭션이 없는 이 클래스에서 tx로 직접 커밋해야 한다.
@@ -115,7 +116,7 @@ class InventoryConcurrencyTest extends ConcurrencySupport {
         // 훨씬 촘촘해 각자 발급이면 사실상 항상 갈라진다 — 그래서 진짜 판별은 이쪽에 싣는다.
         Set<Instant> issuedAts = ConcurrentHashMap.newKeySet();
         RaceResult result = race(2, i -> {
-            ShipResponse res = inventoryService.shipAll(orderId, Map.of(pid, 4));
+            ShipResponse res = inventoryService.shipAll(keyOf(orderId), Map.of(pid, 4));
             trackingNumbers.add(res.trackingNumber());
             issuedAts.add(res.issuedAt());
             return true;

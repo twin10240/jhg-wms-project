@@ -45,17 +45,17 @@ public class InventoryController {
 
     @PostMapping("/reserve")
     public boolean reserve(@RequestBody InventoryWriteRequest req) {
-        return inventoryService.reserveAll(req.orderId(), req.items());
+        return inventoryService.reserveAll(req.requestKey(), req.orderId(), req.items());
     }
 
     @PostMapping("/ship")
     public ShipResponse ship(@RequestBody InventoryWriteRequest req) {
-        return inventoryService.shipAll(req.orderId(), req.items());
+        return inventoryService.shipAll(req.requestKey(), req.items());
     }
 
     @PostMapping("/release")
     public void release(@RequestBody InventoryWriteRequest req) {
-        inventoryService.releaseAll(req.orderId(), req.items());
+        inventoryService.releaseAll(req.requestKey(), req.items());
     }
 
     /** 잘못된 요청(음수/0 수량 등) → 400. */

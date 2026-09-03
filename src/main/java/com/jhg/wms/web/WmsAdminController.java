@@ -91,13 +91,13 @@ public class WmsAdminController {
      * 배송 완료 처리. MANAGER 전용으로 두지 않은 이유는 재고 조정과 같다 —
      * 승인 성격의 "결정"이 아니라 현장이 관측한 사실의 기록이라 OPERATOR도 남길 수 있어야 한다.
      */
-    @PostMapping("/admin/reservations/{orderId}/deliver")
-    public String deliver(@PathVariable Long orderId, RedirectAttributes ra) {
+    @PostMapping("/admin/reservations/{requestKey}/deliver")
+    public String deliver(@PathVariable java.util.UUID requestKey, RedirectAttributes ra) {
         try {
-            boolean firstTime = inventoryService.markDelivered(orderId);
+            boolean firstTime = inventoryService.markDelivered(requestKey);
             ra.addFlashAttribute("successMessage", firstTime
-                    ? "배송 완료 처리했습니다. (주문 #" + orderId + ")"
-                    : "OMS에 배송 완료를 다시 통지했습니다. (주문 #" + orderId + ")");
+                    ? "배송 완료 처리했습니다."
+                    : "OMS에 배송 완료를 다시 통지했습니다.");
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }
