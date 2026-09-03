@@ -30,6 +30,10 @@ import java.util.List;
  *
  * from·to에 기본값을 두지 않는다. 화면은 "안 넣으면 최근 30일"이 친절하지만,
  * 보고서는 분모가 무엇인지 분명해야 한다.
+ *
+ * 소비자: mcp-server/wms_mcp/client.py가 이 넷의 URL 리터럴과 from·to 파라미터 이름을
+ * 그대로 하드코딩해 부른다. 여기서 경로·파라미터 이름을 바꾸면 그쪽도 같이 고쳐야 한다
+ * (Java 테스트는 이 불일치를 잡지 못한다).
  */
 @RestController
 @RequestMapping("/api/analytics")

@@ -66,3 +66,20 @@ jobs:
       # Railway가 배포하는 것과 동일한 멀티스테이지 이미지가 빌드되는지 검증(CD 신뢰성).
       - name: Build Docker image
         run: docker build -t jhg-wms:ci .
+
+  mcp-server:
+    name: MCP server (Python)
+    runs-on: ubuntu-latest
+    # WMS를 띄우지 않는다. 이 테스트는 httpx MockTransport로 도는 단위 테스트라
+    # PostgreSQL도 Java도 필요 없다. 잡을 나눠두면 파이썬이 깨졌을 때 바로 보인다.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Run tests
+        working-directory: mcp-server
+        run: uv run --locked pytest -q

@@ -1,0 +1,23 @@
+[project]
+name = "mcp-server"
+version = "0.1.0"
+description = "WMS 반품 분석 REST를 부르는 읽기 전용 MCP 서버 (stdio)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp>=2.1.1",
+]
+
+# [project.scripts]를 두지 않는다. uv init --no-package로 만든 가상 프로젝트는 설치되지 않아
+# 진입점이 venv에 생기지 않는다(uv run wms-mcp → Failed to spawn). python -m으로 띄운다.
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
