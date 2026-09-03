@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 @RestClientTest(OmsDeliveryNotifier.class)
 @TestPropertySource(properties = "oms.base-url=http://oms-test")
@@ -34,10 +35,10 @@ class OmsDeliveryNotifierTest {
     void send_OMS에_orderId와_배송완료_시각을_POST한다() {
         server.expect(requestTo("http://oms-test/api/delivery-events"))
               .andExpect(method(HttpMethod.POST))
-              .andExpect(content().json("{\"orderId\":7,\"deliveredAt\":\"2026-08-27T06:30:00.123456Z\"}"))
+              .andExpect(content().json("{\"requestKey\":\"00000000-0000-0000-0000-000000000007\",\"orderId\":7,\"deliveredAt\":\"2026-08-27T06:30:00.123456Z\"}"))
               .andRespond(withSuccess());
 
-        notifier.send(7L, DELIVERED_AT);
+        notifier.send(keyOf(7L), 7L, DELIVERED_AT);
         server.verify();
     }
 
@@ -48,7 +49,7 @@ class OmsDeliveryNotifierTest {
               .andExpect(header(HttpHeaders.AUTHORIZATION, expected))
               .andRespond(withSuccess());
 
-        notifier.send(7L, DELIVERED_AT);
+        notifier.send(keyOf(7L), 7L, DELIVERED_AT);
         server.verify();
     }
 
@@ -58,7 +59,7 @@ class OmsDeliveryNotifierTest {
         server.expect(requestTo("http://oms-test/api/delivery-events"))
               .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatCode(() -> notifier.send(7L, DELIVERED_AT)).doesNotThrowAnyException();
+        assertThatCode(() -> notifier.send(keyOf(7L), 7L, DELIVERED_AT)).doesNotThrowAnyException();
     }
 
     @Test
@@ -71,7 +72,7 @@ class OmsDeliveryNotifierTest {
         server.expect(requestTo("http://oms-test/api/delivery-events"))
               .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
-        notifier.send(7L, DELIVERED_AT);
+        notifier.send(keyOf(7L), 7L, DELIVERED_AT);
 
         assertThat(appender.list).anyMatch(e -> e.getFormattedMessage().contains("인증 실패"));
     }

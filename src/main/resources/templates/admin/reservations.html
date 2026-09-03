@@ -48,13 +48,13 @@
                최초 콜백이 실패했을 때 창고가 스스로 복구할 수 있는 유일한 경로다. -->
           <div th:if="${r.deliveredAt != null}">
             <span th:text="|배송 완료 ${#temporals.format(r.deliveredAt, 'yyyy-MM-dd HH:mm')}|">배송 완료</span>
-            <form th:action="@{|/admin/reservations/${r.orderId}/deliver|}" method="post">
+            <form th:action="@{|/admin/reservations/${r.requestKey}/deliver|}" method="post">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
               <button type="submit" class="ghost sm" title="OMS에 배송 완료를 다시 통지합니다. 완료 시각은 그대로입니다.">OMS 재통지</button>
             </form>
           </div>
           <form th:if="${r.status.name() == 'SHIPPED' and r.deliveredAt == null}"
-                th:action="@{|/admin/reservations/${r.orderId}/deliver|}" method="post">
+                th:action="@{|/admin/reservations/${r.requestKey}/deliver|}" method="post">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button type="submit" class="ghost sm">배송 완료</button>
           </form>

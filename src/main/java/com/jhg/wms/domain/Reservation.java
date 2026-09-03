@@ -13,8 +13,16 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
-/** orderId당 예약 원장. unique orderId로 멱등성을 보장한다. 예약 수량을 함께 저장해 재고 SSOT가 된다. */
+/**
+ * 주문당 예약 원장. <b>멱등의 기준은 {@code requestKey}(OMS가 만든 UUID)이지 {@code orderId}가 아니다.</b>
+ * 예약 수량을 함께 저장해 재고 SSOT가 된다.
+ *
+ * <p>orderId는 OMS DB의 시퀀스라 전역 유일하지 않다 — OMS DB를 새로 만들면 1부터 다시 발급되고,
+ * 그때 WMS에 남은 옛 예약과 신규 주문이 같은 번호를 갖는다. 그래서 orderId는 화면·로그·수불대장의
+ * 상관관계 표시용으로만 남기고 유니크 제약을 두지 않는다(같은 규칙: {@code RmaResponse}의 rmaId 주석).
+ */
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -24,7 +32,12 @@ public class Reservation {
     @Column(name = "reservation_id")
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    /** OMS가 주문 생성 시 발급하는 연동 식별자. 예약 멱등·조회의 유일한 키다. */
+    @Column(nullable = false, unique = true, columnDefinition = "uuid")
+    private UUID requestKey;
+
+    /** OMS 주문 번호. 표시·추적용이며 유일하지 않다 — 키로 쓰지 말 것. */
+    @Column(nullable = false)
     private Long orderId;
 
     @JdbcTypeCode(SqlTypes.VARCHAR)   // DB 네이티브 ENUM 대신 VARCHAR 저장 — 값 추가 시 기존 컬럼이 거부하는 사고 방지(PostgreSQL도 동일)
@@ -74,8 +87,9 @@ public class Reservation {
     @Column
     private Instant deliveredAt;
 
-    public static Reservation reserve(Long orderId, Map<Long, Integer> qtyByProductId) {
+    public static Reservation reserve(UUID requestKey, Long orderId, Map<Long, Integer> qtyByProductId) {
         Reservation r = new Reservation();
+        r.requestKey = requestKey;
         r.orderId = orderId;
         r.status = ReservationStatus.RESERVED;
         r.qtyByProductId = new HashMap<>(qtyByProductId);
@@ -97,7 +111,11 @@ public class Reservation {
         // 응답에 실리는 값은 나노초가 살아있지만, DB는 그걸 못 담아 조용히 잘라버리고 이후 조회는
         // 잘린 값을 돌려준다. 마이크로초로 미리 자르면 두 값이 항상 같아 플랫폼에 관계없이 일관된다.
         this.issuedAt = now.truncatedTo(ChronoUnit.MICROS);
-        this.trackingNumber = CARRIER_CODE + "-" + orderId + "-" + TRACKING_TS.format(now);
+        // requestKey 앞 8자를 붙이는 이유: 나머지 부분(orderId + 초 단위 시각)은 OMS DB가 초기화돼
+        // orderId가 재사용되면 같은 초에 같은 문자열을 만들 수 있고, 그러면 unique 제약에 걸려
+        // 신규 주문의 출고가 통째로 실패한다. 예약마다 유일한 값은 requestKey뿐이다.
+        this.trackingNumber = CARRIER_CODE + "-" + orderId + "-" + TRACKING_TS.format(now)
+                + "-" + requestKey.toString().substring(0, 8);
     }
 
     /**

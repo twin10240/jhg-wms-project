@@ -13,6 +13,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 /**
  * "상대가 죽어도 재고는 오염되지 않는다"의 증명.
@@ -52,22 +53,22 @@ class OmsDownTest {
     void 통지가_실패해도_배송완료는_커밋된다() {
         tx.executeWithoutResult(s ->
                 inventoryRepository.save(Inventory.create(PID, "테스트상품", 10)));
-        inventoryService.reserveAll(ORDER_ID, java.util.Map.of(PID, 2));
-        inventoryService.shipAll(ORDER_ID, java.util.Map.of(PID, 2));
+        inventoryService.reserveAll(keyOf(ORDER_ID), ORDER_ID, java.util.Map.of(PID, 2));
+        inventoryService.shipAll(keyOf(ORDER_ID), java.util.Map.of(PID, 2));
 
-        inventoryService.markDelivered(ORDER_ID);
+        inventoryService.markDelivered(keyOf(ORDER_ID));
 
         // 배송 완료는 원장 사건이 아니라 사실 기록이다 — OMS가 죽어도 그 기록은 남아야
         // 창고가 재통지로 복구할 수 있다. 통지가 예외를 던지면 커밋 자체가 날아간다.
         java.time.Instant committed = tx.execute(s ->
-                reservationRepository.findByOrderId(ORDER_ID).orElseThrow().getDeliveredAt());
+                reservationRepository.findByRequestKey(keyOf(ORDER_ID)).orElseThrow().getDeliveredAt());
         assertThat(committed).isNotNull();
     }
 
     @AfterEach
     void 정리() {
         tx.executeWithoutResult(s -> {
-            reservationRepository.findByOrderId(ORDER_ID).ifPresent(reservationRepository::delete);
+            reservationRepository.findByRequestKey(keyOf(ORDER_ID)).ifPresent(reservationRepository::delete);
             inventoryRepository.findByProductId(PID).ifPresent(inventoryRepository::delete);
         });
     }

@@ -28,6 +28,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import org.mockito.ArgumentCaptor;
+import static com.jhg.wms.support.OrderKeys.keyOf;
 
 // API 엔드포인트는 CSRF 예외(SecurityConfig apiChain)라 인증만 필요 — 모든 호출에 httpBasic("wms","wms") 부여.
 // SecurityConfig는 webChain도 함께 등록하는데 webChain이 DbUserDetailsService를 요구하므로,
@@ -80,11 +81,11 @@ class InventoryControllerTest {
 
     @Test
     void reserve_서비스에_위임하고_결과를_반환한다() throws Exception {
-        when(inventoryService.reserveAll(eq(1L), any())).thenReturn(true);
+        when(inventoryService.reserveAll(any(), eq(1L), any())).thenReturn(true);
 
         mockMvc.perform(post("/api/inventory/reserve").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":3}}"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("true"));
     }
@@ -94,13 +95,12 @@ class InventoryControllerTest {
         // issuedAt은 실제로는 Instant.now()(timestamp(6) 왕복)라 초 단위로 딱 떨어지지 않는다.
         // 초 단위 예시(...T06:30:00Z)로 스텁하면 이 테스트가 절대 나오지 않는 모양을 고정해버려
         // 실제 와이어 포맷과 어긋난 문서/가정을 놓친다 — 소수점 이하 자릿수를 가진 값으로 스텁한다.
-        when(inventoryService.shipAll(eq(1L), any())).thenReturn(new ShipResponse(
-                1L, "MOCK", "테스트택배", "MOCK-1-20260827063000",
+        when(inventoryService.shipAll(eq(keyOf(1L)), any())).thenReturn(new ShipResponse(keyOf(1L), 1L, "MOCK", "테스트택배", "MOCK-1-20260827063000",
                 Instant.parse("2026-08-27T06:30:00.123456Z")));
 
         mockMvc.perform(post("/api/inventory/ship").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":3}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderId").value(1))
                 .andExpect(jsonPath("$.carrierCode").value("MOCK"))
@@ -111,61 +111,61 @@ class InventoryControllerTest {
                 // status는 계약에서 뺐다 — 성공이면 항상 SHIPPED라 중복이다.
                 .andExpect(jsonPath("$.status").doesNotExist());
 
-        verify(inventoryService).shipAll(eq(1L), any());
+        verify(inventoryService).shipAll(eq(keyOf(1L)), any());
     }
 
     @Test
     void release_서비스에_위임한다() throws Exception {
         mockMvc.perform(post("/api/inventory/release").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":3}}"))
                 .andExpect(status().isOk());
 
-        verify(inventoryService).releaseAll(eq(1L), any());
+        verify(inventoryService).releaseAll(eq(keyOf(1L)), any());
     }
 
     @Test
     void ship_상태충돌은_409를_반환한다() throws Exception {
         doThrow(new IllegalStateException("예약이 없어 출고할 수 없습니다."))
-                .when(inventoryService).shipAll(eq(1L), any());
+                .when(inventoryService).shipAll(eq(keyOf(1L)), any());
 
         mockMvc.perform(post("/api/inventory/ship").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":3}}"))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void release_상태충돌은_409를_반환한다() throws Exception {
         doThrow(new IllegalStateException("출고된 예약은 해제할 수 없습니다."))
-                .when(inventoryService).releaseAll(eq(1L), any());
+                .when(inventoryService).releaseAll(eq(keyOf(1L)), any());
 
         mockMvc.perform(post("/api/inventory/release").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":3}}"))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void reserve_예약원장_불일치는_409를_반환한다() throws Exception {
-        when(inventoryService.reserveAll(eq(1L), any()))
+        when(inventoryService.reserveAll(any(), eq(1L), any()))
                 .thenThrow(new IllegalStateException("orderId 예약 원장 불일치 — 같은 orderId의 기존 예약과 요청 품목이 다릅니다."));
 
         mockMvc.perform(post("/api/inventory/reserve").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":3}}"))
                 .andExpect(status().isConflict())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("예약 원장 불일치")));
     }
 
     @Test
     void reserve_잘못된_수량은_400을_반환한다() throws Exception {
-        when(inventoryService.reserveAll(eq(1L), any()))
+        when(inventoryService.reserveAll(any(), eq(1L), any()))
                 .thenThrow(new IllegalArgumentException("수량은 1 이상이어야 합니다."));
 
         mockMvc.perform(post("/api/inventory/reserve").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":1,\"items\":{\"1\":-3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000001\",\"orderId\":1,\"items\":{\"1\":-3}}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -179,19 +179,21 @@ class InventoryControllerTest {
         // OMS 어댑터가 보내는 정확한 JSON: {"orderId":99,"items":{"1":3}}
         // InventoryWriteRequest가 이 JSON을 정확히 역직렬화하고,
         // InventoryController가 reserveAll(99L, Map.of(1L, 3))으로 호출하는지 검증
+        ArgumentCaptor<java.util.UUID> requestKeyCaptor = ArgumentCaptor.forClass(java.util.UUID.class);
         ArgumentCaptor<Long> orderIdCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<Map> itemsCaptor = ArgumentCaptor.forClass(Map.class);
-        when(inventoryService.reserveAll(anyLong(), anyMap())).thenReturn(true);
+        when(inventoryService.reserveAll(any(), anyLong(), anyMap())).thenReturn(true);
 
         mockMvc.perform(post("/api/inventory/reserve").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":99,\"items\":{\"1\":3}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000063\",\"orderId\":99,\"items\":{\"1\":3}}"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("true"));
 
-        verify(inventoryService).reserveAll(orderIdCaptor.capture(), itemsCaptor.capture());
+        verify(inventoryService).reserveAll(requestKeyCaptor.capture(), orderIdCaptor.capture(), itemsCaptor.capture());
 
         // 정확한 인자 검증: 필드명 드리프트 방지
+        assertThat(requestKeyCaptor.getValue()).isEqualTo(keyOf(99L));
         assertThat(orderIdCaptor.getValue()).isEqualTo(99L);
         assertThat(itemsCaptor.getValue()).containsExactlyInAnyOrderEntriesOf(Map.of(1L, 3));
     }
@@ -200,17 +202,19 @@ class InventoryControllerTest {
     void reserve_복수상품도_정확하게_역직렬화한다() throws Exception {
         // 여러 상품 예약: orderId=99, items={1:3, 2:5, 3:2}
         // OMS 어댑터가 보내는 JSON: {"orderId":99,"items":{"1":3,"2":5,"3":2}}
+        ArgumentCaptor<java.util.UUID> requestKeyCaptor = ArgumentCaptor.forClass(java.util.UUID.class);
         ArgumentCaptor<Long> orderIdCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<Map> itemsCaptor = ArgumentCaptor.forClass(Map.class);
-        when(inventoryService.reserveAll(anyLong(), anyMap())).thenReturn(true);
+        when(inventoryService.reserveAll(any(), anyLong(), anyMap())).thenReturn(true);
 
         mockMvc.perform(post("/api/inventory/reserve").with(httpBasic("wms", "wms"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderId\":99,\"items\":{\"1\":3,\"2\":5,\"3\":2}}"))
+                        .content("{\"requestKey\":\"00000000-0000-0000-0000-000000000063\",\"orderId\":99,\"items\":{\"1\":3,\"2\":5,\"3\":2}}"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("true"));
 
-        verify(inventoryService).reserveAll(orderIdCaptor.capture(), itemsCaptor.capture());
+        verify(inventoryService).reserveAll(requestKeyCaptor.capture(), orderIdCaptor.capture(), itemsCaptor.capture());
+        assertThat(requestKeyCaptor.getValue()).isEqualTo(keyOf(99L));
         assertThat(orderIdCaptor.getValue()).isEqualTo(99L);
         assertThat(itemsCaptor.getValue())
                 .containsExactlyInAnyOrderEntriesOf(Map.of(1L, 3, 2L, 5, 3L, 2));
