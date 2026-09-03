@@ -143,3 +143,32 @@ def test_client는_GET_외의_HTTP_메서드를_쓰지_않는다():
     source = pathlib.Path(client.__file__).read_text()
     for verb in ("post", "put", "patch", "delete"):
         assert f"http.{verb}(" not in source, f"http.{verb}(가 client.py에 있다"
+
+
+def test_기간이_366일을_넘으면_WMS를_부르기도_전에_거절한다(monkeypatch):
+    # 호출자가 화면에서 모델로 바뀌면서 생긴 실패 모드다. 모델은 from=2020-01-01 같은
+    # 구간을 그럴듯하게 던진다(실측: 기간을 안 주면 최근 3개월짜리를 고른 회차가 있었다).
+    # 소켓을 열기 전에 끊어야 WMS가 구간 내 원장을 통째로 메모리에 올리는 일이 없다.
+    def 절대_불림(): raise AssertionError("WMS를 부르면 안 된다")
+    monkeypatch.setattr(client, "_build_client", 절대_불림)
+
+    with pytest.raises(client.WmsError) as e:
+        client.get_category_breakdown("2020-01-01", "2026-12-31")
+
+    assert "366" in str(e.value)
+
+
+def test_366일_정확히는_통과한다(monkeypatch):
+    # 경계를 거부하면 윤년 한 해가 통째로 막힌다.
+    monkeypatch.setattr(client, "_build_client", lambda: _client_returning(200, json={}))
+
+    assert client.get_category_breakdown("2026-01-01", "2026-12-31") == {}
+
+
+def test_기간_상한은_상세_조회에도_걸린다(monkeypatch):
+    # 사유 원문을 토큰 예산에 태우는 경로라 여기가 더 급하다.
+    def 절대_불림(): raise AssertionError("WMS를 부르면 안 된다")
+    monkeypatch.setattr(client, "_build_client", 절대_불림)
+
+    with pytest.raises(client.WmsError):
+        client.get_details_by_category("UNCLASSIFIED", "2020-01-01", "2026-12-31")
