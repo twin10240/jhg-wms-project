@@ -20,9 +20,12 @@ README가 내세우는 것이 "이 수량이 왜 이렇게 됐는지 역추적"�
 읽기 전용 도구 하나. 상품 하나의 원장 행을 기간으로 잘라 시간순으로 돌려준다.
 
 ```
-GET /api/analytics/inventory-ledger?productId=11&from=2026-09-01&to=2026-09-03
+GET /api/analytics/inventory-ledger/product/11?from=2026-09-01&to=2026-09-03
 inventory_ledger(product_id: int, from_date: str, to_date: str) -> dict
 ```
+
+경로에 상품을 넣는 것은 기존 `return-details/product/{product_id}`와 같은 모양이라
+`client.py`의 `_get(path, from_date, to_date)`를 고치지 않고 쓴다.
 
 새 쿼리는 만들지 않는다. `InventoryTransactionRepository.search(type, productId, from, to, pageable)`가
 V7에서 이미 생겼고 `type=null`로 부르면 그대로 맞는다.
@@ -56,8 +59,11 @@ V7에서 이미 생겼고 `type=null`로 부르면 그대로 맞는다.
 남기면 지금 조사 중인 사건이 잘려 나간다. 끊었으면 응답에 그 사실을 싣는다.
 
 ```json
-{ "productId": 11, "from": "...", "to": "...", "rows": [...], "truncated": true, "returnedRows": 500 }
+{ "productId": 11, "from": "...", "to": "...", "rows": [...], "truncated": true, "total": 812 }
 ```
+
+이 모양은 `client.py`의 ponytail 주석이 이미 예고해둔 계약이다
+(`{"rows": [...], "truncated": bool, "total": int}`). 예고된 자리에 그대로 맞춘다.
 
 조용히 자르면 모델은 받은 것을 전량으로 읽고 **"그 사이 이동이 없었다"**고 쓴다.
 없는 것과 안 보여준 것은 다르다 — `accuracy: null`을 0%로 읽지 말라는 것과 같은 규칙이다.
@@ -103,10 +109,10 @@ V7에서 이미 생겼고 `type=null`로 부르면 그대로 맞는다.
 **Java (MockMvc 슬라이스)**
 - 응답 JSON에 `actor` 키가 없다 — 이 설계의 핵심 제약이라 테스트로 고정한다
 - 시간 오름차순으로 나온다
-- 501행이면 `truncated: true`, `rows` 길이 500
-- 500행이면 `truncated: false`
+- 501행이면 `truncated: true`, `rows` 길이 500, `total: 501`
+- 500행이면 `truncated: false`, `total: 500`
 - 잘못된 날짜 형식 → 400 평문 (기존 계약)
-- 없는 상품 → 빈 `rows` + `truncated: false` (404 아님 — 이동이 없는 것은 오류가 아니다)
+- 없는 상품 → 빈 `rows` + `truncated: false` + `total: 0` (404 아님 — 이동이 없는 것은 오류가 아니다)
 
 **Python**
 - 오류 번역, 366일 상한 (`test_client.py` 기존 패턴)
