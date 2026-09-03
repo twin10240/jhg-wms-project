@@ -74,6 +74,31 @@ def return_details_by_category(category: str, from_date: str, to_date: str) -> l
     return _guard(lambda: client.get_details_by_category(category, from_date, to_date))
 
 
+@mcp.tool()
+def cycle_count_accuracy(from_date: str, to_date: str) -> dict:
+    """기간 내 실사의 계수 정확도와 세션 상태 분포.
+
+    구간 판정은 실사를 시작한 시각(basis="createdAt")이지 승인 시각이 아니다.
+    정확도의 분모는 승인된 세션의 항목뿐이다 — 반려된 세션은 "계수를 신뢰할 수 없다"고
+    사람이 판정한 것이라 뺐고, 뺀 개수가 excludedRejectedItems로 함께 온다. 보고서는 그 수를 밝혀라.
+    accuracy가 null이면 잴 것이 없다는 뜻이다. 0으로 읽지 마라 — 전부 틀린 것과 다르다.
+    날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
+    """
+    return _guard(lambda: client.get_cycle_count_accuracy(from_date, to_date))
+
+
+@mcp.tool()
+def cycle_count_variances(from_date: str, to_date: str) -> list:
+    """차이가 난 상품 목록. 반복해서 틀린 상품이 먼저 온다.
+
+    승인된 세션만 본다(정확도와 같은 모수). occurrences는 몇 번의 실사에서 차이가 났는지이고,
+    netQty는 그 차이들의 합이다(부호가 상쇄될 수 있다 — 과다와 부족이 섞이면 작아 보인다).
+    한 번 크게 틀린 것보다 여러 번 조금씩 틀리는 쪽이 로케이션·라벨 같은 구조적 원인을 가리킨다.
+    빈 목록은 오류가 아니라 차이가 없었다는 뜻이다. 날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
+    """
+    return _guard(lambda: client.get_cycle_count_variances(from_date, to_date))
+
+
 def main() -> None:
     mcp.run(transport="stdio")
 

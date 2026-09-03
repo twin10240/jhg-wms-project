@@ -12,7 +12,7 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 계산은 하지 않습니다. WMS가 이미 하고, 여기서 또 하면 화면과 보고서가 다른 숫자를
 낼 수 있게 됩니다.
 
-## 도구 넷 (전부 읽기 전용)
+## 도구 여섯 (전부 읽기 전용)
 
 | 도구 | 인자 |
 |---|---|
@@ -20,9 +20,16 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 | `return_category_breakdown` | `from_date`, `to_date` |
 | `return_details_by_product` | `product_id`, `from_date`, `to_date` |
 | `return_details_by_category` | `category`, `from_date`, `to_date` |
+| `cycle_count_accuracy` | `from_date`, `to_date` |
+| `cycle_count_variances` | `from_date`, `to_date` |
 
 `from`은 파이썬 예약어라 인자 이름이 `from_date`입니다. REST 파라미터 이름으로
 바꾸는 일은 `client.py`가 합니다.
+
+실사 도구 둘은 **승인된 세션만** 모수로 삼습니다. 반려된 세션은 "계수를 신뢰할 수 없다"고
+사람이 판정한 것이라 정확도에서 빼고, 뺀 항목 수를 `excludedRejectedItems`로 함께 냅니다 —
+조용히 빼면 분모를 속이는 것과 같습니다. `accuracy`가 `null`이면 잴 것이 없다는 뜻이고
+`0`(전부 틀림)과 다릅니다.
 
 **조회 구간은 최대 366일입니다**(`client.MAX_WINDOW_DAYS`). 넘으면 소켓을 열기 전에
 `ToolError`로 거절하고 구간을 좁히라고 말합니다. 호출자가 화면에서 모델로 바뀌면서 생긴
