@@ -15,6 +15,10 @@ import httpx
 BASE_URL = os.environ.get("WMS_BASE_URL", "http://localhost:8081")
 TIMEOUT = 10.0
 
+# 조회 구간 상한. 윤년 한 해를 그대로 담을 수 있는 값이라 정당한 연간 리뷰는 막지 않고,
+# from=2020-01-01 같은 구간만 끊는다.
+MAX_WINDOW_DAYS = 366
+
 
 class WmsError(Exception):
     """예상한 실패. server.py가 이것만 잡아 ToolError로 바꾼다.
@@ -40,11 +44,34 @@ def _check_date(name: str, value: str) -> None:
         raise WmsError(f"{name}는 YYYY-MM-DD 형식이어야 합니다: {value!r}") from None
 
 
-# ponytail: 창 크기 무제한. 모델이 from=2020-01-01을 부르면 사유 원문이 통째로 컨텍스트에
-# 들어간다. 실제 보고서를 몇 번 써 보고 토큰이 문제가 되면 그때 상한을 둔다(응답 행 수 기준).
+def _check_window(from_date: str, to_date: str) -> None:
+    """구간 길이를 도구 경계에서 끊는다.
+
+    호출자가 화면에서 모델로 바뀌면서 생긴 실패 모드다. 사람은 화면에서 달력을 집지만
+    모델은 from=2020-01-01을 그럴듯하게 던진다(실측: 기간을 안 주고 보고서를 시키면
+    최근 3개월짜리를 고르는 회차가 나온다). WMS는 구간 내 원장을 거르기 전에 메모리에
+    올리므로, 소켓을 열기 전에 여기서 끊는 것이 서버와 토큰 예산 양쪽에 싸다.
+
+    from > to는 검사하지 않는다 — WMS가 이미 400과 읽을 수 있는 평문으로 거절하고
+    _get이 그 문구를 그대로 싣는다. 여기서 또 판정하면 메시지 출처가 둘이 된다.
+    """
+    days = (date.fromisoformat(to_date) - date.fromisoformat(from_date)).days
+    if days > MAX_WINDOW_DAYS:
+        raise WmsError(
+            f"조회 구간이 너무 깁니다: {from_date}~{to_date} ({days}일). "
+            f"최대 {MAX_WINDOW_DAYS}일까지만 조회할 수 있습니다. 구간을 좁혀 다시 부르세요."
+        )
+
+
+# ponytail: 응답 행 수에는 상한이 없다. 구간을 366일로 끊으면 명백한 실수는 막히지만,
+# 반품이 많은 창고에서는 정당한 구간의 상세 조회도 사유 원문으로 토큰을 태울 수 있다.
+# 실측(2026-09-03) 전 기간 상세가 50행·653자라 아직 발동할 여지가 없어 넣지 않았다.
+# 필요해지면 상세 도구의 반환을 {"rows": [...], "truncated": bool, "total": int}로 바꾼다
+# — 잘린 사실을 담지 않고 그냥 자르면 조용한 오답이 된다.
 def _get(path: str, from_date: str, to_date: str):
     _check_date("from_date", from_date)
     _check_date("to_date", to_date)
+    _check_window(from_date, to_date)
     params = {"from": from_date, "to": to_date}   # from은 파이썬 예약어라 여기서 바꾼다
     try:
         with _build_client() as http:
