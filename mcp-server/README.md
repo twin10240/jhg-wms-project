@@ -29,11 +29,19 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `WMS_BASE_URL` | `http://localhost:8081` | WMS 주소 |
-| `WMS_USER` | (필수) | 서비스 계정 |
-| `WMS_PASSWORD` | (필수) | 서비스 계정 비밀번호 |
+| `WMS_USER` | `wms` (`.mcp.json`의 `${WMS_USER:-wms}`) | 서비스 계정 |
+| `WMS_PASSWORD` | `wms` (`.mcp.json`의 `${WMS_PASSWORD:-wms}`) | 서비스 계정 비밀번호 |
+
+`.mcp.json`이 로컬 기본값 `wms/wms`를 갖습니다 — `export` 없이 바로 붙습니다.
+`application.yml`이 `${WMS_BASIC_USER:wms}`로 같은 값을 이미 평문으로 담고 있어
+새로 노출되는 비밀이 없고, 두 파일이 같은 규칙(로컬 기본값 + 환경변수 override)을 씁니다.
 
 **이 자격증명은 `/api/**` 전체에 유효합니다** — 읽기 전용은 이 서버가 부르는 URL
-넷이 지키는 것이지 HTTP 계층이 지키는 것이 아닙니다. 값을 `.mcp.json`에 넣지 마세요.
+넷이 지키는 것이지 HTTP 계층이 지키는 것이 아닙니다.
+
+**그래서 `WMS_BASE_URL`을 로컬 밖으로 돌리는 순간 이 기본값은 폐기 대상입니다.**
+원격 WMS를 붙일 때는 `WMS_USER`·`WMS_PASSWORD`를 환경변수로 반드시 덮으세요 —
+기본값이 있다는 것은 누락이 더 이상 오류로 드러나지 않는다는 뜻이기도 합니다.
 
 ## 실행
 
@@ -47,5 +55,6 @@ uv run python -m wms_mcp.server       # 서버 (stdio — 보통은 Claude Code�
 
 ## 연결
 
-저장소 루트의 `.mcp.json`이 등록을 담고 있습니다. `WMS_USER`·`WMS_PASSWORD`를
-셸 환경에 두고 Claude Code를 이 저장소에서 실행하면 도구 넷이 보입니다.
+저장소 루트의 `.mcp.json`이 등록을 담고 있습니다. Claude Code를 이 저장소에서 실행하면
+도구 넷이 보입니다 — 로컬 기본값이 있으므로 `export`는 필요 없습니다.
+다른 WMS를 붙이려면 `WMS_BASE_URL`과 함께 `WMS_USER`·`WMS_PASSWORD`를 환경변수로 덮으세요.
