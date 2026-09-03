@@ -8,10 +8,12 @@ EXPECTED_TOOLS = {
     "return_category_breakdown",
     "return_details_by_product",
     "return_details_by_category",
+    "cycle_count_accuracy",
+    "cycle_count_variances",
 }
 
 
-async def test_등록된_도구는_정확히_넷이다():
+async def test_등록된_도구는_정확히_여섯이다():
     # 이 표면이 곧 공격면이다. 쓰기 도구가 하나 붙으면 이 테스트가 실패한다.
     # 주석으로 적어둔 규칙은 지켜지지 않지만 실패하는 테스트는 지켜진다.
     tools = await server.mcp.list_tools()
@@ -71,3 +73,39 @@ async def test_범주_도구가_UNCLASSIFIED를_그대로_넘긴다(monkeypatch)
 
     # enum에 없는 값이지만 WMS가 이 이름으로 받는다. 여기서 걸러내면 미분류를 못 본다.
     assert seen["category"] == "UNCLASSIFIED"
+
+
+async def test_실사_정확도_도구가_클라이언트에_그대로_위임한다(monkeypatch):
+    seen = {}
+    def fake(from_date, to_date):
+        seen.update(from_date=from_date, to_date=to_date)
+        return {"accuracy": 0.68, "excludedRejectedItems": 3}
+    monkeypatch.setattr(client, "get_cycle_count_accuracy", fake)
+
+    result = await server.mcp.call_tool(
+        "cycle_count_accuracy", {"from_date": "2026-09-01", "to_date": "2026-09-30"})
+
+    assert seen == {"from_date": "2026-09-01", "to_date": "2026-09-30"}
+    assert "excludedRejectedItems" in str(result.content[0].text)
+
+
+async def test_잴_것이_없을_때의_null_정확도를_그대로_통과시킨다(monkeypatch):
+    # 0.0으로 바꾸면 "전부 틀렸다"가 된다. 잴 것이 없는 것과 다 틀린 것은 다르다 —
+    # 이 계층은 번역만 하고 판단하지 않는다.
+    monkeypatch.setattr(client, "get_cycle_count_accuracy",
+                        lambda f, t: {"accuracy": None, "countedItems": 0})
+
+    result = await server.mcp.call_tool(
+        "cycle_count_accuracy", {"from_date": "2026-09-01", "to_date": "2026-09-30"})
+
+    assert "null" in str(result.content[0].text)
+
+
+async def test_실사_차이_도구가_빈_목록도_정상으로_돌려준다(monkeypatch):
+    # 차이가 없는 것은 오류가 아니라 좋은 소식이다.
+    monkeypatch.setattr(client, "get_cycle_count_variances", lambda f, t: [])
+
+    result = await server.mcp.call_tool(
+        "cycle_count_variances", {"from_date": "2026-09-01", "to_date": "2026-09-30"})
+
+    assert result.content is not None

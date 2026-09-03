@@ -108,3 +108,11 @@ def get_details_by_category(category: str, from_date: str, to_date: str) -> list
     # category는 모델이 채우는 문자열이다. 퍼센트 인코딩 없이 넣으면 "../"로 이 서버가
     # 부르는 URL 넷 바깥(같은 자격증명이 유효한 임의 /api 경로)으로 나갈 수 있다.
     return _get(f"/api/analytics/return-details/category/{quote(category, safe='')}", from_date, to_date)
+
+
+def get_cycle_count_accuracy(from_date: str, to_date: str) -> dict:
+    return _get("/api/analytics/cycle-count-accuracy", from_date, to_date)
+
+
+def get_cycle_count_variances(from_date: str, to_date: str) -> list:
+    return _get("/api/analytics/cycle-count-variances", from_date, to_date)
