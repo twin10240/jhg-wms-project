@@ -2,6 +2,7 @@ package com.jhg.wms.web;
 
 import com.jhg.wms.domain.CycleCount;
 import com.jhg.wms.domain.CycleCountStatus;
+import com.jhg.wms.service.CycleCountAnalyticsService;
 import com.jhg.wms.service.CycleCountService;
 import com.jhg.wms.service.InventoryService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public class CycleCountAdminController {
 
     private final CycleCountService cycleCountService;
+    private final CycleCountAnalyticsService cycleCountAnalyticsService;
     private final InventoryService inventoryService;
 
     @GetMapping("/admin/cycle-counts")
@@ -29,6 +32,39 @@ public class CycleCountAdminController {
         model.addAttribute("sessions", cycleCountService.findAll(status));
         model.addAttribute("activeStatus", status);
         return "admin/cycle-counts";
+    }
+
+    /**
+     * 실사 리포트 화면. 집계는 {@code CycleCountAnalyticsService} 하나에서만 나온다 —
+     * REST({@code /api/analytics/cycle-count-*})와 MCP도 같은 것을 부른다.
+     * 여기서 다시 세면 화면과 보고서가 다른 숫자를 낸다.
+     *
+     * <p>{@code /admin/cycle-counts/{id}}보다 먼저 잡힌다 — 리터럴 세그먼트가
+     * 경로 변수를 이긴다({@code /new}가 이미 같은 자리에 있다).
+     *
+     * <p>기간을 매번 손으로 넣게 하면 아무도 안 본다. 링크 한 번으로 열려야 한다
+     * (반품 리포트와 같은 기본값이다). MCP 도구 쪽은 반대로 기본값을 두지 않는데,
+     * 사람은 화면에서 기간을 눈으로 확인하지만 모델은 그러지 못하기 때문이다.
+     */
+    @GetMapping("/admin/cycle-counts/report")
+    public String report(@RequestParam(required = false) LocalDate from,
+                         @RequestParam(required = false) LocalDate to,
+                         Model model) {
+        if (to == null) to = LocalDate.now();
+        if (from == null) from = to.minusDays(30);
+        try {
+            model.addAttribute("report", cycleCountAnalyticsService.accuracy(from, to));
+            model.addAttribute("variances", cycleCountAnalyticsService.variances(from, to));
+        } catch (IllegalArgumentException e) {
+            // 역전된 기간이 여기로 온다. 화면 전체를 잃지 않고 메시지만 낸다 —
+            // 템플릿의 null 가드가 그 자리를 지킨다(반품 리포트와 같은 처리).
+            model.addAttribute("report", null);
+            model.addAttribute("variances", null);
+            model.addAttribute("errorMessage", e.getMessage());
+        }
+        model.addAttribute("from", from);
+        model.addAttribute("to", to);
+        return "admin/cycle-count-report";
     }
 
     @GetMapping("/admin/cycle-counts/new")

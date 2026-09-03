@@ -3,6 +3,7 @@ package com.jhg.wms.web;
 import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
 import com.jhg.wms.domain.CycleCount;
+import com.jhg.wms.service.CycleCountAnalyticsService;
 import com.jhg.wms.service.CycleCountService;
 import com.jhg.wms.service.InventoryService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +42,7 @@ class CycleCountAdminControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean CycleCountService cycleCountService;
+    @MockitoBean CycleCountAnalyticsService cycleCountAnalyticsService;
     @MockitoBean InventoryService inventoryService;
     @MockitoBean DbUserDetailsService userDetailsService;
 
@@ -363,5 +367,125 @@ class CycleCountAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("상품 1")))
                 .andExpect(content().string(containsString("name=\"productIds\"")));
+    }
+
+    // ── 실사 리포트 화면 ────────────────────────────────────────────────────────
+    // 집계는 CycleCountAnalyticsService만 낸다. 화면이 다시 세면 REST·MCP와 다른 숫자가 나온다.
+
+    private CycleCountAnalyticsService.AccuracyReport accuracyReport(Double accuracy, int countedItems,
+                                                                     int excludedRejected) {
+        return new CycleCountAnalyticsService.AccuracyReport(
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 9, 3), "createdAt",
+                new CycleCountAnalyticsService.SessionCounts(0, 0, 4, 1, 5),
+                countedItems, 13, accuracy, 1, 1, 5, 9, excludedRejected);
+    }
+
+    // A안: 요약 밑에 세션별 상세를 전부 펼친다. 접으면 "세션 #8에 상품 둘이 함께 걸렸다" 같은
+    // 단서가 펼치기 전엔 보이지 않는다 — 그 교차를 이 테스트가 고정한다.
+    @Test
+    void 실사리포트_차이상세를_세션별로_전부_펼쳐_보여준다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any())).thenReturn(accuracyReport(0.6842105263157895, 19, 3));
+        when(cycleCountAnalyticsService.variances(any(), any())).thenReturn(List.of(
+                new CycleCountAnalyticsService.ProductVariance(11L, "상품 11", 2, -5, List.of(
+                        new CycleCountAnalyticsService.VarianceRow(7L, 115, 112, -3,
+                                LocalDateTime.of(2026, 9, 3, 17, 10)),
+                        new CycleCountAnalyticsService.VarianceRow(8L, 112, 110, -2,
+                                LocalDateTime.of(2026, 9, 3, 17, 11)))),
+                new CycleCountAnalyticsService.ProductVariance(3L, "상품 3", 2, -3, List.of(
+                        new CycleCountAnalyticsService.VarianceRow(8L, 42, 41, -1,
+                                LocalDateTime.of(2026, 9, 3, 17, 11))))));
+
+        String html = mockMvc.perform(get("/admin/cycle-counts/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/cycle-count-report"))
+                .andReturn().getResponse().getContentAsString();
+
+        // 요약: 반복 횟수가 순차이 옆에 붙어 있다(netQty는 상쇄된 값이라 혼자 두면 오독된다)
+        assertThat(html).contains("차이 <strong>2</strong>회").contains("<strong>-5</strong>");
+        // 상세: 세션 셋이 장부·계수와 함께 그려진다
+        assertThat(html).contains(">115<").contains(">112<").contains(">110<").contains(">42<").contains(">41<");
+        // 같은 세션 #8이 상품 둘 밑에 각각 나온다 — 교차 단서가 클릭 없이 보인다
+        assertThat(html).containsPattern("(?s)상품 11.*#8.*상품 3.*#8");
+        assertThat(html).contains("2026-09-03 17:10");
+    }
+
+    // accuracy가 null이면 잴 것이 없다는 뜻이다. 0%로 렌더하면 "전부 틀렸다"로 읽힌다.
+    @Test
+    void 실사리포트_잴_항목이_없으면_0퍼센트가_아니라_없음으로_낸다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any())).thenReturn(accuracyReport(null, 0, 0));
+        when(cycleCountAnalyticsService.variances(any(), any())).thenReturn(List.of());
+
+        String html = mockMvc.perform(get("/admin/cycle-counts/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("잴 항목 없음").doesNotContain("0.0%");
+        // 빈 목록은 데이터 없음이 아니라 좋은 소식이다
+        assertThat(html).contains("어긋난 상품이 없습니다");
+    }
+
+    // 표본 크기와 반려 제외는 정확도와 같은 자리에 있어야 한다 — 각주로 내리면 인용될 때 떨어져 나간다.
+    @Test
+    void 실사리포트_정확도_옆에_표본크기와_반려제외를_함께_낸다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any())).thenReturn(accuracyReport(0.6842105263157895, 19, 3));
+        when(cycleCountAnalyticsService.variances(any(), any())).thenReturn(List.of());
+
+        String html = mockMvc.perform(get("/admin/cycle-counts/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String accuracyLine = html.substring(html.indexOf("id=\"accuracy-line\""));
+        accuracyLine = accuracyLine.substring(0, accuracyLine.indexOf("</p>"));
+        assertThat(accuracyLine).contains("68.4%").contains("<strong>19</strong>").contains("<strong>4</strong>");
+        assertThat(html).contains("<strong>3</strong>항목은 분모에서 빠졌습니다");
+    }
+
+    // 반려 항목이 0이면 그 줄을 내지 않는다 — 없는 것을 0으로 적으면 매번 한 번씩 읽고 넘겨야 한다.
+    @Test
+    void 실사리포트_반려_제외가_0이면_그_줄을_내지_않는다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any())).thenReturn(accuracyReport(1.0, 19, 0));
+        when(cycleCountAnalyticsService.variances(any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/admin/cycle-counts/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("분모에서 빠졌습니다"))));
+    }
+
+    // 역전된 기간은 서비스가 예외를 던진다. 화면 전체를 잃지 않고 메시지만 나야 한다.
+    @Test
+    void 실사리포트_기간이_뒤집히면_500이_아니라_에러메시지를_렌더링한다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any()))
+                .thenThrow(new IllegalArgumentException("시작일이 종료일보다 뒤입니다."));
+
+        mockMvc.perform(get("/admin/cycle-counts/report")
+                        .param("from", "2026-09-03").param("to", "2026-06-01")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/cycle-count-report"))
+                .andExpect(content().string(containsString("시작일이 종료일보다 뒤입니다.")));
+    }
+
+    // 기간을 매번 손으로 넣게 하면 아무도 안 본다. 링크 한 번으로 열려야 한다.
+    @Test
+    void 실사리포트_기간을_안_주면_최근_30일이_기본이다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any())).thenReturn(accuracyReport(1.0, 1, 0));
+        when(cycleCountAnalyticsService.variances(any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/admin/cycle-counts/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk());
+
+        verify(cycleCountAnalyticsService).accuracy(LocalDate.now().minusDays(30), LocalDate.now());
+    }
+
+    // /report가 /{id}보다 먼저 잡혀야 한다. 뒤로 밀리면 "report"를 Long으로 못 바꿔 400이 난다.
+    @Test
+    void 실사리포트_경로가_세션_상세_경로변수보다_먼저_잡힌다() throws Exception {
+        when(cycleCountAnalyticsService.accuracy(any(), any())).thenReturn(accuracyReport(1.0, 1, 0));
+        when(cycleCountAnalyticsService.variances(any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/admin/cycle-counts/report").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isOk());
+
+        verify(cycleCountService, never()).findById(anyLong());
     }
 }
