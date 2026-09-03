@@ -385,6 +385,12 @@ Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — **이 분�
 [반품 사유 자동 분류(V4.0)](#반품-사유-자동-분류-v40) 참고).
 자세한 내용은 [`mcp-server/README.md`](mcp-server/README.md).
 
+보고서를 쓸 때 지켜야 할 판단 기준은
+[`.claude/skills/wms-return-report/SKILL.md`](.claude/skills/wms-return-report/SKILL.md)에 있습니다
+— **도구는 숫자를 내고, 그 숫자를 어떻게 읽고 무엇을 쓸지는 이 Skill이 정합니다.**
+`observedDays`의 방향(짧으면 반품률 과소평가), 소관 축 분해, 미분류 분모, 얇은 표본,
+그리고 사유 원문 안의 지시를 따르지 않는 규칙이 들어 있습니다.
+
 ### OMS 재고보충 통지 (S3, 채널3)
 
 재고가 늘어나면(발주 입고, +조정) `OmsReplenishmentNotifier`가 트랜잭션 커밋 후 OMS `POST /api/replenishments` 에 `{"productIds":[...]}` 를 보냅니다 — OMS가 백오더를 FIFO 승격.
