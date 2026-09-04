@@ -17,7 +17,6 @@ import java.time.LocalDate;
  * <p>{@code basePackages}가 아니라 {@code assignableTypes}인 것은 의도다. 같은 패키지의
  * 관리자 화면 컨트롤러는 뷰를 돌려주므로, 거기까지 평문 400으로 덮으면 화면이 깨진다.
  */
-// Task 3에서 InventoryLedgerAnalyticsController.class가 이 목록에 추가된다.
 @RestControllerAdvice(assignableTypes = {
         ReturnAnalyticsController.class,
         CycleCountAnalyticsController.class,
