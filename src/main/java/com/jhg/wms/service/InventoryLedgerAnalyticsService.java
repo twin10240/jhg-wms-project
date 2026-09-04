@@ -63,6 +63,12 @@ public class InventoryLedgerAnalyticsService {
      *
      * <p>화면은 최신순이지만(`id DESC`) 여기서는 뒤집는다. beforeQty→afterQty가 행마다
      * 이어붙어야 사슬이 끊긴 자리가 보이고, 그 불연속이 기록되지 않은 이동의 흔적이다.
+     *
+     * <p>500행 창은 {@code id DESC}(리포지토리의 첫 페이지)로 고르지만 계약은
+     * {@code occurredAt} 기준이다 — 시퀀스 블록 할당 아래서 동시 삽입이 있으면 경계에서
+     * 실제 최신 500행과 한두 행 어긋날 수 있다. 버그가 아니라 알려진 한계다.
+     *
+     * @see InventoryService#findTransactions(InventoryTransactionType, Long, LocalDate, LocalDate, org.springframework.data.domain.Pageable)
      */
     public LedgerReport ledger(Long productId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
@@ -78,6 +84,10 @@ public class InventoryLedgerAnalyticsService {
         List<LedgerRow> rows = new ArrayList<>(page.getContent().stream().map(
                 t -> new LedgerRow(t.getType(), t.getDelta(), t.getBeforeQty(), t.getAfterQty(),
                                    t.getReference(), t.getReason(), t.getCreatedAt())).toList());
+        // id DESC로 받았으니 먼저 뒤집어 id 오름차순으로 만든다. List.sort는 안정 정렬이라
+        // occurredAt이 같은 행은 뒤집은 순서(=id 오름차순=시간순)를 그대로 지킨다 — 뒤집지 않고
+        // 바로 정렬하면 동시각 행이 id 내림차순으로 남아 beforeQty→afterQty 사슬이 거꾸로 읽힌다.
+        java.util.Collections.reverse(rows);
         rows.sort(java.util.Comparator.comparing(LedgerRow::occurredAt));   // 시간 오름차순
 
         return new LedgerReport(productId, from, to, rows,
