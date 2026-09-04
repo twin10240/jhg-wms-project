@@ -14,7 +14,7 @@ EXPECTED_TOOLS = {
 }
 
 
-async def test_등록된_도구는_정확히_여섯이다():
+async def test_등록된_도구는_정확히_일곱이다():
     # 이 표면이 곧 공격면이다. 쓰기 도구가 하나 붙으면 이 테스트가 실패한다.
     # 주석으로 적어둔 규칙은 지켜지지 않지만 실패하는 테스트는 지켜진다.
     tools = await server.mcp.list_tools()
