@@ -87,17 +87,48 @@ public class Reservation {
     @Column
     private Instant deliveredAt;
 
+    /**
+     * 예약 생성 시각. 이 필드가 생기기 전 행은 null이다 — 알 수 없는 정보라 백필하지 않는다
+     * ({@code InventoryTransaction.actor}와 같은 규칙).
+     *
+     * <p>예약이 얼마나 오래 재고를 붙들고 있었는지는 이 값 없이는 잴 수 없다. 예약 생성은
+     * onHand를 바꾸지 않아 원장에 행을 남기지 않으므로, 원장으로 우회할 수도 없다.
+     *
+     * <p>{@code issueShipment}·{@code deliver}와 달리 시각을 인자로 받지 않는다. 그쪽은
+     * 송장번호 문자열과 issuedAt이 <b>같은 순간</b>이어야 해서 호출자가 넘기는 것이고,
+     * 여기엔 그런 결합이 없다({@code InventoryTransaction.of}와 같다).
+     */
+    @Column
+    private Instant createdAt;
+
+    /**
+     * 예약 해제 시각. 해제되지 않았으면 null이다. 이 필드가 생기기 전 행도 null이다.
+     *
+     * <p>출고 시각에 해당하는 필드는 따로 두지 않았다 — {@code shipAll}이 {@code ship()} 직후
+     * 송장을 발급하므로 {@code issuedAt}이 곧 출고 시각이다. 같은 사실을 두 컬럼에 적으면
+     * 언젠가 둘이 어긋난다.
+     */
+    @Column
+    private Instant releasedAt;
+
     public static Reservation reserve(UUID requestKey, Long orderId, Map<Long, Integer> qtyByProductId) {
         Reservation r = new Reservation();
         r.requestKey = requestKey;
         r.orderId = orderId;
         r.status = ReservationStatus.RESERVED;
         r.qtyByProductId = new HashMap<>(qtyByProductId);
+        // 절삭 이유는 issueShipment와 같다 — 컬럼이 timestamp(6)라 자르지 않으면
+        // 나노초 정밀도 플랫폼에서 저장 직후 값과 재조회 값이 달라진다.
+        r.createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
         return r;
     }
 
     public void ship()    { this.status = ReservationStatus.SHIPPED; }
-    public void release() { this.status = ReservationStatus.RELEASED; }
+
+    public void release() {
+        this.status = ReservationStatus.RELEASED;
+        this.releasedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
 
     /**
      * 출고 송장 발급. 주문당 1회이며 재발급하지 않는다 — 호출 측이 trackingNumber == null을 확인하고 부른다.

@@ -3,6 +3,7 @@ package com.jhg.wms.domain;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,6 +17,35 @@ class ReservationTest {
         assertThat(r.getStatus()).isEqualTo(ReservationStatus.RESERVED);
         assertThat(r.getOrderId()).isEqualTo(1L);
         assertThat(r.getQtyByProductId()).containsExactlyInAnyOrderEntriesOf(Map.of(10L, 3, 20L, 5));
+    }
+
+    @Test
+    void reserve_생성_시각을_담는다() {
+        // 이 값이 없으면 예약이 재고를 얼마나 붙들고 있었는지 영영 잴 수 없다.
+        // 예약 생성은 onHand를 바꾸지 않아 원장에도 남지 않으므로 우회로가 없다.
+        Instant before = Instant.now().truncatedTo(ChronoUnit.MICROS);
+
+        Reservation r = Reservation.reserve(keyOf(1L), 1L, Map.of(1L, 2));
+
+        assertThat(r.getCreatedAt()).isNotNull();
+        assertThat(r.getCreatedAt()).isBetween(before, Instant.now());
+        // 마이크로초로 잘려 있어야 저장 직후 값과 재조회 값이 같다(issuedAt과 같은 이유).
+        assertThat(r.getCreatedAt().getNano() % 1000).isZero();
+    }
+
+    @Test
+    void release_해제_시각을_담고_출고는_담지_않는다() {
+        Reservation released = Reservation.reserve(keyOf(1L), 1L, Map.of(1L, 2));
+        Reservation shipped = Reservation.reserve(keyOf(2L), 2L, Map.of(1L, 2));
+
+        assertThat(released.getReleasedAt()).isNull();
+
+        released.release();
+        shipped.ship();
+
+        assertThat(released.getReleasedAt()).isNotNull();
+        // 출고 시각은 issuedAt이 갖는다 — 해제 시각 자리에 출고를 적으면 두 사실이 섞인다.
+        assertThat(shipped.getReleasedAt()).isNull();
     }
 
     @Test
