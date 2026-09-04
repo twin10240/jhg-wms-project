@@ -12,7 +12,7 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 계산은 하지 않습니다. WMS가 이미 하고, 여기서 또 하면 화면과 보고서가 다른 숫자를
 낼 수 있게 됩니다.
 
-## 도구 여섯 (전부 읽기 전용)
+## 도구 일곱 (전부 읽기 전용)
 
 | 도구 | 인자 |
 |---|---|
@@ -22,6 +22,7 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 | `return_details_by_category` | `category`, `from_date`, `to_date` |
 | `cycle_count_accuracy` | `from_date`, `to_date` |
 | `cycle_count_variances` | `from_date`, `to_date` |
+| `inventory_ledger` | `product_id`, `from_date`, `to_date` |
 
 `from`은 파이썬 예약어라 인자 이름이 `from_date`입니다. REST 파라미터 이름으로
 바꾸는 일은 `client.py`가 합니다.
@@ -37,10 +38,11 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 구간 내 원장을 거르기 전에 메모리에 올립니다. 윤년 한 해를 담는 값이라 정당한 연간 리뷰는
 막지 않습니다.
 
-**응답 행 수에는 상한이 없습니다.** 실측(2026-09-03) 전 기간 상세가 50행·653자라 아직
-발동할 여지가 없어 넣지 않았습니다. 필요해지면 상세 도구의 반환을
-`{"rows": [...], "truncated": bool, "total": int}`로 바꿉니다 — 잘린 사실을 담지 않고
-그냥 자르면 조용한 오답이 됩니다.
+**`inventory_ledger`만 상한이 있습니다.** 최대 500행이고, 반환은
+`{"rows": [...], "truncated": bool, "total": int}`입니다 — 잘린 사실을 담지 않고
+그냥 자르면 조용한 오답이 되기 때문입니다. 나머지 상세 도구(`return_details_by_product`,
+`return_details_by_category`)는 여전히 상한이 없습니다. 실측(2026-09-03) 전 기간 상세가
+50행·653자라 아직 발동할 여지가 없어 넣지 않았습니다 — 필요해지면 같은 모양으로 바꿉니다.
 
 ## 환경변수
 

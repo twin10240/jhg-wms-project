@@ -1,6 +1,6 @@
 ---
 name: wms-cycle-count-report
-description: Use when writing, reviewing, or summarizing a WMS 재고 실사(cycle count) report, or whenever quoting count accuracy, book-vs-counted variances, or session status from the wms MCP tools (cycle_count_accuracy, cycle_count_variances).
+description: Use when writing, reviewing, or summarizing a WMS 재고 실사(cycle count) report, or whenever quoting count accuracy, book-vs-counted variances, or session status from the wms MCP tools (cycle_count_accuracy, cycle_count_variances, inventory_ledger), including tracing a single product's inventory-ledger history for a date range even outside a cycle-count framing.
 ---
 
 # WMS 실사 보고서
