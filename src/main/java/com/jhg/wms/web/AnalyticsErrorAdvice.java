@@ -20,7 +20,8 @@ import java.time.LocalDate;
 // Task 3에서 InventoryLedgerAnalyticsController.class가 이 목록에 추가된다.
 @RestControllerAdvice(assignableTypes = {
         ReturnAnalyticsController.class,
-        CycleCountAnalyticsController.class})
+        CycleCountAnalyticsController.class,
+        InventoryLedgerAnalyticsController.class})
 public class AnalyticsErrorAdvice {
 
     /** 400이지 500이 아니다 — 역전된 기간이 여기로 온다. */
