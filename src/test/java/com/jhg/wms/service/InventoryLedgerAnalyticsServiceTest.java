@@ -146,6 +146,23 @@ class InventoryLedgerAnalyticsServiceTest {
     }
 
     @Test
+    void 같은_시각의_행은_기록된_순서대로_낸다() {
+        // 정렬만 하면 안정 정렬이 저장소의 id DESC를 그대로 남겨 동시각 구간만 거꾸로 나온다.
+        // 그러면 before→after 사슬이 그 구간에서 끊겨 보인다 — 사슬을 만들려고 하는 정렬이
+        // 사슬을 깨는 셈이다. 뒤집은 뒤 정렬해야 타이가 기록 순서로 남는다.
+        var 같은시각 = LocalDateTime.of(2026, 9, 2, 10, 0);
+        save(PRODUCT, InventoryTransactionType.SHIP, -1, 10, 9, null, "먼저", 같은시각);
+        save(PRODUCT, InventoryTransactionType.SHIP, -1, 9, 8, null, "나중", 같은시각);
+
+        var rows = service.ledger(PRODUCT, FROM, TO).rows();
+
+        assertThat(rows).extracting(InventoryLedgerAnalyticsService.LedgerRow::reason)
+                .containsExactly("먼저", "나중");
+        // 사슬이 이어진다: 10→9, 9→8
+        assertThat(rows.get(0).afterQty()).isEqualTo(rows.get(1).beforeQty());
+    }
+
+    @Test
     void 행위자는_보고서에_담기지_않는다() {
         // LedgerRow에 actor 필드가 없다는 것이 이 설계의 핵심 제약이다.
         save(PRODUCT, InventoryTransactionType.ADJUST, -1, 10, 9, null, "파손",
