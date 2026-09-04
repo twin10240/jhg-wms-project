@@ -172,3 +172,31 @@ def test_기간_상한은_상세_조회에도_걸린다(monkeypatch):
 
     with pytest.raises(client.WmsError):
         client.get_details_by_category("UNCLASSIFIED", "2020-01-01", "2026-12-31")
+
+
+def test_원장_도구가_상품_경로로_부른다(monkeypatch):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, request=request,
+                              json={"productId": 11, "rows": [], "truncated": False, "total": 0})
+
+    monkeypatch.setattr(client, "_build_client",
+                        lambda: httpx.Client(transport=httpx.MockTransport(handler),
+                                             base_url="http://wms.test"))
+
+    result = client.get_inventory_ledger(11, "2026-09-01", "2026-09-03")
+
+    assert "/api/analytics/inventory-ledger/product/11" in seen["url"]
+    assert "from=2026-09-01" in seen["url"]
+    assert "to=2026-09-03" in seen["url"]
+    assert result["truncated"] is False
+
+
+def test_원장_도구도_366일_상한에_걸린다(monkeypatch):
+    # 구간 검사는 소켓을 열기 전에 끝난다 — transport를 깔지 않아도 걸려야 한다.
+    with pytest.raises(client.WmsError) as e:
+        client.get_inventory_ledger(11, "2020-01-01", "2026-09-03")
+
+    assert "366" in str(e.value)

@@ -99,6 +99,21 @@ def cycle_count_variances(from_date: str, to_date: str) -> list:
     return _guard(lambda: client.get_cycle_count_variances(from_date, to_date))
 
 
+@mcp.tool()
+def inventory_ledger(product_id: int, from_date: str, to_date: str) -> dict:
+    """한 상품의 재고 원장. 기간 내 이동을 시간 오름차순으로 준다.
+
+    beforeQty→afterQty가 행마다 이어붙는다. 사슬이 끊긴 자리는 원장 밖 이동이 있었다는
+    뜻이지만, 그것이 무엇인지는 이 데이터로 말할 수 없다.
+    ADJUST가 있으면 사람이 이미 조정한 것이다 — 실사 차이와 겹쳐 읽으면 이중 계상이 된다.
+    빈 목록은 오류가 아니라 그 기간에 기록된 이동이 없었다는 뜻이다.
+    truncated가 true면 500행에서 잘린 것이다 — 남은 것은 최근 500행이고, 전체 수는 total이다.
+    행위자(actor)는 주지 않는다. 사람 확인이 필요하면 원장 화면으로 넘겨라.
+    날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
+    """
+    return _guard(lambda: client.get_inventory_ledger(product_id, from_date, to_date))
+
+
 def main() -> None:
     mcp.run(transport="stdio")
 
