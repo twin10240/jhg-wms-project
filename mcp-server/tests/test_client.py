@@ -190,6 +190,7 @@ def test_원장_도구가_상품_경로로_부른다(monkeypatch):
 
     assert "/api/analytics/inventory-ledger/product/11" in seen["url"]
     assert "from=2026-09-01" in seen["url"]
+    assert "to=2026-09-03" in seen["url"]
     assert result["truncated"] is False
 
 

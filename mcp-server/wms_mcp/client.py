@@ -119,5 +119,7 @@ def get_cycle_count_variances(from_date: str, to_date: str) -> list:
 
 
 def get_inventory_ledger(product_id: int, from_date: str, to_date: str) -> dict:
-    # product_id는 int라 경로 조작이 되지 않는다(category처럼 quote할 필요가 없다).
-    return _get(f"/api/analytics/inventory-ledger/product/{product_id}", from_date, to_date)
+    # int()로 강제해 경로 조작을 이 함수 안에서 막는다(category처럼 quote가 필요한 게 아니라
+    # 애초에 숫자가 아니면 여기서 ValueError로 죽는다) — 스키마상 int라는 보장을 MCP 도구
+    # 계층에 기대지 않는다. 이 모듈은 단독으로도 import될 수 있다.
+    return _get(f"/api/analytics/inventory-ledger/product/{int(product_id)}", from_date, to_date)

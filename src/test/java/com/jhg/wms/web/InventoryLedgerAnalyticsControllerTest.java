@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,12 +53,17 @@ class InventoryLedgerAnalyticsControllerTest {
                         .with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.productId").value(11))
+                .andExpect(jsonPath("$.from").value("2026-09-01"))
+                .andExpect(jsonPath("$.to").value("2026-09-03"))
                 .andExpect(jsonPath("$.truncated").value(false))
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.rows[0].type").value("ADJUST"))
+                .andExpect(jsonPath("$.rows[0].delta").value(-1))
                 .andExpect(jsonPath("$.rows[0].beforeQty").value(115))
                 .andExpect(jsonPath("$.rows[0].afterQty").value(114))
-                .andExpect(jsonPath("$.rows[0].reason").value("파손 폐기"));
+                .andExpect(jsonPath("$.rows[0].reference").value("PO#7"))
+                .andExpect(jsonPath("$.rows[0].reason").value("파손 폐기"))
+                .andExpect(jsonPath("$.rows[0].occurredAt").value("2026-09-02T10:00:00"));
     }
 
     @Test
@@ -109,6 +115,21 @@ class InventoryLedgerAnalyticsControllerTest {
                         .with(httpBasic("wms", "wms")))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("YYYY-MM-DD")));
+    }
+
+    @Test
+    void 역전된_범위는_400이고_500이_아니다() throws Exception {
+        // 서비스의 ledger()가 실제로 던지는 예외다. 매핑이 없으면 500이 되고,
+        // 모델은 "내 인자가 틀렸다"와 "창고가 고장났다"를 구분하지 못한다.
+        doThrow(new IllegalArgumentException("조회 구간이 뒤집혔습니다: " + TO + " ~ " + FROM))
+                .when(inventoryLedgerAnalyticsService).ledger(11L, TO, FROM);
+
+        mockMvc.perform(get("/api/analytics/inventory-ledger/product/11")
+                        .param("from", "2026-09-03").param("to", "2026-09-01")
+                        .with(httpBasic("wms", "wms")))
+                .andExpect(status().isBadRequest())
+                // 본문은 평문이다(README의 기존 API 오류 계약). 무엇을 고쳐야 할지 읽혀야 한다.
+                .andExpect(content().string("조회 구간이 뒤집혔습니다: " + TO + " ~ " + FROM));
     }
 
     @Test
