@@ -98,34 +98,51 @@ class InventoryLedgerAnalyticsServiceTest {
         assertThat(report.total()).isZero();
     }
 
+    // 아래 두 상한 테스트는 실제 상한(500)이 아니라 낮춘 상한으로 같은 로직을 검증한다.
+    // 500/501행을 실제로 물리 DB에 꽂으면 스위트 전체를 도는 동안 여러 테스트 컨텍스트가
+    // 켜켜이 캐시된 채 같은 물리 DB(wms_test)를 공유하는 상황에서 시퀀스 경계를 넓게
+    // 가로질러 NonUniqueObjectException을 낼 수 있다 — 상한을 낮추면 같은 코드 경로를
+    // 훨씬 적은 insert로 증명할 수 있다.
+    private static final int SMALL_CAP = 5;
+
     @Test
-    void 상한을_넘기면_최근_500행을_남기고_잘랐다고_말한다() {
-        for (int i = 0; i < InventoryLedgerAnalyticsService.MAX_ROWS + 1; i++) {
+    void 상한을_넘기면_최근_행을_남기고_잘랐다고_말한다() {
+        service = new InventoryLedgerAnalyticsService(repository, SMALL_CAP);
+        for (int i = 0; i < SMALL_CAP + 1; i++) {
             save(PRODUCT, InventoryTransactionType.ADJUST, -1, 100 - i, 99 - i, null, "행 " + i,
                  LocalDateTime.of(2026, 9, 1, 0, 0).plusMinutes(i));
         }
 
         var report = service.ledger(PRODUCT, FROM, TO);
 
-        assertThat(report.rows()).hasSize(InventoryLedgerAnalyticsService.MAX_ROWS);
+        assertThat(report.rows()).hasSize(SMALL_CAP);
         assertThat(report.truncated()).isTrue();
-        assertThat(report.total()).isEqualTo(InventoryLedgerAnalyticsService.MAX_ROWS + 1);
+        assertThat(report.total()).isEqualTo(SMALL_CAP + 1);
         // 오래된 쪽을 버린다 — 조사 중인 사건은 최근에 있다
         assertThat(report.rows().get(0).reason()).isEqualTo("행 1");
     }
 
     @Test
     void 정확히_상한이면_자르지_않는다() {
-        // 경계다. `>=`로 쓰면 500행짜리가 잘렸다고 거짓을 말한다.
-        for (int i = 0; i < InventoryLedgerAnalyticsService.MAX_ROWS; i++) {
+        // 경계다. `>=`로 쓰면 상한과 같은 개수여도 잘렸다고 거짓을 말한다.
+        service = new InventoryLedgerAnalyticsService(repository, SMALL_CAP);
+        for (int i = 0; i < SMALL_CAP; i++) {
             save(PRODUCT, InventoryTransactionType.ADJUST, -1, 100, 99, null, "행 " + i,
                  LocalDateTime.of(2026, 9, 1, 0, 0).plusMinutes(i));
         }
 
         var report = service.ledger(PRODUCT, FROM, TO);
 
-        assertThat(report.rows()).hasSize(InventoryLedgerAnalyticsService.MAX_ROWS);
+        assertThat(report.rows()).hasSize(SMALL_CAP);
         assertThat(report.truncated()).isFalse();
+    }
+
+    @Test
+    void 운영_기본_상한은_500이다() {
+        // 기본 생성자를 쓰면 DEFAULT_MAX_ROWS(500)가 적용된다는 것을 리플렉션으로 고정한다.
+        // 이 상수가 바뀌면 이 테스트가 실패해야 한다.
+        assertThat(InventoryLedgerAnalyticsService.DEFAULT_MAX_ROWS).isEqualTo(500);
+        assertThat(ReflectionTestUtils.getField(service, "maxRows")).isEqualTo(500);
     }
 
     @Test

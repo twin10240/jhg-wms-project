@@ -3,6 +3,7 @@ package com.jhg.wms.service;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
 import com.jhg.wms.repository.InventoryTransactionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -27,13 +28,22 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class InventoryLedgerAnalyticsService {
 
-    /** 응답 행 상한. 넘으면 최근 것부터 남긴다 — 조사 중인 사건은 최근에 있다. */
-    static final int MAX_ROWS = 500;
+    /** 운영 기본 상한. 넘으면 최근 것부터 남긴다 — 조사 중인 사건은 최근에 있다. */
+    static final int DEFAULT_MAX_ROWS = 500;
 
     private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final int maxRows;
 
+    // 생성자가 둘이라 Spring이 스스로 고르지 못한다 — 운영이 쓸 쪽을 명시한다.
+    @Autowired
     public InventoryLedgerAnalyticsService(InventoryTransactionRepository inventoryTransactionRepository) {
+        this(inventoryTransactionRepository, DEFAULT_MAX_ROWS);
+    }
+
+    /** 테스트 전용 시드. 상한 자체를 낮춰 같은 로직을 적은 행 수로 검증한다. */
+    InventoryLedgerAnalyticsService(InventoryTransactionRepository inventoryTransactionRepository, int maxRows) {
         this.inventoryTransactionRepository = inventoryTransactionRepository;
+        this.maxRows = maxRows;
     }
 
     /** @param occurredAt 원장에 찍힌 시각. 행위자는 담지 않는다. */
@@ -61,9 +71,9 @@ public class InventoryLedgerAnalyticsService {
         LocalDateTime fromAt = from.atStartOfDay();
         LocalDateTime toAt = to.plusDays(1).atStartOfDay();   // 종료일 당일을 포함한다
 
-        // search는 id DESC로 준다. 첫 페이지 = 최근 MAX_ROWS행.
+        // search는 id DESC로 준다. 첫 페이지 = 최근 maxRows행.
         Page<InventoryTransaction> page = inventoryTransactionRepository.search(
-                null, productId, fromAt, toAt, PageRequest.of(0, MAX_ROWS));
+                null, productId, fromAt, toAt, PageRequest.of(0, maxRows));
 
         List<LedgerRow> rows = new ArrayList<>(page.getContent().stream().map(
                 t -> new LedgerRow(t.getType(), t.getDelta(), t.getBeforeQty(), t.getAfterQty(),
@@ -71,6 +81,6 @@ public class InventoryLedgerAnalyticsService {
         rows.sort(java.util.Comparator.comparing(LedgerRow::occurredAt));   // 시간 오름차순
 
         return new LedgerReport(productId, from, to, rows,
-                                page.getTotalElements() > MAX_ROWS, page.getTotalElements());
+                                page.getTotalElements() > maxRows, page.getTotalElements());
     }
 }
