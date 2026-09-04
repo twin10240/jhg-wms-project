@@ -10,6 +10,7 @@ EXPECTED_TOOLS = {
     "return_details_by_category",
     "cycle_count_accuracy",
     "cycle_count_variances",
+    "inventory_ledger",
 }
 
 
@@ -109,3 +110,16 @@ async def test_실사_차이_도구가_빈_목록도_정상으로_돌려준다(m
         "cycle_count_variances", {"from_date": "2026-09-01", "to_date": "2026-09-30"})
 
     assert result.content is not None
+
+
+async def test_원장_도구가_잘림_표시를_그대로_통과시킨다(monkeypatch):
+    # 잘린 사실을 삼키면 모델이 받은 것을 전량으로 읽고 "이동이 없었다"고 쓴다.
+    monkeypatch.setattr(client, "get_inventory_ledger",
+                        lambda p, f, t: {"rows": [], "truncated": True, "total": 812})
+
+    result = await server.mcp.call_tool(
+        "inventory_ledger",
+        {"product_id": 11, "from_date": "2026-09-01", "to_date": "2026-09-03"})
+
+    assert "truncated" in str(result.content[0].text)
+    assert "812" in str(result.content[0].text)

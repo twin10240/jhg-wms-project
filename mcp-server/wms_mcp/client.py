@@ -116,3 +116,8 @@ def get_cycle_count_accuracy(from_date: str, to_date: str) -> dict:
 
 def get_cycle_count_variances(from_date: str, to_date: str) -> list:
     return _get("/api/analytics/cycle-count-variances", from_date, to_date)
+
+
+def get_inventory_ledger(product_id: int, from_date: str, to_date: str) -> dict:
+    # product_id는 int라 경로 조작이 되지 않는다(category처럼 quote할 필요가 없다).
+    return _get(f"/api/analytics/inventory-ledger/product/{product_id}", from_date, to_date)
