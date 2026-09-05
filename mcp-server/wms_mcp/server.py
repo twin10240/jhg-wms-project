@@ -1,4 +1,4 @@
-"""WMS 반품 분석 MCP 서버 — 읽기 전용 도구 넷.
+"""WMS 반품 분석 MCP 서버 — 읽기 전용 도구 아홉.
 
 두 얼굴이다. Claude Code 쪽으로는 MCP 서버(도구를 내놓는 쪽), WMS 쪽으로는
 HTTP 클라이언트다. 그 사이에서 하는 일은 번역뿐이다.
@@ -112,6 +112,37 @@ def inventory_ledger(product_id: int, from_date: str, to_date: str) -> dict:
     날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
     """
     return _guard(lambda: client.get_inventory_ledger(product_id, from_date, to_date))
+
+
+@mcp.tool()
+def reservation_dwell(from_date: str, to_date: str) -> dict:
+    """기간 내 끝난 예약이 재고를 붙들고 있던 시간의 분포.
+
+    체류는 예약 생성부터 종료까지다. 구간 판정은 종료 시각(basis="endedAt")이지 생성 시각이 아니다.
+    shipped와 released는 따로 온다 — 합쳐 읽지 마라. 출고 체류는 정상 처리에 걸린 시간이고
+    해제 체류는 헛되이 묶여 있던 시간이라 조치할 곳이 다르다.
+    count가 0이면 median·p90·max는 null이다. 0분과 잴 것이 없는 것은 다르다.
+    stillOpen은 구간 끝에 아직 안 끝난 예약 수이고 생존 편향의 크기다 — 오래 붙들린 예약일수록
+    아직 안 끝나 이 분포에 안 잡히므로, 이 수를 밝히지 않고 중앙값을 인용하지 마라.
+    excludedMissingCreatedAt은 생성 시각이 없어 잴 수 없었던 예약 수다. 보고서는 그 수를 밝혀라.
+    단위는 분이다. 날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
+    """
+    return _guard(lambda: client.get_reservation_dwell(from_date, to_date))
+
+
+@mcp.tool()
+def reservation_dwell_by_product(from_date: str, to_date: str) -> list:
+    """상품별 체류 묶음. 반복해서 오래 붙들린 상품이 먼저 온다.
+
+    집계 도구와 같은 모수다(기간 내 끝난 예약, 생성 시각이 있는 것만).
+    occurrences는 그 상품이 든 예약 중 체류를 잰 건수다 — 예약 하나가 상품 여럿을 담으면
+    담은 수만큼 계상되므로 occurrences의 합은 예약 건수가 아니다.
+    한 번 아주 오래 걸린 것보다 여러 번 반복해서 오래 걸리는 쪽이 로케이션·재고 부족 같은
+    구조적 원인을 가리킨다 — 정렬이 그 순서다.
+    빈 목록은 오류가 아니라 그 기간에 끝난 예약이 없었다는 뜻이다.
+    단위는 분이다. 날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
+    """
+    return _guard(lambda: client.get_reservation_dwell_by_product(from_date, to_date))
 
 
 def main() -> None:

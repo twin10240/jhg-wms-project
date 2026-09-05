@@ -123,3 +123,11 @@ def get_inventory_ledger(product_id: int, from_date: str, to_date: str) -> dict:
     # 애초에 숫자가 아니면 여기서 ValueError로 죽는다) — 스키마상 int라는 보장을 MCP 도구
     # 계층에 기대지 않는다. 이 모듈은 단독으로도 import될 수 있다.
     return _get(f"/api/analytics/inventory-ledger/product/{int(product_id)}", from_date, to_date)
+
+
+def get_reservation_dwell(from_date: str, to_date: str) -> dict:
+    return _get("/api/analytics/reservation-dwell", from_date, to_date)
+
+
+def get_reservation_dwell_by_product(from_date: str, to_date: str) -> list:
+    return _get("/api/analytics/reservation-dwell-by-product", from_date, to_date)
