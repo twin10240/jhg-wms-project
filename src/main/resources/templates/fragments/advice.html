@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- 발주 근거 표. 임박한 몇 행과 접어 둔 나머지가 같은 조판을 써야 하므로 조각으로 뺀다.
+     두 표는 각각 폭을 재면 열이 어긋나므로 .advice table에 고정 레이아웃을 건다(admin.css). -->
+<div class="table-wrap" th:fragment="table(rows)">
+  <table>
+    <thead>
+      <tr>
+        <th>상품</th>
+        <th style="text-align:right">최근 출고</th>
+        <th style="text-align:right">일평균</th>
+        <th style="text-align:right">가용</th>
+        <th style="text-align:right">소진 예상</th>
+        <th>직전 발주</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="a : ${rows}">
+        <td th:text="${a.productId + ' — ' + a.productName}">1 — 상품 1</td>
+        <!-- 표본 일수를 값마다 붙인다. 상품별로 다르고, 이 수를 밝히지 않으면
+             일평균이 어느 분모 위에서 나온 값인지 알 수 없다. -->
+        <td style="text-align:right">
+          <span th:text="${a.shippedQty} + '개'">0개</span>
+          <span class="advice__sample" th:text="'(표본 ' + ${a.sampleDays} + '일)'">(표본 30일)</span>
+        </td>
+        <td style="text-align:right"
+            th:text="${#numbers.formatDecimal(a.dailyAverage, 1, 'COMMA', 1, 'POINT')}">0.0</td>
+        <td style="text-align:right" th:text="${a.availableQty}">0</td>
+        <!-- 일평균 0이면 null이다. 0일로 적으면 오늘 소진된다는 뜻이 된다. -->
+        <td style="text-align:right" th:switch="${a.daysToStockout == null}">
+          <span th:case="true" title="출고가 없어 잴 수 없습니다">—</span>
+          <span th:case="*"
+                th:text="${#numbers.formatDecimal(a.daysToStockout, 1, 'COMMA', 1, 'POINT')} + '일'">0.0일</span>
+        </td>
+        <td th:if="${a.lastOrder == null}">—</td>
+        <td th:if="${a.lastOrder != null}">
+          <a th:href="@{'/admin/purchase-orders/' + ${a.lastOrder.purchaseOrderId}}"
+             th:text="'#' + ${a.lastOrder.purchaseOrderId}">#1</a>
+          <span th:text="${#temporals.format(a.lastOrder.orderedOn,'M/d')} + ' ' + ${a.lastOrder.quantity} + '개'">8/30 20개</span>
+          <span class="advice__sample" th:if="${a.lastOrder.leadTimeDays != null}"
+                th:text="'· 입고 ' + ${#temporals.format(a.lastOrder.receivedOn,'M/d')} + ' (리드 ' + ${a.lastOrder.leadTimeDays} + '일)'">· 입고 8/30 (리드 0일)</span>
+          <span class="advice__sample" th:if="${a.lastOrder.leadTimeDays == null}"
+                th:switch="${a.lastOrder.status.name()}">
+            <span th:case="'ORDERED'">· 입고대기</span>
+            <span th:case="'PARTIALLY_RECEIVED'">· 부분입고</span>
+            <span th:case="'CANCELLED'">· 취소됨</span>
+            <span th:case="*">· —</span>
+          </span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
