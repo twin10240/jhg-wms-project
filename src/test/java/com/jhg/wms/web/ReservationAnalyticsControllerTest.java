@@ -63,8 +63,12 @@ class ReservationAnalyticsControllerTest {
                         .with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].productId").value(11))
+                .andExpect(jsonPath("$[0].productName").value("볼펜"))
                 .andExpect(jsonPath("$[0].occurrences").value(2))
-                .andExpect(jsonPath("$[0].shippedCount").value(2));
+                .andExpect(jsonPath("$[0].medianMinutes").value(120))
+                .andExpect(jsonPath("$[0].maxMinutes").value(240))
+                .andExpect(jsonPath("$[0].shippedCount").value(2))
+                .andExpect(jsonPath("$[0].releasedCount").value(0));
     }
 
     @Test

@@ -87,11 +87,12 @@ public class ReservationAnalyticsService {
 
         for (Reservation r : endedIn(from, to)) {
             if (r.getCreatedAt() == null) { excluded++; continue; }
-            long minutes = Duration.between(r.getCreatedAt(), endedAt(r)).toMinutes();
+            Instant ended = endedAt(r);
+            if (ended == null) continue;   // RESERVED는 endedAt이 null이다 — 조회가 걸러내므로 실제로는 안 옴
+            long minutes = Duration.between(r.getCreatedAt(), ended).toMinutes();
             switch (r.getStatus()) {
                 case SHIPPED -> shipped.add(minutes);
                 case RELEASED -> released.add(minutes);
-                case RESERVED -> { }   // 조회가 걸러내므로 여기 오지 않는다
             }
         }
 
@@ -113,11 +114,14 @@ public class ReservationAnalyticsService {
 
         for (Reservation r : endedIn(from, to)) {
             if (r.getCreatedAt() == null) continue;
-            long minutes = Duration.between(r.getCreatedAt(), endedAt(r)).toMinutes();
+            Instant ended = endedAt(r);
+            if (ended == null) continue;   // RESERVED는 endedAt이 null이다 — 조회가 걸러내므로 실제로는 안 옴
+            long minutes = Duration.between(r.getCreatedAt(), ended).toMinutes();
             for (Long productId : r.getQtyByProductId().keySet()) {
                 minutesByProduct.computeIfAbsent(productId, k -> new ArrayList<>()).add(minutes);
                 int[] counts = countsByProduct.computeIfAbsent(productId, k -> new int[2]);
-                if (r.getStatus() == ReservationStatus.SHIPPED) counts[0]++; else counts[1]++;
+                if (r.getStatus() == ReservationStatus.SHIPPED) counts[0]++;
+                else if (r.getStatus() == ReservationStatus.RELEASED) counts[1]++;
             }
         }
         if (minutesByProduct.isEmpty()) return List.of();

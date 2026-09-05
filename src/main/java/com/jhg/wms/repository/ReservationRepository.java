@@ -47,7 +47,19 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * 두지 않은 이유: shipAll이 ship() 직후 항상 issueShipment를 부르고 송장 없는 기존 주문까지
      * 메우므로 앞으로 생기지 않는다.
      *
-     * <p>qtyByProductId는 지연로딩이라 상품별 집계에서 터진다 — 여기서 즉시 페치한다.
+     * <p>다만 그 메움이 issuedAt을 <b>출고 시각이 아니라 메운 시각</b>으로 채운다는 뜻이기도 하다.
+     * 오래전에 출고됐지만 송장이 없던 예약이 shipAll 재시도로 issuedAt=지금이 되면, 이 조회는
+     * createdAt(오래전)부터 지금까지를 체류로 잡아 그 행을 잴 수 없는 게 아니라 <b>실제보다
+     * 훨씬 길게 잘못 잰다</b> — 메워진 그날 구간의 최댓값·p90을 끌어올릴 수 있다.
+     *
+     * <p>qtyByProductId는 지연로딩이다. ReservationAnalyticsService는 클래스 레벨
+     * {@code @Transactional(readOnly = true)}라 세션이 열려 있어 터지지는 않는다 — 대신
+     * 상품별 집계에서 행마다 지연 쿼리가 나가는 N+1이 된다. 여기서 즉시 페치해 막는다.
+     *
+     * <p>행 수 상한은 없다. 366일 구간이면 그해 끝난 예약 전부와 qtyByProductId를 메모리에
+     * 올린다 — 응답이 작아 토큰 비용은 없지만(원장의 500행 상한과 다른 이유) 네 분석 조회 중
+     * 서버 메모리를 가장 많이 쓰는 것은 이쪽이다. 주문량이 늘면 여기가 먼저 아프다.
+     * ponytail: 상한 없음, 트래픽이 늘면 원장처럼 최근 N행 자르기 + total 필드로 전환한다.
      */
     @EntityGraph(attributePaths = "qtyByProductId")
     @Query("""
@@ -67,6 +79,10 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * 인용하면 실제보다 짧게 보인다.
      *
      * <p>createdAt이 null인 행은 세지 않는다 — 언제 시작했는지 모르면 그 시각에 열려 있었는지도 모른다.
+     *
+     * <p>일부러 createdAt 하한을 두지 않았다({@code from}과 무관하다). 묻는 것은 "그 순간에
+     * 몇 건이 재고를 붙들고 있었나"이지 "그 구간 안에서 시작된 것 중 몇 건인가"가 아니다 —
+     * 구간이 언제 시작했는지는 그 순간의 잔량과 관계가 없다.
      */
     @Query("""
            SELECT COUNT(r) FROM Reservation r
