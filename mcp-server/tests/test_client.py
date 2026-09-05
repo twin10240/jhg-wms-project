@@ -200,3 +200,50 @@ def test_원장_도구도_366일_상한에_걸린다(monkeypatch):
         client.get_inventory_ledger(11, "2020-01-01", "2026-09-03")
 
     assert "366" in str(e.value)
+
+
+def test_체류_도구가_집계_경로로_부른다(monkeypatch):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, request=request,
+                              json={"basis": "endedAt", "stillOpen": 0,
+                                    "excludedMissingCreatedAt": 0})
+
+    monkeypatch.setattr(client, "_build_client",
+                        lambda: httpx.Client(transport=httpx.MockTransport(handler),
+                                             base_url="http://wms.test"))
+
+    result = client.get_reservation_dwell("2026-09-01", "2026-09-30")
+
+    # 집계 경로는 상품별 경로의 접두사이므로, 접두사 일치만으로는 둘을 구분할 수 없다
+    assert "/api/analytics/reservation-dwell" in seen["url"]
+    assert "-by-product" not in seen["url"]
+    assert "from=2026-09-01" in seen["url"]
+    assert "to=2026-09-30" in seen["url"]
+    assert result["basis"] == "endedAt"
+
+
+def test_체류_상품별_도구가_제_경로로_부른다(monkeypatch):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, request=request, json=[])
+
+    monkeypatch.setattr(client, "_build_client",
+                        lambda: httpx.Client(transport=httpx.MockTransport(handler),
+                                             base_url="http://wms.test"))
+
+    client.get_reservation_dwell_by_product("2026-09-01", "2026-09-30")
+
+    # 집계 경로의 접두사이므로 정확히 구분되는지 확인한다
+    assert "/api/analytics/reservation-dwell-by-product" in seen["url"]
+
+
+def test_체류_도구도_366일_상한에_걸린다():
+    with pytest.raises(client.WmsError) as e:
+        client.get_reservation_dwell("2020-01-01", "2026-09-30")
+
+    assert "366" in str(e.value)

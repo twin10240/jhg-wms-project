@@ -9,7 +9,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.time.LocalDate;
 
 /**
- * {@code /api/analytics} 조회의 400 평문 계약. 세 컨트롤러가 같은 문구를 쓴다.
+ * {@code /api/analytics} 조회의 400 평문 계약. 네 컨트롤러가 같은 문구를 쓴다.
  *
  * <p>본문이 평문인 것은 기존 API 오류 계약이고, 그 소비자는 사람이 아니라 모델이다 —
  * "내가 인자를 잘못 줬다"를 알아볼 수 있어야 스스로 고친다.
@@ -20,7 +20,8 @@ import java.time.LocalDate;
 @RestControllerAdvice(assignableTypes = {
         ReturnAnalyticsController.class,
         CycleCountAnalyticsController.class,
-        InventoryLedgerAnalyticsController.class})
+        InventoryLedgerAnalyticsController.class,
+        ReservationAnalyticsController.class})
 public class AnalyticsErrorAdvice {
 
     /** 400이지 500이 아니다 — 역전된 기간이 여기로 온다. */

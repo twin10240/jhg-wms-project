@@ -12,7 +12,7 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 계산은 하지 않습니다. WMS가 이미 하고, 여기서 또 하면 화면과 보고서가 다른 숫자를
 낼 수 있게 됩니다.
 
-## 도구 일곱 (전부 읽기 전용)
+## 도구 아홉 (전부 읽기 전용)
 
 | 도구 | 인자 |
 |---|---|
@@ -23,6 +23,8 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 | `cycle_count_accuracy` | `from_date`, `to_date` |
 | `cycle_count_variances` | `from_date`, `to_date` |
 | `inventory_ledger` | `product_id`, `from_date`, `to_date` |
+| `reservation_dwell` | `from_date`, `to_date` |
+| `reservation_dwell_by_product` | `from_date`, `to_date` |
 
 `from`은 파이썬 예약어라 인자 이름이 `from_date`입니다. REST 파라미터 이름으로
 바꾸는 일은 `client.py`가 합니다.
@@ -43,6 +45,10 @@ Claude Code ──stdio(MCP)──> 이 서버 ──HTTP basic──> WMS ─�
 그냥 자르면 조용한 오답이 되기 때문입니다. 나머지 상세 도구(`return_details_by_product`,
 `return_details_by_category`)는 여전히 상한이 없습니다. 실측(2026-09-03) 전 기간 상세가
 50행·653자라 아직 발동할 여지가 없어 넣지 않았습니다 — 필요해지면 같은 모양으로 바꿉니다.
+
+체류 도구 둘은 **기간 내 끝난 예약만** 모수로 삼습니다(`basis="endedAt"`). `reservation_dwell`은
+아직 안 끝난 예약을 `stillOpen`으로 제공합니다 — 오래 붙들린 예약일수록 아직 안 끝나 빠지므로,
+그 수를 밝히지 않은 중앙값은 실제보다 짧습니다.
 
 ## 환경변수
 
@@ -110,5 +116,5 @@ DEMO 30건도 같이 날아간다.
 ## 연결
 
 저장소 루트의 `.mcp.json`이 등록을 담고 있습니다. Claude Code를 이 저장소에서 실행하면
-도구 일곱이 보입니다 — 로컬 기본값이 있으므로 `export`는 필요 없습니다.
+도구 아홉이 보입니다 — 로컬 기본값이 있으므로 `export`는 필요 없습니다.
 다른 WMS를 붙이려면 `WMS_BASE_URL`과 함께 `WMS_USER`·`WMS_PASSWORD`를 환경변수로 덮으세요.
