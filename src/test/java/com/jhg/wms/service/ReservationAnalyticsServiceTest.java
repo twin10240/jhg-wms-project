@@ -175,10 +175,13 @@ class ReservationAnalyticsServiceTest {
 
     @Test
     void 예약_하나가_담은_상품마다_체류가_계상된다() {
-        seedProduct(1L, "볼펜");
-        seedProduct(2L, "노트");
+        // productId를 14/100으로 고른 것은 우연이 아니다 — 두 값은 HashMap 버킷 순서가
+        // productId 오름차순과 반대(100, 14 순)라서, 정렬의 productId 타이브레이크를 빼면
+        // 이 테스트가 우연히 통과하는 일 없이 바로 깨진다.
+        seedProduct(14L, "볼펜");
+        seedProduct(100L, "노트");
         seedShipped(at(LocalDate.of(2026, 9, 5), 10), at(LocalDate.of(2026, 9, 5), 13),
-                Map.of(1L, 1, 2L, 5));
+                Map.of(14L, 1, 100L, 5));
 
         var rows = service.dwellByProduct(FROM, TO);
 
@@ -188,10 +191,31 @@ class ReservationAnalyticsServiceTest {
             assertThat(row.occurrences()).isEqualTo(1);
             assertThat(row.medianMinutes()).isEqualTo(180L);
         });
+        // occurrences와 medianMinutes가 모두 같으면 productId 오름차순이다.
+        assertThat(rows.get(0).productId()).isEqualTo(14L);
+        assertThat(rows.get(1).productId()).isEqualTo(100L);
     }
 
     @Test
-    void 차이가_없으면_빈_목록이다() {
+    void 반복_횟수가_같으면_중앙값이_큰_상품이_먼저_온다() {
+        seedProduct(9L, "지우개");
+        seedProduct(3L, "자");
+        // 9번 상품: 6시간 / 3번 상품: 2시간 — productId 오름차순이면 3번이 먼저지만
+        // medianMinutes 내림차순이 앞서므로 9번이 먼저 와야 한다.
+        seedShipped(at(LocalDate.of(2026, 9, 5), 10), at(LocalDate.of(2026, 9, 5), 16), Map.of(9L, 1));
+        seedShipped(at(LocalDate.of(2026, 9, 6), 10), at(LocalDate.of(2026, 9, 6), 12), Map.of(3L, 1));
+
+        var rows = service.dwellByProduct(FROM, TO);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).productId()).isEqualTo(9L);
+        assertThat(rows.get(0).medianMinutes()).isEqualTo(360L);
+        assertThat(rows.get(1).productId()).isEqualTo(3L);
+        assertThat(rows.get(1).medianMinutes()).isEqualTo(120L);
+    }
+
+    @Test
+    void 예약이_없으면_빈_목록이다() {
         assertThat(service.dwellByProduct(FROM, TO)).isEmpty();
     }
 }
