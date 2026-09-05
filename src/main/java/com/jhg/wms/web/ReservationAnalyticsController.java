@@ -17,6 +17,9 @@ import java.util.List;
  * 여기에 집계를 넣으면 화면과 보고서가 다른 숫자를 낼 수 있게 된다
  * ({@code CycleCountAnalyticsController}와 같은 규칙이다).
  *
+ * <p>읽기 전용이다. 경로가 {@code /api/**} 안인 것도 의도다 — apiChain의 basic 인증·
+ * CSRF 비활성·401 직접 응답을 그대로 쓰고 {@code SecurityConfig}를 고치지 않는다.
+ *
  * <p>{@code from}·{@code to}에 기본값을 두지 않는다. 보고서는 분모가 무엇인지 분명해야 한다.
  *
  * <p><b>소비자</b>: {@code mcp-server/wms_mcp/client.py}가 이 경로와 파라미터 이름을 그대로
