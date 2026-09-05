@@ -127,7 +127,8 @@ def reservation_dwell(from_date: str, to_date: str) -> dict:
     stillOpen은 from_date에 의존하지 않는다 — 구간 안에서 센 것이 아니라 구간 끝 시점의
     잔량(그 시각에 아직 안 끝난 예약 수)이라, 표본 크기와 직접 비교할 수치가 아니다.
     excludedMissingCreatedAt은 생성 시각이 없어 잴 수 없었던 예약 수다. 보고서는 그 수를 밝혀라.
-    단위는 분이다. 날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
+    단위는 분이다. 날짜는 YYYY-MM-DD이고 구간은 최대 366일이다. 하루 경계는 Asia/Seoul
+    자정이다 — OMS 쪽 수치와 맞춰 볼 때 어느 자정 기준인지 헷갈리지 마라.
     """
     return _guard(lambda: client.get_reservation_dwell(from_date, to_date))
 

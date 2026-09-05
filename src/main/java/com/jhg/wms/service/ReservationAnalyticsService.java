@@ -44,8 +44,12 @@ public class ReservationAnalyticsService {
     /**
      * 예약 시각은 Instant인데(서비스 경계를 넘는 값이라 의도적이다) 조회 인자는 LocalDate라
      * 존이 필요하다. 단일 창고라 설정값으로 빼지 않는다 — 필요해지면 그때 뺀다.
+     *
+     * <p>{@code systemDefault()}가 아니라 이름을 박는다. 컨테이너 기본 이미지(eclipse-temurin,
+     * {@code TZ} 미설정)는 UTC고 개발 머신은 KST라, systemDefault()를 쓰면 개발할 때와
+     * 배포됐을 때 하루 경계가 9시간 어긋난다 — 어디서 도는지에 따라 대답이 달라지는 조회가 된다.
      */
-    private static final ZoneId ZONE = ZoneId.systemDefault();
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
     private final ReservationRepository reservationRepository;
     private final InventoryRepository inventoryRepository;

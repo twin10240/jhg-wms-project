@@ -47,9 +47,13 @@ class ReservationAnalyticsServiceTest {
         service = new ReservationAnalyticsService(reservationRepository, inventoryRepository);
     }
 
-    /** 테스트 시각을 서비스와 같은 존으로 만든다 — 존이 어긋나면 구간 경계가 하루씩 밀린다. */
+    /**
+     * 서비스와 같은 이름의 존(Asia/Seoul)을 그대로 박는다 — systemDefault()를 쓰면 이 테스트가
+     * KST 머신에서는 통과하고 UTC CI에서는 실패할 수 있다(경계 케이스의 기준 존이 서비스와
+     * 어긋나므로). 같은 이름의 존을 쓰면 경계 케이스가 어느 머신에서도 재현된다.
+     */
     private static Instant at(LocalDate day, int hour) {
-        return LocalDateTime.of(day, java.time.LocalTime.of(hour, 0)).atZone(ZoneId.systemDefault()).toInstant();
+        return LocalDateTime.of(day, java.time.LocalTime.of(hour, 0)).atZone(ZoneId.of("Asia/Seoul")).toInstant();
     }
 
     private void seedProduct(long productId, String name) {

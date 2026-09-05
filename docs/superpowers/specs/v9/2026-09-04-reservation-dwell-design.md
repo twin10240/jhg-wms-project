@@ -107,9 +107,14 @@ SHIPPED의 종료 시각으로 `issuedAt`(송장 발급 시각)을 쓴다. 별�
 `Reservation`의 시각은 `Instant`인데(서비스 경계를 넘는 값이라 의도적이다) 다른 분석 도구들은
 `LocalDateTime`이라 `atStartOfDay()`로 끝났다. 여기서는 존을 정해야 한다.
 
-`ZoneId.systemDefault()`로 변환하고 그 사실을 주석에 남긴다. 반개구간(`>= fromAt`,
-`< toAtExclusive`)은 `CycleCountRepository`와 동일하게 간다. 존을 설정값으로 빼지 않는다 —
-단일 창고이고, 필요해지면 그때 뺀다.
+`ZoneId.of("Asia/Seoul")`로 변환하고 그 사실을 주석에 남긴다. `systemDefault()`는 쓰지 않는다 —
+컨테이너 기본 이미지(eclipse-temurin, `TZ` 미설정)는 UTC, 개발 머신은 KST라 배포된 존과
+개발한 존이 어긋나고, 그러면 하루 경계가 어디서 도느냐에 따라 9시간 밀린다. 반개구간
+(`>= fromAt`, `< toAtExclusive`)은 `CycleCountRepository`와 동일하게 간다. 존을 설정값으로
+빼지 않는다 — 단일 창고이고, 필요해지면 그때 뺀다.
+
+형제 분석 도구(반품·실사·원장)는 여전히 `LocalDateTime`(naive, 존 없는) 경계를 쓴다 — 이번
+수정의 범위가 아니라 일부러 그대로 뒀다.
 
 ## 스킬 연결
 
