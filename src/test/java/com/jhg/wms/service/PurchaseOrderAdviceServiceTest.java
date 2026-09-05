@@ -48,7 +48,8 @@ class PurchaseOrderAdviceServiceTest {
     void setUp() {
         InventoryService inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
                 mock(OmsReplenishmentNotifier.class), mock(OmsDeliveryNotifier.class), () -> "system");
-        purchaseOrderService = new PurchaseOrderService(poRepo, inventoryService, requestRepo);
+        purchaseOrderService = new PurchaseOrderService(poRepo, inventoryService, requestRepo,
+                mock(PurchaseOrderMemoClassificationTrigger.class));
         service = new PurchaseOrderAdviceService(txnRepo, inventoryService, purchaseOrderService);
     }
 

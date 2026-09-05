@@ -45,7 +45,8 @@ class PurchaseOrderServiceTest {
         notifier = mock(OmsReplenishmentNotifier.class);
         inventoryService = new InventoryService(inventoryRepo, reservationRepo, adjustmentRepo, notifier,
                 mock(com.jhg.wms.client.OmsDeliveryNotifier.class), () -> "system");
-        service = new PurchaseOrderService(poRepo, inventoryService, requestRepo);
+        service = new PurchaseOrderService(poRepo, inventoryService, requestRepo,
+                mock(PurchaseOrderMemoClassificationTrigger.class));
     }
 
     @Test

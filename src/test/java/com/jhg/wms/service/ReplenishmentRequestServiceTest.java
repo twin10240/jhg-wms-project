@@ -42,6 +42,8 @@ class ReplenishmentRequestServiceTest {
     @Autowired ReplenishmentRequestService service;
 
     @MockitoBean InventoryService inventoryService;
+    // 발주 생성이 메모 분류를 등록한다. 여기서 재는 것은 보충 승인이라 분류는 목으로 끊는다.
+    @MockitoBean PurchaseOrderMemoClassificationTrigger memoClassificationTrigger;
 
     @BeforeEach
     void setUp() {

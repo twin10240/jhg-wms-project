@@ -3,7 +3,9 @@ package com.jhg.wms.config;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jhg.wms.client.ClaudePurchaseOrderMemoClassifier;
 import com.jhg.wms.client.ClaudeReturnReasonClassifier;
+import com.jhg.wms.service.PurchaseOrderMemoClassifier;
 import com.jhg.wms.service.ReturnReasonClassifier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,14 +37,41 @@ public class AiConfig {
             return reason -> Optional.empty();
         }
 
-        AnthropicClient client = AnthropicOkHttpClient.builder()
+        log.info("반품 사유 자동 분류 활성: model={} maxTokens={} timeout={}", model, maxTokens, timeout);
+        return new ClaudeReturnReasonClassifier(anthropicClient(apiKey, timeout), objectMapper, model, maxTokens);
+    }
+
+    /**
+     * 발주 메모 분류. 반품 분류와 같은 규칙이다 — 키가 없으면 이것만 꺼진 채 기동한다.
+     */
+    @Bean
+    public PurchaseOrderMemoClassifier purchaseOrderMemoClassifier(
+            @Value("${wms.ai.api-key:}") String apiKey,
+            @Value("${wms.ai.model}") String model,
+            @Value("${wms.ai.max-tokens}") long maxTokens,
+            @Value("${wms.ai.timeout}") Duration timeout,
+            ObjectMapper objectMapper) {
+
+        if (apiKey == null || apiKey.isBlank()) {
+            log.info("ANTHROPIC_API_KEY 미설정 — 발주 메모 자동 분류를 끈 채로 기동합니다.");
+            return memo -> Optional.empty();
+        }
+
+        log.info("발주 메모 자동 분류 활성: model={} maxTokens={} timeout={}", model, maxTokens, timeout);
+        return new ClaudePurchaseOrderMemoClassifier(anthropicClient(apiKey, timeout), objectMapper, model, maxTokens);
+    }
+
+    /**
+     * 분류기마다 클라이언트를 따로 만든다. 빈으로 공유하지 않는 이유는 하나뿐 —
+     * 키가 없을 때 아예 만들지 않기 위해서다. OkHttp 클라이언트 하나 더 두는 값은 그보다 싸다.
+     */
+    private static AnthropicClient anthropicClient(String apiKey, Duration timeout) {
+        return AnthropicOkHttpClient.builder()
                 .apiKey(apiKey)
                 // SDK 기본 타임아웃은 10분이다. 참고 정보 하나 때문에 스레드를 그만큼 붙잡을 이유가 없다.
                 .timeout(timeout)
                 // 실패해도 재시도 스윕이 없는 설계라 여기서 한 번만 더 시도한다.
                 .maxRetries(1)
                 .build();
-        log.info("반품 사유 자동 분류 활성: model={} maxTokens={} timeout={}", model, maxTokens, timeout);
-        return new ClaudeReturnReasonClassifier(client, objectMapper, model, maxTokens);
     }
 }
