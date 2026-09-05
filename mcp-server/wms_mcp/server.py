@@ -1,4 +1,4 @@
-"""WMS 반품 분석 MCP 서버 — 읽기 전용 도구 아홉.
+"""WMS 분석 MCP 서버 — 읽기 전용 도구 아홉.
 
 두 얼굴이다. Claude Code 쪽으로는 MCP 서버(도구를 내놓는 쪽), WMS 쪽으로는
 HTTP 클라이언트다. 그 사이에서 하는 일은 번역뿐이다.
@@ -124,6 +124,8 @@ def reservation_dwell(from_date: str, to_date: str) -> dict:
     count가 0이면 median·p90·max는 null이다. 0분과 잴 것이 없는 것은 다르다.
     stillOpen은 구간 끝에 아직 안 끝난 예약 수이고 생존 편향의 크기다 — 오래 붙들린 예약일수록
     아직 안 끝나 이 분포에 안 잡히므로, 이 수를 밝히지 않고 중앙값을 인용하지 마라.
+    stillOpen은 from_date에 의존하지 않는다 — 구간 안에서 센 것이 아니라 구간 끝 시점의
+    잔량(그 시각에 아직 안 끝난 예약 수)이라, 표본 크기와 직접 비교할 수치가 아니다.
     excludedMissingCreatedAt은 생성 시각이 없어 잴 수 없었던 예약 수다. 보고서는 그 수를 밝혀라.
     단위는 분이다. 날짜는 YYYY-MM-DD이고 구간은 최대 366일이다.
     """
@@ -137,6 +139,9 @@ def reservation_dwell_by_product(from_date: str, to_date: str) -> list:
     집계 도구와 같은 모수다(기간 내 끝난 예약, 생성 시각이 있는 것만).
     occurrences는 그 상품이 든 예약 중 체류를 잰 건수다 — 예약 하나가 상품 여럿을 담으면
     담은 수만큼 계상되므로 occurrences의 합은 예약 건수가 아니다.
+    medianMinutes·maxMinutes는 출고와 해제를 합친 값이다 — 경로별로 갈라 주지 않는다.
+    어느 쪽이 얼마나 섞였는지는 shippedCount·releasedCount로만 알 수 있고,
+    경로를 갈라 본 분포가 필요하면 reservation_dwell을 써라.
     한 번 아주 오래 걸린 것보다 여러 번 반복해서 오래 걸리는 쪽이 로케이션·재고 부족 같은
     구조적 원인을 가리킨다 — 정렬이 그 순서다.
     빈 목록은 오류가 아니라 그 기간에 끝난 예약이 없었다는 뜻이다.
