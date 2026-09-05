@@ -217,7 +217,9 @@ def test_체류_도구가_집계_경로로_부른다(monkeypatch):
 
     result = client.get_reservation_dwell("2026-09-01", "2026-09-30")
 
+    # 집계 경로는 상품별 경로의 접두사이므로, 접두사 일치만으로는 둘을 구분할 수 없다
     assert "/api/analytics/reservation-dwell" in seen["url"]
+    assert "-by-product" not in seen["url"]
     assert "from=2026-09-01" in seen["url"]
     assert "to=2026-09-30" in seen["url"]
     assert result["basis"] == "endedAt"
