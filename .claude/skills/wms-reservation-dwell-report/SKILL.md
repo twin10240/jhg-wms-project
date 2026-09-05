@@ -7,7 +7,7 @@ description: Use when writing, reviewing, or summarizing a WMS 예약 체류(res
 
 숫자는 WMS가 이미 냈다. 이 문서가 정하는 것은 **그 숫자를 어떻게 읽고 무엇을 쓸지**다.
 
-## 도구 셋 (읽기 전용, 날짜는 `YYYY-MM-DD`, 구간은 최대 366일)
+## 도구 둘 (읽기 전용, 날짜는 `YYYY-MM-DD`, 구간은 최대 366일)
 
 | 도구 | 인자 | 돌려주는 것 |
 |---|---|---|
@@ -32,6 +32,10 @@ description: Use when writing, reviewing, or summarizing a WMS 예약 체류(res
 **분위수는 보간하지 않은 실측치(nearest-rank)다.** 표본에 실제로 있는 값이다.
 
 **`occurrences`의 합은 예약 건수가 아니다.** 예약 하나가 상품 여럿을 담으면 담은 수만큼 계상된다.
+
+**`reservation_dwell_by_product`의 `medianMinutes`·`maxMinutes`는 출고와 해제를 합친 값이다.**
+경로별로 갈라 주지 않는다 — 어느 쪽이 얼마나 섞였는지는 `shippedCount`·`releasedCount`로만 알 수 있다.
+경로를 갈라 본 분포가 필요하면 `reservation_dwell`을 써라.
 
 ## 보고서에 반드시 들어가는 것
 
@@ -70,5 +74,6 @@ description: Use when writing, reviewing, or summarizing a WMS 예약 체류(res
 | `count: 0`의 `null`을 0분으로 읽는다 | 잴 것이 없다는 뜻이다 |
 | "통상 24시간 이내가 정상"이라고 쓴다 | **그 기준은 데이터에 없다.** 지어낸 기준 위에 결론을 세우는 것 |
 | `occurrences` 합을 예약 건수로 쓴다 | 예약 하나가 상품 여럿을 담으면 여러 번 계상된다 |
+| 상품별 중앙값을 출고 체류로 읽는다 | 출고·해제가 합쳐진 값이다. 경로별 분포는 `reservation_dwell`에만 있다 |
 | 체류가 기니 재고 부족이라고 쓴다 | 도구는 얼마나 걸렸는지만 안다. 왜는 모른다 |
 | 원장에 없으니 예약이 없었다고 쓴다 | 예약은 원장에 애초에 안 남는다 |
