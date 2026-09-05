@@ -23,6 +23,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final InventoryService inventoryService;
     private final ReplenishmentRequestRepository requestRepository;
+    private final PurchaseOrderMemoClassificationTrigger memoClassificationTrigger;
 
     public record PurchaseOrderLine(Long productId, int quantity) {}
 
@@ -37,7 +38,11 @@ public class PurchaseOrderService {
                     return PurchaseOrderItem.create(l.productId(), l.quantity());
                 })
                 .toArray(PurchaseOrderItem[]::new);
-        return purchaseOrderRepository.save(PurchaseOrder.create(memo, items)).getId();
+        Long poId = purchaseOrderRepository.save(PurchaseOrder.create(memo, items)).getId();
+        // 모든 발주 경로가 여기를 지난다. OMS 보충 경로를 거르는 판별은 커밋 뒤에 한다 —
+        // 이 시점에는 보충 요청과의 링크가 아직 걸리지 않아 수동 발주와 구분되지 않는다.
+        memoClassificationTrigger.classifyAfterCommit(poId, memo);
+        return poId;
     }
 
     @Transactional

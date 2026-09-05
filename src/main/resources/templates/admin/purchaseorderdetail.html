@@ -21,6 +21,28 @@
     · 입고완료일시: <span th:text="${po.receivedAt != null} ? ${#temporals.format(po.receivedAt,'yyyy-MM-dd HH:mm')} : '—'">—</span>
   </p>
 
+  <!-- AI 분류 참고 영역. 분류가 없으면 통째로 렌더하지 않는다 — 빈 껍데기를 두지 않기 위해서다.
+       발주 근거 패널(.advice)과 달리 여기는 모델이 낸 값이라 "참고" 태그를 단다.
+       실선(.advice)과 점선(.ai-hint)으로 갈라 둔 것이 그 구분이다. -->
+  <section class="ai-hint" th:if="${memoClassification != null}">
+    <h3>메모 분류 <span class="ai-hint__tag">참고</span></h3>
+    <dl>
+      <dt>범주</dt>
+      <dd>
+        <span th:text="${memoClassification.category.label()}">정기 보충</span>
+        · 신뢰도
+        <span th:switch="${memoClassification.confidence.name()}">
+          <span th:case="'HIGH'">높음</span>
+          <span th:case="'MEDIUM'">보통</span>
+          <span th:case="*">낮음</span>
+        </span>
+      </dd>
+      <dt>근거</dt>
+      <dd th:text="${#strings.isEmpty(memoClassification.evidence) ? '—' : memoClassification.evidence}">—</dd>
+    </dl>
+    <p class="ai-hint__note">메모를 읽어 붙인 참고 분류입니다. 발주 내용에는 영향을 주지 않습니다.</p>
+  </section>
+
   <!-- 진행 중 발주만 입고·취소 가능(ORDERED·PARTIALLY_RECEIVED) -->
   <div th:with="receivable=${po.status.name() == 'ORDERED' or po.status.name() == 'PARTIALLY_RECEIVED'}" th:remove="tag">
 

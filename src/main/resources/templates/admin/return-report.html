@@ -35,6 +35,8 @@
         </tr>
       </thead>
       <tbody>
+        <!-- 행 클릭 → 상세(js/row-link.js).
+             ponytail: 셀 링크를 두지 않아 키보드로는 상세에 갈 길이 없다. -->
         <tr th:each="row : ${report.rows}"
             th:data-href="@{/admin/returns/report/detail(from=${from},to=${to},productId=${row.productId})}">
           <td th:text="${row.productId}">1</td>
@@ -88,18 +90,6 @@
     </table>
     </div>
   </div>
-
-  <!-- 행 전체 클릭 → 상세. 표가 둘이라 main 하나에 리스너를 건다.
-       ponytail: 셀 링크를 두지 않기로 해서 키보드로는 상세에 갈 길이 없다.
-       필요해지면 tr에 tabindex와 Enter 핸들러를 붙인다. -->
-  <script>
-    document.querySelector('main').addEventListener('click', function (e) {
-      var tr = e.target.closest('tr[data-href]');
-      if (!tr || e.target.closest('a')) return;
-      if (window.getSelection().toString()) return;   // 텍스트 드래그 복사 중이면 이동하지 않는다
-      location.href = tr.dataset.href;
-    });
-  </script>
 </main>
 </body>
 </html>

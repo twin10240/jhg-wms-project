@@ -7,6 +7,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title th:text="${title}">JHG-WMS</title>
   <link rel="stylesheet" th:href="@{/css/admin.css}" />
+  <!-- 행 클릭 → 상세. document에 위임하므로 data-href를 쓰는 화면이면 다 먹는다. -->
+  <script defer th:src="@{/js/row-link.js}"></script>
 </head>
 <body>
   <nav class="topnav" th:fragment="nav(active)">

@@ -294,3 +294,32 @@ dialog label { display: block; margin-bottom: 4px; font-weight: 600; }
 .ai-hint dt { color: var(--color-text-muted); font-size: .9em; }
 .ai-hint dd { margin: 0; }
 .ai-hint__note { margin: 12px 0 0; color: var(--color-text-muted); font-size: .88em; }
+
+/* 발주 근거 패널 — AI가 아니라 원장 산술이다. ai-hint와 같은 계열로 두되 실선으로 가른다:
+   같은 점선과 "참고" 태그를 쓰면 측정치와 제안이 한 표시를 나눠 갖게 된다. */
+.advice {
+  margin: 16px 0;
+  padding: 14px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+.advice h3 { margin: 0 0 10px; font-size: 1em; }
+.advice__note { margin: 10px 0 0; color: var(--color-text-muted); font-size: .88em; }
+.advice__sample { color: var(--color-text-muted); font-size: .85em; }
+.advice__rest { margin-top: 8px; }
+.advice__rest > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--color-text-muted);
+  font-size: .9em;
+}
+.advice__rest > summary:hover { color: var(--color-text); }
+/* 펴 둔 표와 접힌 표는 별개 table이라 각자 폭을 잰다 — 고정 레이아웃으로 열을 맞춘다. */
+.advice table { table-layout: fixed; }
+.advice th:nth-child(1), .advice td:nth-child(1) { width: 22%; }
+.advice th:nth-child(2), .advice td:nth-child(2) { width: 20%; }
+.advice th:nth-child(3), .advice td:nth-child(3) { width: 10%; }
+.advice th:nth-child(4), .advice td:nth-child(4) { width: 10%; }
+.advice th:nth-child(5), .advice td:nth-child(5) { width: 12%; }
+.advice th:nth-child(6), .advice td:nth-child(6) { width: 26%; }

@@ -58,12 +58,13 @@ public class ClassificationJsonParser {
         return sb.toString().trim();
     }
 
-    private static String text(JsonNode node, String field) {
+    // package-private: 발주 메모 파서(PurchaseOrderMemoJsonParser)가 같은 규칙으로 읽는다.
+    static String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return (value == null || !value.isTextual()) ? null : value.asText();
     }
 
-    private static <E extends Enum<E>> E enumOf(Class<E> type, String value) {
+    static <E extends Enum<E>> E enumOf(Class<E> type, String value) {
         if (value == null) return null;
         try {
             return Enum.valueOf(type, value);

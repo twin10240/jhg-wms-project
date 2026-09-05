@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["URGENT_STOCKOUT", "ROUTINE", "DEMAND_EVENT", "SUPPLIER", "QUALITY", "OTHER"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["HIGH", "MEDIUM", "LOW"]
+    },
+    "evidence": {
+      "type": "string"
+    }
+  },
+  "required": ["category", "confidence", "evidence"],
+  "additionalProperties": false
+}

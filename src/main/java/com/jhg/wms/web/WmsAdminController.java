@@ -3,6 +3,8 @@ package com.jhg.wms.web;
 import com.jhg.wms.domain.*;
 import com.jhg.wms.service.CycleCountService;
 import com.jhg.wms.service.InventoryService;
+import com.jhg.wms.service.PurchaseOrderAdviceService;
+import com.jhg.wms.service.PurchaseOrderMemoClassificationService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import com.jhg.wms.service.ReplenishmentRequestService;
@@ -28,6 +30,8 @@ public class WmsAdminController {
 
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
+    private final PurchaseOrderAdviceService purchaseOrderAdviceService;
+    private final PurchaseOrderMemoClassificationService memoClassificationService;
     private final ReplenishmentRequestService replenishmentRequestService;
     private final RmaService rmaService;
     private final CycleCountService cycleCountService;
@@ -246,6 +250,7 @@ public class WmsAdminController {
         model.addAttribute("products", rows);
         model.addAttribute("productNames", rows.stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
+        model.addAttribute("advice", purchaseOrderAdviceService.advise(LocalDate.now()));
         return "admin/purchaseorders";
     }
 
@@ -266,6 +271,9 @@ public class WmsAdminController {
     @GetMapping("/admin/purchase-orders/{poId}")
     public String purchaseOrderDetail(@PathVariable Long poId, Model model) {
         model.addAttribute("po", purchaseOrderService.findWithItems(poId));
+        // 분류가 없으면 모델에 담지 않는다 — 화면이 빈 껍데기를 그리지 않게(반품 상세와 같다).
+        memoClassificationService.findByPurchaseOrderId(poId)
+                .ifPresent(c -> model.addAttribute("memoClassification", c));
         return "admin/purchaseorderdetail";
     }
 
