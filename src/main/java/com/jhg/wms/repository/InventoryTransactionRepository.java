@@ -55,6 +55,11 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
            "WHERE t.createdAt < :before GROUP BY t.productId")
     List<Object[]> sumDeltaByProductBefore(@Param("before") LocalDateTime before);
 
+    // 발주 근거 패널의 일평균 분모용. 창 길이가 아니라 그 상품의 원장이 실제로 존재한 날부터 세야
+    // 10일치를 30일로 나눠 소진 예상일이 3배 길어지는 사고가 안 난다.
+    @Query("SELECT t.productId, MIN(t.createdAt) FROM InventoryTransaction t GROUP BY t.productId")
+    List<Object[]> findFirstRecordedAtByProduct();
+
     @Query("SELECT t.productId, t.type, COALESCE(SUM(t.delta), 0) FROM InventoryTransaction t " +
            "WHERE t.createdAt >= :from AND t.createdAt < :to GROUP BY t.productId, t.type")
     List<Object[]> sumDeltaByProductAndTypeInPeriod(@Param("from") LocalDateTime from,

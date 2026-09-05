@@ -7,6 +7,65 @@
   <h2>발주 관리</h2>
   <div th:replace="~{fragments/layout :: flash}"></div>
 
+  <!-- 발주 근거. 원장 실측만 낸다 — 무엇을 얼마나 발주할지는 사람이 정한다.
+       원장이 한 행도 없으면 통째로 렌더하지 않는다(빈 껍데기를 두지 않는다). -->
+  <section class="advice" th:if="${advice != null and !advice.isEmpty()}">
+    <h3>발주 근거 — 최근 30일 원장</h3>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>상품</th>
+          <th style="text-align:right">최근 출고</th>
+          <th style="text-align:right">일평균</th>
+          <th style="text-align:right">가용</th>
+          <th style="text-align:right">소진 예상</th>
+          <th>직전 발주</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="a : ${advice}">
+          <td th:text="${a.productId + ' — ' + a.productName}">1 — 상품 1</td>
+          <!-- 표본 일수를 값마다 붙인다. 상품별로 다르고, 이 수를 밝히지 않으면
+               일평균이 어느 분모 위에서 나온 값인지 알 수 없다. -->
+          <td style="text-align:right">
+            <span th:text="${a.shippedQty} + '개'">0개</span>
+            <span class="advice__sample" th:text="'(표본 ' + ${a.sampleDays} + '일)'">(표본 30일)</span>
+          </td>
+          <td style="text-align:right"
+              th:text="${#numbers.formatDecimal(a.dailyAverage, 1, 'COMMA', 1, 'POINT')}">0.0</td>
+          <td style="text-align:right" th:text="${a.availableQty}">0</td>
+          <!-- 일평균 0이면 null이다. 0일로 적으면 오늘 소진된다는 뜻이 된다. -->
+          <td style="text-align:right" th:switch="${a.daysToStockout == null}">
+            <span th:case="true" title="출고가 없어 잴 수 없습니다">—</span>
+            <span th:case="*"
+                  th:text="${#numbers.formatDecimal(a.daysToStockout, 1, 'COMMA', 1, 'POINT')} + '일'">0.0일</span>
+          </td>
+          <td th:if="${a.lastOrder == null}">—</td>
+          <td th:if="${a.lastOrder != null}">
+            <a th:href="@{'/admin/purchase-orders/' + ${a.lastOrder.purchaseOrderId}}"
+               th:text="'#' + ${a.lastOrder.purchaseOrderId}">#1</a>
+            <span th:text="${#temporals.format(a.lastOrder.orderedOn,'M/d')} + ' ' + ${a.lastOrder.quantity} + '개'">8/30 20개</span>
+            <span class="advice__sample" th:if="${a.lastOrder.leadTimeDays != null}"
+                  th:text="'· 입고 ' + ${#temporals.format(a.lastOrder.receivedOn,'M/d')} + ' (리드 ' + ${a.lastOrder.leadTimeDays} + '일)'">· 입고 8/30 (리드 0일)</span>
+            <span class="advice__sample" th:if="${a.lastOrder.leadTimeDays == null}"
+                  th:switch="${a.lastOrder.status.name()}">
+              <span th:case="'ORDERED'">· 입고대기</span>
+              <span th:case="'PARTIALLY_RECEIVED'">· 부분입고</span>
+              <span th:case="'CANCELLED'">· 취소됨</span>
+              <span th:case="*">· —</span>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="advice__note">
+      원장에 실제로 찍힌 값입니다. 소진 예상은 가용재고 ÷ 일평균이고, 표본 일수가 짧을수록 흔들립니다.
+      목표 재고일수나 안전재고 기준은 WMS에 없습니다 — 발주 수량은 직접 정하세요.
+    </p>
+  </section>
+
   <h3 sec:authorize="hasRole('MANAGER')">발주 생성</h3>
   <form sec:authorize="hasRole('MANAGER')" th:action="@{/admin/purchase-orders}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

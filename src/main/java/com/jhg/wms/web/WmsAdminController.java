@@ -3,6 +3,7 @@ package com.jhg.wms.web;
 import com.jhg.wms.domain.*;
 import com.jhg.wms.service.CycleCountService;
 import com.jhg.wms.service.InventoryService;
+import com.jhg.wms.service.PurchaseOrderAdviceService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
 import com.jhg.wms.service.ReplenishmentRequestService;
@@ -28,6 +29,7 @@ public class WmsAdminController {
 
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
+    private final PurchaseOrderAdviceService purchaseOrderAdviceService;
     private final ReplenishmentRequestService replenishmentRequestService;
     private final RmaService rmaService;
     private final CycleCountService cycleCountService;
@@ -246,6 +248,7 @@ public class WmsAdminController {
         model.addAttribute("products", rows);
         model.addAttribute("productNames", rows.stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
+        model.addAttribute("advice", purchaseOrderAdviceService.advise(LocalDate.now()));
         return "admin/purchaseorders";
     }
 
