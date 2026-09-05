@@ -45,16 +45,6 @@
       </tbody>
     </table>
   </div>
-
-  <!-- 행 전체 클릭 → 상세. ID 링크는 그대로 둔다(키보드·스크린리더 경로). returns.html과 동일 스크립트. -->
-  <script>
-    document.querySelector('.table-wrap').addEventListener('click', function (e) {
-      var tr = e.target.closest('tr[data-href]');
-      if (!tr || e.target.closest('a')) return;
-      if (window.getSelection().toString()) return;   // 텍스트 드래그 복사 중이면 이동하지 않는다
-      location.href = tr.dataset.href;
-    });
-  </script>
 </main>
 </body>
 </html>
