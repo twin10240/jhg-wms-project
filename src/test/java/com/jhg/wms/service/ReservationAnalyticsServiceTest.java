@@ -150,4 +150,48 @@ class ReservationAnalyticsServiceTest {
         assertThatThrownBy(() -> service.dwell(TO, FROM))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void 상품별로_묶고_반복_횟수가_많은_상품이_먼저_온다() {
+        seedProduct(1L, "볼펜");
+        seedProduct(2L, "노트");
+        // 1번 상품: 2건 (2시간, 4시간) / 2번 상품: 1건 (10시간)
+        seedShipped(at(LocalDate.of(2026, 9, 5), 10), at(LocalDate.of(2026, 9, 5), 12), Map.of(1L, 1));
+        seedShipped(at(LocalDate.of(2026, 9, 6), 10), at(LocalDate.of(2026, 9, 6), 14), Map.of(1L, 1));
+        seedReleased(at(LocalDate.of(2026, 9, 7), 0), at(LocalDate.of(2026, 9, 7), 10), Map.of(2L, 1));
+
+        var rows = service.dwellByProduct(FROM, TO);
+
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).productId()).isEqualTo(1L);
+        assertThat(rows.get(0).productName()).isEqualTo("볼펜");
+        assertThat(rows.get(0).occurrences()).isEqualTo(2);
+        assertThat(rows.get(0).shippedCount()).isEqualTo(2);
+        assertThat(rows.get(0).releasedCount()).isZero();
+        assertThat(rows.get(0).maxMinutes()).isEqualTo(240L);
+        assertThat(rows.get(1).productId()).isEqualTo(2L);
+        assertThat(rows.get(1).releasedCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 예약_하나가_담은_상품마다_체류가_계상된다() {
+        seedProduct(1L, "볼펜");
+        seedProduct(2L, "노트");
+        seedShipped(at(LocalDate.of(2026, 9, 5), 10), at(LocalDate.of(2026, 9, 5), 13),
+                Map.of(1L, 1, 2L, 5));
+
+        var rows = service.dwellByProduct(FROM, TO);
+
+        // 예약은 하나지만 상품이 둘이라 행이 둘이다 — occurrences 합은 예약 건수가 아니다.
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(row -> {
+            assertThat(row.occurrences()).isEqualTo(1);
+            assertThat(row.medianMinutes()).isEqualTo(180L);
+        });
+    }
+
+    @Test
+    void 차이가_없으면_빈_목록이다() {
+        assertThat(service.dwellByProduct(FROM, TO)).isEmpty();
+    }
 }

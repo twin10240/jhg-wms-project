@@ -1,6 +1,8 @@
 package com.jhg.wms.service;
 
+import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.Reservation;
+import com.jhg.wms.domain.ReservationStatus;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.ReservationRepository;
 import org.springframework.stereotype.Service;
@@ -11,7 +13,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 예약 체류 분석 조회. 읽기만 한다 — 예약·재고를 만들지도 고치지도 않는다.
@@ -65,6 +71,14 @@ public class ReservationAnalyticsService {
                               DwellStats shipped, DwellStats released,
                               int stillOpen, int excludedMissingCreatedAt) {}
 
+    /**
+     * @param occurrences 그 상품이 든 예약 중 체류를 잰 건수. <b>합은 예약 건수가 아니다</b> —
+     *                    예약 하나가 상품 여럿을 담으면 담은 수만큼 계상된다.
+     */
+    public record ProductDwell(Long productId, String productName,
+                               int occurrences, long medianMinutes, long maxMinutes,
+                               int shippedCount, int releasedCount) {}
+
     /** 기간 내 끝난 예약의 체류 분포. 출고와 해제를 각각 낸다. */
     public DwellReport dwell(LocalDate from, LocalDate to) {
         List<Long> shipped = new ArrayList<>();
@@ -84,6 +98,49 @@ public class ReservationAnalyticsService {
         long openAtEnd = reservationRepository.countOpenAt(startOf(to.plusDays(1)));
         return new DwellReport(from, to, "endedAt",
                 stats(shipped), stats(released), (int) openAtEnd, excluded);
+    }
+
+    /**
+     * 상품별 체류 묶음. 반복해서 오래 붙들린 상품이 먼저 온다.
+     *
+     * <p>정렬은 <b>반복 횟수가 먼저</b>고 그다음이 중앙값이다. 한 번 아주 오래 걸린 것보다
+     * 여러 번 반복해서 오래 걸리는 쪽이 로케이션·재고 부족 같은 구조적 원인을 가리키기 때문이다
+     * ({@code CycleCountAnalyticsService.variances}와 같은 규칙이다).
+     */
+    public List<ProductDwell> dwellByProduct(LocalDate from, LocalDate to) {
+        Map<Long, List<Long>> minutesByProduct = new LinkedHashMap<>();
+        Map<Long, int[]> countsByProduct = new HashMap<>();   // [shipped, released]
+
+        for (Reservation r : endedIn(from, to)) {
+            if (r.getCreatedAt() == null) continue;
+            long minutes = Duration.between(r.getCreatedAt(), endedAt(r)).toMinutes();
+            for (Long productId : r.getQtyByProductId().keySet()) {
+                minutesByProduct.computeIfAbsent(productId, k -> new ArrayList<>()).add(minutes);
+                int[] counts = countsByProduct.computeIfAbsent(productId, k -> new int[2]);
+                if (r.getStatus() == ReservationStatus.SHIPPED) counts[0]++; else counts[1]++;
+            }
+        }
+        if (minutesByProduct.isEmpty()) return List.of();
+
+        // Collectors.toMap은 값이 null이면 NPE다. 이름은 나중에 도입된 컬럼이라 null일 수 있고,
+        // 이름 없는 상품 하나가 보고서 전체를 막으면 안 된다(variances와 같은 이유).
+        Map<Long, String> nameByProduct = new HashMap<>();
+        for (Inventory inv : inventoryRepository.findByProductIdIn(minutesByProduct.keySet()))
+            nameByProduct.put(inv.getProductId(), inv.getProductName());
+
+        List<ProductDwell> result = new ArrayList<>();
+        minutesByProduct.forEach((productId, minutes) -> {
+            List<Long> sorted = minutes.stream().sorted().toList();
+            int[] counts = countsByProduct.get(productId);
+            result.add(new ProductDwell(productId, nameByProduct.get(productId),
+                    sorted.size(), percentile(sorted, 0.5), sorted.get(sorted.size() - 1),
+                    counts[0], counts[1]));
+        });
+
+        result.sort(Comparator.comparingInt(ProductDwell::occurrences).reversed()
+                .thenComparing(Comparator.comparingLong(ProductDwell::medianMinutes).reversed())
+                .thenComparing(ProductDwell::productId));
+        return result;
     }
 
     private static DwellStats stats(List<Long> minutes) {
