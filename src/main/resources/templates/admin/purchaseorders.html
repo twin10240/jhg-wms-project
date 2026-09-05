@@ -73,7 +73,8 @@
       <tr><th>발주번호</th><th>상태</th><th>상품ID</th><th>상품명</th><th>입고/발주</th><th>메모</th><th>발주일시</th><th>입고일시</th><th>입고</th></tr>
     </thead>
     <tbody>
-      <tr th:each="po : ${purchaseOrders}">
+      <tr th:each="po : ${purchaseOrders}"
+          th:data-href="@{'/admin/purchase-orders/' + ${po.id}}">
         <td th:text="${po.id}">1</td>
         <td>
           <span th:switch="${po.status.name()}" class="badge"
@@ -121,6 +122,19 @@
       const lines = document.getElementById('po-lines');
       if (lines.children.length > 1) lines.removeChild(lines.lastElementChild);
     }
+  </script>
+  <!-- 행 전체 클릭 → 상세. 상세 링크는 그대로 둔다(키보드·스크린리더 경로) —
+       returns.html·cycle-counts.html과 같은 전례다.
+       리스너를 .table-wrap이 아니라 main에 건다: 이 화면은 표가 둘이라
+       querySelector('.table-wrap')가 발주 근거 표에 걸린다. 근거 표의 행에는
+       data-href가 없어 클릭해도 아무 일도 일어나지 않는다. -->
+  <script>
+    document.querySelector('main').addEventListener('click', function (e) {
+      var tr = e.target.closest('tr[data-href]');
+      if (!tr || e.target.closest('a')) return;
+      if (window.getSelection().toString()) return;   // 텍스트 드래그 복사 중이면 이동하지 않는다
+      location.href = tr.dataset.href;
+    });
   </script>
 </main>
 </body>
