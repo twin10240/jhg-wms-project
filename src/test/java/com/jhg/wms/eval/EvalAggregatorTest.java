@@ -5,6 +5,7 @@ import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.RmaDisposition;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,12 +16,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class EvalAggregatorTest {
 
+    private static final List<String> 범주들 =
+            Arrays.stream(ReturnCategory.values()).map(Enum::name).toList();
+
     private EvalCase 케이스(String id, ReturnCategory expected) {
-        return new EvalCase(id, "사유 " + id, expected, "테스트용");
+        return new EvalCase(id, "사유 " + id, expected.name(), "테스트용");
     }
 
     private EvalObservation 관측(String id, ReturnCategory c, Confidence conf, RmaDisposition d) {
-        return new EvalObservation(id, c, conf, d, 1000, 40, "claude-haiku-4-5-20251001");
+        return new EvalObservation(id, c.name(), conf, d, 1000, 40, "claude-haiku-4-5-20251001");
     }
 
     @Test
@@ -31,7 +35,7 @@ class EvalAggregatorTest {
                         관측("a", ReturnCategory.DAMAGED, Confidence.HIGH, RmaDisposition.DISPOSED),
                         관측("a", ReturnCategory.DAMAGED, Confidence.HIGH, RmaDisposition.DISPOSED)));
 
-        assertThat(result.majority()).isEqualTo(ReturnCategory.DAMAGED);
+        assertThat(result.majority()).isEqualTo(ReturnCategory.DAMAGED.name());
         assertThat(result.unstable()).isFalse();
     }
 
@@ -43,7 +47,7 @@ class EvalAggregatorTest {
                         관측("b", ReturnCategory.CHANGED_MIND, Confidence.LOW, RmaDisposition.RESTOCKED),
                         관측("b", ReturnCategory.OTHER, Confidence.LOW, RmaDisposition.RESTOCKED)));
 
-        assertThat(result.majority()).isEqualTo(ReturnCategory.OTHER);
+        assertThat(result.majority()).isEqualTo(ReturnCategory.OTHER.name());
         assertThat(result.unstable()).isTrue();
     }
 
@@ -69,9 +73,9 @@ class EvalAggregatorTest {
                         EvalObservation.failed("d"),
                         관측("d", ReturnCategory.DAMAGED, Confidence.HIGH, RmaDisposition.DISPOSED)));
 
-        var summary = EvalAggregator.summarize(List.of(result));
+        var summary = EvalAggregator.summarize(List.of(result), 범주들);
 
-        assertThat(result.majority()).isEqualTo(ReturnCategory.DAMAGED);
+        assertThat(result.majority()).isEqualTo(ReturnCategory.DAMAGED.name());
         assertThat(result.unstable()).isFalse();
         assertThat(summary.failedObservations()).isEqualTo(1);
     }
@@ -85,12 +89,12 @@ class EvalAggregatorTest {
                 케이스("f", ReturnCategory.OTHER),
                 List.of(관측("f", ReturnCategory.CHANGED_MIND, Confidence.MEDIUM, RmaDisposition.RESTOCKED)));
 
-        var summary = EvalAggregator.summarize(List.of(맞음, 틀림));
+        var summary = EvalAggregator.summarize(List.of(맞음, 틀림), 범주들);
 
         assertThat(summary.total()).isEqualTo(2);
         assertThat(summary.correct()).isEqualTo(1);
-        assertThat(summary.perCategory().get(ReturnCategory.DAMAGED)).containsExactly(1, 1);
-        assertThat(summary.perCategory().get(ReturnCategory.OTHER)).containsExactly(0, 1);
+        assertThat(summary.perCategory().get(ReturnCategory.DAMAGED.name())).containsExactly(1, 1);
+        assertThat(summary.perCategory().get(ReturnCategory.OTHER.name())).containsExactly(0, 1);
     }
 
     @Test
@@ -100,9 +104,9 @@ class EvalAggregatorTest {
                 List.of(관측("g", ReturnCategory.CHANGED_MIND, Confidence.HIGH, RmaDisposition.RESTOCKED),
                         관측("g", ReturnCategory.CHANGED_MIND, Confidence.HIGH, RmaDisposition.REJECTED)));
 
-        var summary = EvalAggregator.summarize(List.of(a));
+        var summary = EvalAggregator.summarize(List.of(a), 범주들);
 
-        assertThat(summary.dispositionByCategory().get(ReturnCategory.CHANGED_MIND))
+        assertThat(summary.dispositionByCategory().get(ReturnCategory.CHANGED_MIND.name()))
                 .containsEntry(RmaDisposition.RESTOCKED, 1)
                 .containsEntry(RmaDisposition.REJECTED, 1);
     }
@@ -119,7 +123,7 @@ class EvalAggregatorTest {
                 케이스("i", ReturnCategory.DAMAGED),
                 List.of(관측("i", ReturnCategory.DAMAGED, Confidence.HIGH, RmaDisposition.DISPOSED)));
 
-        var summary = EvalAggregator.summarize(List.of(흔들림, 안정));
+        var summary = EvalAggregator.summarize(List.of(흔들림, 안정), 범주들);
 
         assertThat(summary.confidenceOfUnstable())
                 .containsEntry(Confidence.LOW, 2)
@@ -135,7 +139,7 @@ class EvalAggregatorTest {
                 List.of(관측("j", ReturnCategory.DAMAGED, Confidence.HIGH, RmaDisposition.DISPOSED),
                         관측("j", ReturnCategory.DAMAGED, Confidence.HIGH, RmaDisposition.DISPOSED)));
 
-        var summary = EvalAggregator.summarize(List.of(a));
+        var summary = EvalAggregator.summarize(List.of(a), 범주들);
 
         assertThat(summary.inputTokens()).isEqualTo(2000);
         assertThat(summary.outputTokens()).isEqualTo(80);

@@ -1,0 +1,37 @@
+[
+  { "id": "uso-01", "reason": "지금 두 박스밖에 안 남았습니다", "expectedCategory": "URGENT_STOCKOUT", "note": "수량으로 결품 임박을 말한다. '급하다'는 단어가 없어도 잡는지" },
+  { "id": "uso-02", "reason": "품절 뜨기 직전이라 당장 필요", "expectedCategory": "URGENT_STOCKOUT", "note": "기본 케이스" },
+  { "id": "uso-03", "reason": "주말 물량 못 버팁니다", "expectedCategory": "URGENT_STOCKOUT", "note": "시점을 말하지만 행사가 아니라 소진 속도다. DEMAND_EVENT로 새기 쉽다" },
+  { "id": "uso-04", "reason": "어제 주문이 몰려서 바닥났어요", "expectedCategory": "URGENT_STOCKOUT", "note": "라벨 논쟁적 — 수요 급증이 원인이지만 발주가 난 계기는 결품이다. 프롬프트의 '계기 쪽을 고른다' 규칙이 여기서 시험된다" },
+  { "id": "uso-05", "reason": "재고 0 찍혔습니다", "expectedCategory": "URGENT_STOCKOUT", "note": "가장 짧은 형태. 근거가 분명하므로 신뢰도가 높아야 한다" },
+
+  { "id": "rtn-01", "reason": "매달 넣던 대로 넣습니다", "expectedCategory": "ROUTINE", "note": "기본 케이스" },
+  { "id": "rtn-02", "reason": "정례 발주분", "expectedCategory": "ROUTINE", "note": "메모가 짧다. 그래도 '정례'가 근거다" },
+  { "id": "rtn-03", "reason": "늘 하던 주기대로", "expectedCategory": "ROUTINE", "note": "주기를 숫자로 말하지 않는다" },
+  { "id": "rtn-04", "reason": "2주치 채워둡니다", "expectedCategory": "ROUTINE", "note": "경계 — 수량 근거가 있지만 사정이 없다. URGENT_STOCKOUT으로 새는지" },
+
+  { "id": "dmd-01", "reason": "설 선물세트 대비분입니다", "expectedCategory": "DEMAND_EVENT", "note": "기본 케이스 — 명절" },
+  { "id": "dmd-02", "reason": "다음달 쿠폰전 물량", "expectedCategory": "DEMAND_EVENT", "note": "프로모션" },
+  { "id": "dmd-03", "reason": "TV 노출 예정이라 미리 잡아둡니다", "expectedCategory": "DEMAND_EVENT", "note": "방송 노출" },
+  { "id": "dmd-04", "reason": "여름 되기 전에 확보해둡니다", "expectedCategory": "DEMAND_EVENT", "note": "시즌. 행사보다 근거가 약하다 — 신뢰도가 낮아지는지" },
+  { "id": "dmd-05", "reason": "신규 거래처 납품 예정분", "expectedCategory": "DEMAND_EVENT", "note": "라벨 논쟁적 — '거래처'라는 단어 때문에 SUPPLIER로 새기 쉽다. 우리가 납품하는 쪽이므로 수요다" },
+
+  { "id": "sup-01", "reason": "박스 단위로만 판다고 해서 올려 잡았습니다", "expectedCategory": "SUPPLIER", "note": "최소발주수량. 수량이 필요분보다 많아진 이유가 거래처에 있다" },
+  { "id": "sup-02", "reason": "다음달부터 값 올린다고 연락 왔습니다", "expectedCategory": "SUPPLIER", "note": "단가 인상 전 선매입" },
+  { "id": "sup-03", "reason": "공장 셧다운 기간 있다고 해서 미리", "expectedCategory": "SUPPLIER", "note": "거래처 휴무" },
+  { "id": "sup-04", "reason": "이제 이거 안 나온답니다", "expectedCategory": "SUPPLIER", "note": "단종 통보. 구어체라 근거가 짧다" },
+  { "id": "sup-05", "reason": "배로 오는 거라 두 달 걸린다고 합니다", "expectedCategory": "SUPPLIER", "note": "리드타임 변경. URGENT_STOCKOUT으로 새기 쉽다 — 급한 게 아니라 미리 넣는 것이다" },
+
+  { "id": "qly-01", "reason": "지난 입고분 상태가 안 좋아서 다시 넣습니다", "expectedCategory": "QUALITY", "note": "기본 케이스" },
+  { "id": "qly-02", "reason": "불량 빼고 나니 수량이 모자랍니다", "expectedCategory": "QUALITY", "note": "불량 교체분" },
+  { "id": "qly-03", "reason": "회수분 입고가 밀려서 부족한 만큼 넣습니다", "expectedCategory": "QUALITY", "note": "반품 재입고 지연. URGENT_STOCKOUT으로 새기 쉽다" },
+  { "id": "qly-04", "reason": "검수에서 걸러진 만큼 다시", "expectedCategory": "QUALITY", "note": "메모가 짧다" },
+
+  { "id": "oth-01", "reason": "ㅇㅇ", "expectedCategory": "OTHER", "note": "의미 없는 입력. 억지로 범주를 맞추지 않는지" },
+  { "id": "oth-02", "reason": "발주", "expectedCategory": "OTHER", "note": "사유가 아닌 동작만 적음" },
+  { "id": "oth-03", "reason": "위에서 하라고 해서요", "expectedCategory": "OTHER", "note": "지시. 사유가 아니다" },
+  { "id": "oth-04", "reason": "일단 넣어두고 나중에 정리하겠습니다", "expectedCategory": "OTHER", "note": "판단 유보. 어느 범주도 아니다" },
+  { "id": "oth-05", "reason": "협의된 건입니다", "expectedCategory": "OTHER", "note": "누구와 무엇을 협의했는지가 없다. SUPPLIER로 새기 쉽다" },
+  { "id": "oth-06", "reason": "전산 오류로 재발주합니다", "expectedCategory": "OTHER", "note": "일반화 검사 — 시스템 문제. 프롬프트의 여섯 범주 어디에도 없는 모양" },
+  { "id": "oth-07", "reason": "창고 이전 대비해서 미리 넣습니다", "expectedCategory": "OTHER", "note": "라벨 논쟁적 — 창고 사정이다. 수요도 거래처도 품질도 아니다" }
+]

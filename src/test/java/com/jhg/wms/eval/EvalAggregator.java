@@ -1,7 +1,6 @@
 package com.jhg.wms.eval;
 
 import com.jhg.wms.domain.Confidence;
-import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.RmaDisposition;
 
 import java.util.EnumMap;
@@ -15,16 +14,16 @@ public final class EvalAggregator {
     private EvalAggregator() {}
 
     public record CaseResult(EvalCase source,
-                             ReturnCategory majority,
+                             String majority,
                              boolean unstable,
                              List<EvalObservation> observations) {}
 
     /** perCategory의 int[]는 {맞은 수, 전체 수}다. */
     public record Summary(int total,
                           int correct,
-                          Map<ReturnCategory, int[]> perCategory,
+                          Map<String, int[]> perCategory,
                           int unstableCount,
-                          Map<ReturnCategory, Map<RmaDisposition, Integer>> dispositionByCategory,
+                          Map<String, Map<RmaDisposition, Integer>> dispositionByCategory,
                           Map<Confidence, Integer> confidenceDistribution,
                           Map<Confidence, Integer> confidenceOfUnstable,
                           int failedObservations,
@@ -32,30 +31,36 @@ public final class EvalAggregator {
                           long outputTokens) {}
 
     public static CaseResult toCaseResult(EvalCase source, List<EvalObservation> observations) {
-        Map<ReturnCategory, Integer> 표 = new EnumMap<>(ReturnCategory.class);
+        Map<String, Integer> 표 = new LinkedHashMap<>();
         for (EvalObservation o : observations)
             if (o.succeeded()) 표.merge(o.category(), 1, Integer::sum);
 
         int 최다 = 표.values().stream().mapToInt(Integer::intValue).max().orElse(0);
         // 최빈값이 여럿이면 판단 불가다. 임의로 하나를 고르면 정확도가 우연에 좌우된다.
-        List<ReturnCategory> 최빈 = 표.entrySet().stream()
+        List<String> 최빈 = 표.entrySet().stream()
                 .filter(e -> e.getValue() == 최다).map(Map.Entry::getKey).toList();
-        ReturnCategory majority = 최빈.size() == 1 ? 최빈.get(0) : null;
+        String majority = 최빈.size() == 1 ? 최빈.get(0) : null;
 
         boolean unstable = 표.size() > 1;
         return new CaseResult(source, majority, unstable, observations);
     }
 
-    public static Summary summarize(List<CaseResult> results) {
+    /**
+     * @param categories 이 평가셋의 범주 전체. 0건인 범주도 표에 자리를 갖게 하려고 받는다 —
+     *                   "라벨이 하나도 없는 범주"와 "0건인 범주"는 다른 뜻이고, 라벨에 등장한
+     *                   것만 세면 그 구분이 사라진다.
+     */
+    public static Summary summarize(List<CaseResult> results, List<String> categories) {
         int correct = 0, unstableCount = 0, failed = 0;
         long in = 0, out = 0;
-        Map<ReturnCategory, int[]> perCategory = new EnumMap<>(ReturnCategory.class);
-        Map<ReturnCategory, Map<RmaDisposition, Integer>> byCategory = new EnumMap<>(ReturnCategory.class);
+        Map<String, int[]> perCategory = new LinkedHashMap<>();
+        for (String c : categories) perCategory.put(c, new int[2]);
+        Map<String, Map<RmaDisposition, Integer>> byCategory = new LinkedHashMap<>();
         Map<Confidence, Integer> confAll = new EnumMap<>(Confidence.class);
         Map<Confidence, Integer> confUnstable = new EnumMap<>(Confidence.class);
 
         for (CaseResult r : results) {
-            ReturnCategory expected = r.source().expectedCategory();
+            String expected = r.source().expectedCategory();
             int[] 칸 = perCategory.computeIfAbsent(expected, k -> new int[2]);
             칸[1]++;
             if (expected.equals(r.majority())) { 칸[0]++; correct++; }

@@ -1,7 +1,6 @@
 package com.jhg.wms.eval;
 
 import com.jhg.wms.domain.Confidence;
-import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.RmaDisposition;
 
 /**
@@ -14,7 +13,7 @@ import com.jhg.wms.domain.RmaDisposition;
  * 아니라 이 값을 리포트에 적어야 나중에 어느 버전에서 잰 점수인지 알 수 있다.
  */
 public record EvalObservation(String caseId,
-                              ReturnCategory category,
+                              String category,
                               Confidence confidence,
                               RmaDisposition disposition,
                               int inputTokens,

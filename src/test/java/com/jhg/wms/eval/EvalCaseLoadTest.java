@@ -9,6 +9,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * 평가셋 자체를 검증한다. 유료 실행을 돌린 뒤에야 "id가 겹쳤다"를 아는 일이 없도록,
@@ -16,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class EvalCaseLoadTest {
 
-    private final List<EvalCase> cases = EvalCase.loadAll();
+    private final List<EvalCase> cases = EvalCase.loadAll("eval/return-reasons.json");
 
     /**
      * 배분은 중립이 아니라 가설을 겨냥한 값이다. 그래서 숫자가 바뀌면 왜 바뀌었는지가 같이 남아야 한다.
@@ -27,15 +28,23 @@ class EvalCaseLoadTest {
      */
     @Test
     void 마흔한_건이_설계대로_배분돼_있다() {
-        Map<ReturnCategory, Long> 배분 = cases.stream()
+        Map<String, Long> 배분 = cases.stream()
                 .collect(Collectors.groupingBy(EvalCase::expectedCategory, Collectors.counting()));
 
         assertThat(cases).hasSize(41);
         assertThat(배분).containsExactlyInAnyOrderEntriesOf(Map.of(
-                ReturnCategory.DAMAGED, 7L,
-                ReturnCategory.WRONG_ITEM, 7L,
-                ReturnCategory.CHANGED_MIND, 11L,
-                ReturnCategory.OTHER, 16L));
+                ReturnCategory.DAMAGED.name(), 7L,
+                ReturnCategory.WRONG_ITEM.name(), 7L,
+                ReturnCategory.CHANGED_MIND.name(), 11L,
+                ReturnCategory.OTHER.name(), 16L));
+    }
+
+    // 범주가 String이라 오타가 컴파일에서 안 걸린다. 그 자리를 여기가 대신 지킨다.
+    @Test
+    void 모든_라벨이_ReturnCategory의_값이다() {
+        assertThat(cases).allSatisfy(c ->
+                assertThatCode(() -> ReturnCategory.valueOf(c.expectedCategory()))
+                        .as("expectedCategory: %s", c.id()).doesNotThrowAnyException());
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.jhg.wms.eval;
 
 import com.jhg.wms.domain.Confidence;
-import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.RmaDisposition;
 
 import java.time.LocalDate;
@@ -19,9 +18,13 @@ public final class EvalReportWriter {
 
     private EvalReportWriter() {}
 
+    /**
+     * @param categories 표에 낼 범주 순서. 평가셋마다 다르므로 하네스가 정하지 않는다.
+     */
     public static String render(String model, int repeats,
                                 List<EvalAggregator.CaseResult> results,
-                                EvalAggregator.Summary summary) {
+                                EvalAggregator.Summary summary,
+                                List<String> categories) {
         StringBuilder sb = new StringBuilder();
         sb.append("# 분류 품질 평가 — ").append(LocalDate.now()).append("\n\n");
         sb.append("- 모델: `").append(model).append("`\n");
@@ -35,9 +38,11 @@ public final class EvalReportWriter {
         if (summary.failedObservations() > 0)
             sb.append("분류 실패 관측 **").append(summary.failedObservations()).append("회**\n");
         sb.append("\n| 범주 | 맞음 / 전체 |\n|---|---|\n");
-        for (ReturnCategory c : ReturnCategory.values()) {
+        for (String c : categories) {
             int[] 칸 = summary.perCategory().get(c);
-            if (칸 != null) sb.append("| `").append(c).append("` | ").append(칸[0]).append(" / ").append(칸[1]).append(" |\n");
+            // 라벨이 한 건도 없는 범주는 줄을 만들지 않는다 — 0/0은 읽는 사람에게 뜻이 없다.
+            if (칸 != null && 칸[1] > 0)
+                sb.append("| `").append(c).append("` | ").append(칸[0]).append(" / ").append(칸[1]).append(" |\n");
         }
 
         sb.append("\n## 틀리거나 흔들린 케이스\n\n");
@@ -54,8 +59,12 @@ public final class EvalReportWriter {
         // 1회차(2026-09-01)가 여기서 막혔다. 케이스 단위 요약만으로는 (1) 한 케이스 안에서 처분이
         // 갈렸는지, (2) 틀린 케이스가 어떤 신뢰도를 받았는지 알 수 없어 산술로 추론하는 수밖에 없었다.
         // 관측을 하나씩 적으면 다음 회차에서 같은 자리에 다시 막히지 않는다.
+        // 처분이 없는 평가(발주 메모)에서는 그 칸도, 아래 처분 매핑 절도 내지 않는다.
+        boolean 처분있음 = !summary.dispositionByCategory().isEmpty();
         sb.append("\n## 케이스별 관측\n\n");
-        sb.append("| id | 기대 | 다수결 | 관측 (범주 · 처분 · 신뢰도) |\n|---|---|---|---|\n");
+        sb.append(처분있음
+                ? "| id | 기대 | 다수결 | 관측 (범주 · 처분 · 신뢰도) |\n|---|---|---|---|\n"
+                : "| id | 기대 | 다수결 | 관측 (범주 · 신뢰도) |\n|---|---|---|---|\n");
         for (EvalAggregator.CaseResult r : results) {
             boolean 맞음 = r.source().expectedCategory().equals(r.majority());
             sb.append("| `").append(r.source().id()).append("` | `").append(r.source().expectedCategory())
@@ -64,11 +73,14 @@ public final class EvalReportWriter {
             StringJoiner 관측 = new StringJoiner(" / ");
             for (EvalObservation o : r.observations())
                 관측.add(o.succeeded()
-                        ? "`" + o.category() + "`·`" + o.disposition() + "`·`" + o.confidence() + "`"
+                        ? (처분있음
+                            ? "`" + o.category() + "`·`" + o.disposition() + "`·`" + o.confidence() + "`"
+                            : "`" + o.category() + "`·`" + o.confidence() + "`")
                         : "실패");   // 자리를 비우면 3회 중 몇 번이 실패인지가 표에서 사라진다
             sb.append(관측).append(" |\n");
         }
 
+        if (처분있음) {
         sb.append("\n## 처분 매핑\n\n");
         sb.append("같은 범주에 항상 같은 처분이 붙으면 매핑 테이블로 대체할 수 있다.\n\n");
         sb.append("| 범주 | 처분 분포 |\n|---|---|\n");
@@ -78,6 +90,7 @@ public final class EvalReportWriter {
                 sb.append("`").append(d.getKey()).append("` ").append(d.getValue()).append(" · ");
             sb.setLength(sb.length() - 3);
             sb.append(" |\n");
+        }
         }
 
         sb.append("\n## 신뢰도\n\n| 신뢰도 | 전체 | 흔들린 케이스 |\n|---|---|---|\n");

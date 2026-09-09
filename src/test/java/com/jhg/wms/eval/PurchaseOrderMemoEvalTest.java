@@ -2,9 +2,9 @@ package com.jhg.wms.eval;
 
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jhg.wms.client.ClaudeReturnReasonClassifier;
-import com.jhg.wms.domain.ReturnCategory;
-import com.jhg.wms.service.ReturnReasonClassifier;
+import com.jhg.wms.client.ClaudePurchaseOrderMemoClassifier;
+import com.jhg.wms.domain.PurchaseOrderMemoCategory;
+import com.jhg.wms.service.PurchaseOrderMemoClassifier;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -22,30 +23,32 @@ import java.util.concurrent.Future;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 실제 Claude API를 호출하는 품질 평가. 기본 test에서 제외돼 있다 — 실행은 ./gradlew evalTest.
+ * 발주 메모 분류의 품질 평가. 구조는 {@link ClassificationEvalTest}와 같고, 다른 것은 셋뿐이다 —
+ * 평가셋 파일, 분류기, 범주 목록. 하네스(EvalCase·EvalAggregator·EvalReportWriter)는 그대로 쓴다.
  *
- * 점수로 실패하지 않는다. 임계값을 두면 비결정적 출력 때문에 언젠가 반드시 헛경보가 나고,
- * 지금 목적은 회귀 게이트가 아니라 측정이다. 실패 조건은 오직 "러너가 못 돌았다"이다.
+ * <p>처분이 없다. 발주 메모 분류는 category·confidence·evidence만 내므로 관측의 disposition은
+ * 항상 null이고, 리포트도 처분 매핑 절을 내지 않는다.
+ *
+ * <p>점수로 실패하지 않는 것도 같다. 실패 조건은 오직 "러너가 못 돌았다"이다.
  */
 @Tag("eval")
-class ClassificationEvalTest {
+class PurchaseOrderMemoEvalTest {
 
     private static final String MODEL = "claude-haiku-4-5";
     private static final int REPEATS = 3;
     private static final int PARALLELISM = 5;
-    private static final Path REPORT = Path.of("build/reports/classification-eval.md");
-    private static final String CASES = "eval/return-reasons.json";
+    private static final Path REPORT = Path.of("build/reports/memo-classification-eval.md");
+    private static final String CASES = "eval/purchase-order-memos.json";
     private static final List<String> CATEGORIES =
-            java.util.Arrays.stream(ReturnCategory.values()).map(Enum::name).toList();
+            Arrays.stream(PurchaseOrderMemoCategory.values()).map(Enum::name).toList();
 
     @Test
-    void 분류_품질을_재고_리포트를_남긴다() throws Exception {
+    void 메모_분류_품질을_재고_리포트를_남긴다() throws Exception {
         String apiKey = System.getenv("ANTHROPIC_API_KEY");
-        // 키가 없으면 실패가 아니라 스킵이다. 이 테스트를 못 돌리는 것은 사고가 아니다.
         Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
                 "ANTHROPIC_API_KEY 미설정 — 평가를 건너뜁니다.");
 
-        ReturnReasonClassifier classifier = new ClaudeReturnReasonClassifier(
+        PurchaseOrderMemoClassifier classifier = new ClaudePurchaseOrderMemoClassifier(
                 AnthropicOkHttpClient.builder()
                         .apiKey(apiKey)
                         .timeout(Duration.ofSeconds(20))
@@ -57,7 +60,6 @@ class ClassificationEvalTest {
         List<EvalAggregator.CaseResult> results = new ArrayList<>();
         String 실제모델 = MODEL;
 
-        // 순차로 돌리면 90회 × 약 6초 = 9분이다. 동시 5면 2분 안쪽이고 rate limit에도 여유가 있다.
         ExecutorService pool = Executors.newFixedThreadPool(PARALLELISM);
         try {
             for (EvalCase c : cases) {
@@ -73,8 +75,6 @@ class ClassificationEvalTest {
             pool.shutdown();
         }
 
-        // 모델이 돌려준 확정 스냅샷을 쓴다. 별칭(claude-haiku-4-5)으로 적으면
-        // 나중에 어느 버전에서 잰 점수인지 알 수 없다.
         for (EvalAggregator.CaseResult r : results)
             for (EvalObservation o : r.observations())
                 if (o.succeeded() && o.model() != null) { 실제모델 = o.model(); break; }
@@ -86,14 +86,14 @@ class ClassificationEvalTest {
         Files.writeString(REPORT, report);
         System.out.println(report);
 
-        // 유일한 단언: 러너가 실제로 돌았는가. 점수는 판단하지 않는다.
         assertThat(results).hasSize(cases.size());
     }
 
-    private Callable<EvalObservation> observe(ReturnReasonClassifier classifier, EvalCase c) {
+    private Callable<EvalObservation> observe(PurchaseOrderMemoClassifier classifier, EvalCase c) {
+        // disposition은 null이다 — 이 분류기는 처분을 내지 않는다.
         return () -> classifier.classify(c.reason())
                 .map(r -> new EvalObservation(c.id(), r.category().name(), r.confidence(),
-                        r.suggestedDisposition(), r.inputTokens(), r.outputTokens(), r.model()))
+                        null, r.inputTokens(), r.outputTokens(), r.model()))
                 .orElseGet(() -> EvalObservation.failed(c.id()));
     }
 }
