@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 428개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
+| 테스트 | 511개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -303,7 +303,7 @@ CANCELLED ── 재입고 불가
 
 | Method | URL | Body | 설명 |
 |--------|-----|------|------|
-| POST | `/api/returns` | `{"requestKey":"UUID","orderId":100,"reason":"...","items":[{"orderItemId":501,"productId":1,"quantity":1}]}` | 반품 접수 |
+| POST | `/api/returns` | `{"requestKey":"UUID","orderId":100,"orderRequestKey":"UUID","reason":"...","items":[{"orderItemId":501,"productId":1,"quantity":1}]}` | 반품 접수 |
 | GET | `/api/returns/{rmaId}` | | 단건 조회 — 상태·품목별 승인 수량·처분 |
 
 | 응답 | 조건 |
@@ -311,7 +311,7 @@ CANCELLED ── 재입고 불가
 | `201` | 신규 접수 |
 | `200` | 같은 `requestKey` + 같은 내용 (멱등 재요청 — 기존 `rmaId` 반환) |
 | `409` | 같은 `requestKey` + 다른 내용 |
-| `400` | 검증 실패 — 미출고 주문, 출고 내역에 없는 상품, 누적 반품량 초과, 수량 0 이하 |
+| `400` | 검증 실패 — 미출고 주문, 출고 내역에 없는 상품, 누적 반품량 초과, 수량 0 이하, `orderRequestKey` 형식 오류·`orderId` 불일치 |
 | `404` | 없는 `rmaId` 조회 — OMS 보상 스윕이 "요청이 잘못됨"과 구분해 처리하므로 400과 나눕니다 |
 
 > **`rmaId`는 WMS 로컬 식별자입니다 — 전역 유일하지 않습니다.**
@@ -321,6 +321,16 @@ CANCELLED ── 재입고 불가
 > `POST /api/returns` 응답과 `POST /api/return-status-events` 통지 페이로드 양쪽에 항상 들어 있습니다.
 > `rmaId`를 전역 키로 저장하면 WMS DB가 초기화된 뒤 옛 번호와 충돌합니다
 > (2026-08-27 실제 발생 — OMS가 `rmaId`를 유일 키로 써서 반품 통지가 409로 거부됨).
+
+> **`orderRequestKey`는 그 반품이 가리키는 <ins>주문</ins>의 `requestKey`입니다** — 반품 자신의
+> `requestKey`와 다른 값이니 헷갈리면 안 됩니다. **지금은 선택 항목**이고, 실으면 WMS가 예약을
+> **단건으로** 찾습니다. 없으면 `orderId`로 가장 최근 예약을 고르는 레거시 경로를 탑니다.
+> `orderId`는 유일하지 않아서(OMS DB 초기화로 재사용) 그 추측은 옛 주문의 반품을 새 주문에
+> 붙이거나 실제로 출고된 상품을 "출고 내역에 없다"고 거절합니다 — 예약·출고·해제·송장조회가
+> 2026-09-03에 `requestKey`로 옮겨간 것과 같은 이유입니다.
+> 두 값을 같이 보내면 WMS가 서로 맞는지 검사하고, 어긋나면 `400`으로 막습니다.
+> **OMS가 모든 반품 요청에 이 값을 싣게 되면 레거시 경로는 삭제됩니다**
+> (요청서: `docs/oms-request-rma-order-request-key.md`).
 
 ```
 REQUESTED ──▶ RECEIVED ──▶ COMPLETED    (입고 → 검수 완료)

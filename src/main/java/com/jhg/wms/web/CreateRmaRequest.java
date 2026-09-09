@@ -5,6 +5,7 @@ import java.util.List;
 public record CreateRmaRequest(
         String requestKey,
         Long orderId,
+        String orderRequestKey,
         String reason,
         List<Item> items
 ) {
