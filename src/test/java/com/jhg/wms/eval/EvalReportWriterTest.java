@@ -42,4 +42,31 @@ class EvalReportWriterTest {
 
         assertThat(report).contains("b").contains("OTHER").contains("CHANGED_MIND");
     }
+
+    /**
+     * 1회차(2026-09-01)가 여기서 막혔다. 리포트가 케이스 단위 요약만 내서
+     * (1) 같은 케이스 안에서 처분이 갈린 것을 산술로만 추론했고
+     * (2) 틀린 케이스가 어떤 신뢰도를 받았는지 확인하지 못했다.
+     * 관측 하나하나를 표로 내야 다음 회차에서 같은 자리에 다시 막히지 않는다.
+     */
+    @Test
+    void 케이스별로_관측_하나하나의_범주_처분_신뢰도를_낸다() {
+        var c = new EvalCase("x", "사유 x", ReturnCategory.DAMAGED, "테스트용");
+        var results = List.of(EvalAggregator.toCaseResult(c, List.of(
+                new EvalObservation("x", ReturnCategory.DAMAGED, Confidence.HIGH,
+                        RmaDisposition.DISPOSED, 100, 10, "claude-haiku-4-5-20251001"),
+                new EvalObservation("x", ReturnCategory.DAMAGED, Confidence.LOW,
+                        RmaDisposition.RESTOCKED, 100, 10, "claude-haiku-4-5-20251001"),
+                EvalObservation.failed("x"))));
+
+        String report = EvalReportWriter.render(
+                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results));
+
+        assertThat(report).contains("케이스별 관측");
+        String 절 = report.substring(report.indexOf("케이스별 관측"));
+        assertThat(절)
+                .contains("DISPOSED").contains("RESTOCKED")   // 같은 범주 안에서 처분이 갈린 것
+                .contains("HIGH").contains("LOW")             // 관측별 신뢰도
+                .contains("실패");                             // 분류 실패도 자리를 비우지 않고 적는다
+    }
 }
