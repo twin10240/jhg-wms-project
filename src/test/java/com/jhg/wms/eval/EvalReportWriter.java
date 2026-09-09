@@ -7,6 +7,7 @@ import com.jhg.wms.domain.RmaDisposition;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 /** 집계 결과를 사람이 읽고 문서로 옮길 수 있는 마크다운으로 만든다. */
 public final class EvalReportWriter {
@@ -48,6 +49,24 @@ public final class EvalReportWriter {
               .append("` | ").append(r.majority() == null ? "판단 불가" : "`" + r.majority() + "`")
               .append(" | ").append(r.unstable() ? "예" : "아니오")
               .append(" | ").append(r.source().note()).append(" |\n");
+        }
+
+        // 1회차(2026-09-01)가 여기서 막혔다. 케이스 단위 요약만으로는 (1) 한 케이스 안에서 처분이
+        // 갈렸는지, (2) 틀린 케이스가 어떤 신뢰도를 받았는지 알 수 없어 산술로 추론하는 수밖에 없었다.
+        // 관측을 하나씩 적으면 다음 회차에서 같은 자리에 다시 막히지 않는다.
+        sb.append("\n## 케이스별 관측\n\n");
+        sb.append("| id | 기대 | 다수결 | 관측 (범주 · 처분 · 신뢰도) |\n|---|---|---|---|\n");
+        for (EvalAggregator.CaseResult r : results) {
+            boolean 맞음 = r.source().expectedCategory().equals(r.majority());
+            sb.append("| `").append(r.source().id()).append("` | `").append(r.source().expectedCategory())
+              .append("` | ").append(r.majority() == null ? "판단 불가" : "`" + r.majority() + "`")
+              .append(맞음 ? " ✓" : " ✗").append(" | ");
+            StringJoiner 관측 = new StringJoiner(" / ");
+            for (EvalObservation o : r.observations())
+                관측.add(o.succeeded()
+                        ? "`" + o.category() + "`·`" + o.disposition() + "`·`" + o.confidence() + "`"
+                        : "실패");   // 자리를 비우면 3회 중 몇 번이 실패인지가 표에서 사라진다
+            sb.append(관측).append(" |\n");
         }
 
         sb.append("\n## 처분 매핑\n\n");
