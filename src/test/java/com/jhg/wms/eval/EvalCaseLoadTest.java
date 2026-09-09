@@ -18,17 +18,22 @@ class EvalCaseLoadTest {
 
     private final List<EvalCase> cases = EvalCase.loadAll();
 
+    /**
+     * 배분은 중립이 아니라 가설을 겨냥한 값이다. 그래서 숫자가 바뀌면 왜 바뀌었는지가 같이 남아야 한다.
+     * 30 → 38: 3회차(프롬프트 수정 후) OTHER 8/8이 과적합인지 가리려고 OTHER에 5건,
+     * 좁힌 CHANGED_MIND가 과교정인지 보려고 그쪽에 3건을 더했다.
+     */
     @Test
-    void 서른_건이_설계대로_배분돼_있다() {
+    void 서른여덟_건이_설계대로_배분돼_있다() {
         Map<ReturnCategory, Long> 배분 = cases.stream()
                 .collect(Collectors.groupingBy(EvalCase::expectedCategory, Collectors.counting()));
 
-        assertThat(cases).hasSize(30);
+        assertThat(cases).hasSize(38);
         assertThat(배분).containsExactlyInAnyOrderEntriesOf(Map.of(
                 ReturnCategory.DAMAGED, 7L,
                 ReturnCategory.WRONG_ITEM, 7L,
-                ReturnCategory.CHANGED_MIND, 8L,
-                ReturnCategory.OTHER, 8L));
+                ReturnCategory.CHANGED_MIND, 11L,
+                ReturnCategory.OTHER, 13L));
     }
 
     @Test
