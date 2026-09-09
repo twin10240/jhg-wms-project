@@ -31,12 +31,7 @@ public class RmaService {
     public CreateResult createReturn(CreateRmaRequest request) {
         validateCreateRequest(request);
 
-        // orderId는 유일하지 않다(OMS DB 초기화로 재사용). 반품은 가장 최근 주문을 대상으로 본다.
-        // 반품 요청이 주문의 requestKey를 함께 싣게 되면 이 조회는 requestKey 단건으로 바뀐다.
-        Reservation reservation = reservationRepository.findByOrderIdLatestFirstWithLock(request.orderId())
-                .stream().findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "예약이 없습니다. orderId=" + request.orderId()));
+        Reservation reservation = findReservation(request);
 
         if (reservation.getStatus() != ReservationStatus.SHIPPED)
             throw new IllegalArgumentException(
@@ -58,6 +53,10 @@ public class RmaService {
                         "출고 내역에 없는 상품입니다. productId=" + productId);
         }
 
+        // ponytail: 누적은 아직 orderId로 센다. 재사용된 orderId에서는 옛 주문의 반품까지 세어
+        // 과다 집계될 수 있는데, 과다 집계는 접수를 '거절'하는 방향이라 조용한 오답이 아니다
+        // (예약 선택이 틀리는 것과 달리 사람이 바로 안다). 모든 반품이 orderRequestKey를
+        // 싣게 되면 RmaReturn에 그 키를 저장하고 여기도 키 기준으로 바꾼다.
         Map<Long, Integer> cumulative = cumulativeReturnQty(request.orderId());
         for (var entry : requestQtyByProduct.entrySet()) {
             int total = cumulative.getOrDefault(entry.getKey(), 0) + entry.getValue();
@@ -137,6 +136,41 @@ public class RmaService {
 
     // ── 내부 ──────────────────────────────────────────────────────
 
+    /**
+     * 반품 대상 예약을 찾는다.
+     *
+     * <p>{@code orderRequestKey}가 오면 <b>단건 조회</b>다. orderId는 유일하지 않아서
+     * (OMS DB 초기화로 재사용된다) "가장 최근 예약" 추측은 옛 주문의 반품을 새 주문에 붙이거나,
+     * 실제로 출고된 상품을 "출고 내역에 없다"고 거절한다 — 예약/출고 경로가 PR #23에서
+     * requestKey로 옮겨간 것과 같은 이유다.
+     *
+     * <p>키가 없으면 레거시 경로다. OMS가 모든 반품 요청에 키를 싣게 되면 이 분기와
+     * {@code findByOrderIdLatestFirstWithLock}을 같이 지운다.
+     */
+    private Reservation findReservation(CreateRmaRequest request) {
+        if (!hasOrderRequestKey(request))
+            return reservationRepository.findByOrderIdLatestFirstWithLock(request.orderId())
+                    .stream().findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "예약이 없습니다. orderId=" + request.orderId()));
+
+        UUID key = UUID.fromString(request.orderRequestKey());   // 형식은 validate에서 이미 걸렀다
+        Reservation reservation = reservationRepository.findByRequestKeyWithLock(key)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "예약이 없습니다. orderRequestKey=" + key));
+
+        // 둘 다 OMS가 같은 요청에 실어 보낸 값이다. 어긋나면 보내는 쪽이 헷갈린 것이므로
+        // 한쪽을 임의로 믿지 않는다 — 잘못 믿으면 남의 주문에 반품이 붙는다.
+        if (!reservation.getOrderId().equals(request.orderId()))
+            throw new IllegalArgumentException(
+                    "orderRequestKey가 orderId와 맞지 않습니다. orderId=" + request.orderId());
+        return reservation;
+    }
+
+    private static boolean hasOrderRequestKey(CreateRmaRequest request) {
+        return request.orderRequestKey() != null && !request.orderRequestKey().isBlank();
+    }
+
     private void validateCreateRequest(CreateRmaRequest request) {
         if (request.requestKey() == null || request.requestKey().isBlank())
             throw new IllegalArgumentException("requestKey는 필수입니다.");
@@ -144,6 +178,14 @@ public class RmaService {
             throw new IllegalArgumentException("orderId는 필수입니다.");
         if (request.items() == null || request.items().isEmpty())
             throw new IllegalArgumentException("품목이 없습니다.");
+        // 형식은 경계에서 막는다. 안쪽에서 UUID.fromString이 터지면 400이어야 할 것이 500이 된다.
+        if (hasOrderRequestKey(request)) {
+            try {
+                UUID.fromString(request.orderRequestKey());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("orderRequestKey는 UUID 형식이어야 합니다.");
+            }
+        }
         for (var item : request.items()) {
             if (item.orderItemId() == null)
                 throw new IllegalArgumentException("orderItemId는 필수입니다.");

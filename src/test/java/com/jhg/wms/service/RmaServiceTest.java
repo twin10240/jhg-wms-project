@@ -60,7 +60,7 @@ class RmaServiceTest {
 
     private CreateRmaRequest req(String key, long orderId, String reason,
                                   List<CreateRmaRequest.Item> items) {
-        return new CreateRmaRequest(key, orderId, reason, items);
+        return new CreateRmaRequest(key, orderId, null, reason, items);
     }
 
     private List<CreateRmaRequest.Item> items(long orderItemId, long productId, int qty) {
@@ -384,5 +384,64 @@ class RmaServiceTest {
         assertThatThrownBy(() -> rmaService.complete(rma.getId(), Map.of(itemId,
                 new RmaService.InspectionResult(1, RmaDisposition.REJECTED))))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 주문_requestKey를_실으면_그_예약을_단건으로_찾는다() {
+        // orderId는 유일하지 않다(OMS DB 초기화로 재사용). 같은 orderId에 예약이 둘일 때
+        // "가장 최근" 추측은 옛 주문의 반품을 새 주문에 붙이거나, 실제로 출고된 상품을 없다고 거절한다.
+        inventoryRepo.save(Inventory.create(1L, 20));
+        inventoryRepo.save(Inventory.create(2L, 20));
+        UUID 옛예약 = UUID.randomUUID();
+        UUID 새예약 = UUID.randomUUID();
+        inventoryService.reserveAll(옛예약, 100L, Map.of(1L, 5));
+        inventoryService.shipAll(옛예약, Map.of(1L, 5));
+        inventoryService.reserveAll(새예약, 100L, Map.of(2L, 5));
+        inventoryService.shipAll(새예약, Map.of(2L, 5));
+
+        // 레거시 경로(키 없음)는 최신 예약만 본다 — 옛 주문의 상품 1이 "출고 내역에 없다"가 된다.
+        assertThatThrownBy(() -> rmaService.createReturn(
+                req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 2))))
+                .hasMessageContaining("출고 내역에 없는 상품");
+
+        var result = rmaService.createReturn(new CreateRmaRequest(
+                UUID.randomUUID().toString(), 100L, 옛예약.toString(), "불량", items(501, 1, 2)));
+
+        assertThat(result.created()).isTrue();
+        assertThat(result.rma().getItems()).hasSize(1);
+    }
+
+    @Test
+    void 주문_requestKey에_맞는_예약이_없으면_거부() {
+        seedAndShip(100L, Map.of(1L, 5));
+
+        assertThatThrownBy(() -> rmaService.createReturn(new CreateRmaRequest(
+                UUID.randomUUID().toString(), 100L, UUID.randomUUID().toString(), "불량", items(501, 1, 2))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("예약이 없습니다");
+    }
+
+    @Test
+    void 주문_requestKey가_UUID가_아니면_거부() {
+        seedAndShip(100L, Map.of(1L, 5));
+
+        // 경계에서 막지 않으면 UUID.fromString이 서비스 안쪽에서 터져 500이 된다.
+        assertThatThrownBy(() -> rmaService.createReturn(new CreateRmaRequest(
+                UUID.randomUUID().toString(), 100L, "not-a-uuid", "불량", items(501, 1, 2))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("orderRequestKey");
+    }
+
+    @Test
+    void 주문_requestKey와_orderId가_어긋나면_거부() {
+        seedAndShip(100L, Map.of(1L, 5));
+        seedAndShip(200L, Map.of(2L, 5));
+
+        // 둘 다 OMS가 같은 요청에 실어 보낸 값이다. 어긋나면 보내는 쪽이 헷갈린 것이라
+        // 조용히 한쪽을 믿지 않고 막는다 — 잘못 믿으면 남의 주문에 반품이 붙는다.
+        assertThatThrownBy(() -> rmaService.createReturn(new CreateRmaRequest(
+                UUID.randomUUID().toString(), 200L, keyOf(100L).toString(), "불량", items(501, 1, 2))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("orderId와 맞지 않습니다");
     }
 }
