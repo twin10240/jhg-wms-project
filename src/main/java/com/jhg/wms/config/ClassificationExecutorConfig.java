@@ -27,6 +27,13 @@ public class ClassificationExecutorConfig {
     /**
      * 분류 전용 작은 풀. 반품 사유와 발주 메모가 같이 쓴다 — 둘 다 참고 정보라
      * 서로 밀려도 잃는 것이 같고, 풀을 따로 두면 놀고 있는 스레드만 늘어난다.
+     *
+     * 코어가 2인 이유 — ThreadPoolExecutor는 <b>큐가 다 차야</b> 코어를 넘겨 스레드를 만든다.
+     * 큐가 50이라 코어 1이면 사실상 워커 1개이고, 호출 하나가 최대 40초(timeout 20s × 재시도 1)다.
+     * 발주 메모가 이 풀에 들어오면서 시드 30건 같은 몰림이 생기면 그 뒤에 들어온 반품 분류가
+     * 20분 넘게 줄을 선다(버려지진 않지만 화면의 참고 정보가 한참 뒤에 뜬다).
+     * 두 종류가 한 풀을 쓰는 이상 워커도 최소 둘이어야 한 종류가 다른 종류를 굶기지 않는다.
+     *
      * 큐가 차면 그냥 버린다 —
      * CallerRuns로 되돌리면 막으려던 것(요청 스레드가 분류를 기다림)이 그대로 일어나고,
      * 무제한 큐로 두면 밀린 분류가 메모리로 쌓인다. 분류는 빠져도 업무가 막히지 않으므로 버리는 쪽이 맞다.
@@ -40,7 +47,7 @@ public class ClassificationExecutorConfig {
      */
     @Bean(name = "classificationExecutor", destroyMethod = "")
     public ExecutorService classificationExecutor() {
-        this.executor = new ThreadPoolExecutor(1, 2, 60L, TimeUnit.SECONDS,
+        this.executor = new ThreadPoolExecutor(2, 2, 60L, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(50),
                 runnable -> {
                     Thread t = new Thread(runnable, "classify");
