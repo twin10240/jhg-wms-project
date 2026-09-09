@@ -241,16 +241,17 @@ public class WmsAdminController {
 
     @GetMapping("/admin/purchase-orders")
     public String purchaseOrders(@RequestParam(required = false) PurchaseOrderStatus status, Model model) {
-        List<PurchaseOrder> pos = purchaseOrderService.findAllWithItems();
-        if (status != null)
-            pos = pos.stream().filter(po -> po.getStatus() == status).toList();
+        List<PurchaseOrder> allPos = purchaseOrderService.findAllWithItems();
+        List<PurchaseOrder> pos = status == null ? allPos
+                : allPos.stream().filter(po -> po.getStatus() == status).toList();
         model.addAttribute("purchaseOrders", pos);
         model.addAttribute("activeStatus", status);
         List<InventoryRowResponse> rows = inventoryService.findAllRows();
         model.addAttribute("products", rows);
         model.addAttribute("productNames", rows.stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
-        model.addAttribute("advice", purchaseOrderAdviceService.advise(LocalDate.now()));
+        // 근거 패널은 이미 올려둔 재고 행·발주 전건을 그대로 쓴다(상태 필터 전 목록이어야 한다).
+        model.addAttribute("advice", purchaseOrderAdviceService.advise(LocalDate.now(), rows, allPos));
         return "admin/purchaseorders";
     }
 

@@ -5,6 +5,7 @@ import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
+import com.jhg.wms.domain.PurchaseOrder;
 import com.jhg.wms.repository.InventoryRepository;
 import com.jhg.wms.repository.InventoryTransactionRepository;
 import com.jhg.wms.repository.PurchaseOrderRepository;
@@ -20,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -41,16 +43,17 @@ class PurchaseOrderAdviceServiceTest {
     @Autowired ReplenishmentRequestRepository requestRepo;
     @Autowired ReservationRepository reservationRepo;
 
+    InventoryService inventoryService;
     PurchaseOrderService purchaseOrderService;
     PurchaseOrderAdviceService service;
 
     @BeforeEach
     void setUp() {
-        InventoryService inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
+        inventoryService = new InventoryService(inventoryRepo, reservationRepo, txnRepo,
                 mock(OmsReplenishmentNotifier.class), mock(OmsDeliveryNotifier.class), () -> "system");
         purchaseOrderService = new PurchaseOrderService(poRepo, inventoryService, requestRepo,
                 mock(PurchaseOrderMemoClassificationTrigger.class));
-        service = new PurchaseOrderAdviceService(txnRepo, inventoryService, purchaseOrderService);
+        service = new PurchaseOrderAdviceService(txnRepo);
     }
 
     private void 재고(Long productId, String name, int onHand) {
@@ -64,6 +67,11 @@ class PurchaseOrderAdviceServiceTest {
         txnRepo.save(t);
     }
 
+    /** 재고 행·발주 전건은 화면 핸들러가 넘긴다 — 여기서도 같은 방식으로 부른다. */
+    private List<ProductAdvice> 조언() {
+        return service.advise(오늘, inventoryService.findAllRows(), purchaseOrderService.findAllWithItems());
+    }
+
     private ProductAdvice 상품(List<ProductAdvice> rows, Long productId) {
         return rows.stream().filter(r -> r.productId().equals(productId)).findFirst().orElseThrow();
     }
@@ -71,7 +79,7 @@ class PurchaseOrderAdviceServiceTest {
     @Test
     void 원장이_비면_빈_목록이다() {
         재고(1L, "상품 1", 50);
-        assertThat(service.advise(오늘)).isEmpty();
+        assertThat(조언()).isEmpty();
     }
 
     @Test
@@ -81,7 +89,7 @@ class PurchaseOrderAdviceServiceTest {
         원장(1L, InventoryTransactionType.OPENING, 100, 오늘.minusDays(9));
         원장(1L, InventoryTransactionType.SHIP, -102, 오늘.minusDays(5));
 
-        ProductAdvice a = 상품(service.advise(오늘), 1L);
+        ProductAdvice a = 상품(조언(), 1L);
 
         assertThat(a.sampleDays()).isEqualTo(10);
         assertThat(a.shippedQty()).isEqualTo(102);              // SHIP 델타는 음수 — 부호를 뒤집어 낸다
@@ -96,7 +104,7 @@ class PurchaseOrderAdviceServiceTest {
         원장(1L, InventoryTransactionType.OPENING, 500, 오늘.minusDays(90));
         원장(1L, InventoryTransactionType.SHIP, -60, 오늘.minusDays(3));
 
-        ProductAdvice a = 상품(service.advise(오늘), 1L);
+        ProductAdvice a = 상품(조언(), 1L);
 
         assertThat(a.sampleDays()).isEqualTo(PurchaseOrderAdviceService.WINDOW_DAYS);
         assertThat(a.dailyAverage()).isCloseTo(2.0, within(0.001));
@@ -108,7 +116,7 @@ class PurchaseOrderAdviceServiceTest {
         원장(1L, InventoryTransactionType.OPENING, 500, 오늘.minusDays(90));
         원장(1L, InventoryTransactionType.SHIP, -60, 오늘.minusDays(40));
 
-        assertThat(상품(service.advise(오늘), 1L).shippedQty()).isZero();
+        assertThat(상품(조언(), 1L).shippedQty()).isZero();
     }
 
     @Test
@@ -116,7 +124,7 @@ class PurchaseOrderAdviceServiceTest {
         재고(1L, "상품 1", 50);
         원장(1L, InventoryTransactionType.OPENING, 50, 오늘.minusDays(9));
 
-        ProductAdvice a = 상품(service.advise(오늘), 1L);
+        ProductAdvice a = 상품(조언(), 1L);
 
         assertThat(a.dailyAverage()).isZero();
         // 0일이 아니다 — 오늘 소진된다는 뜻이 되어버린다. 잴 것이 없는 것과 다르다.
@@ -130,7 +138,7 @@ class PurchaseOrderAdviceServiceTest {
         원장(1L, InventoryTransactionType.RETURN, 5, 오늘.minusDays(2));
         원장(1L, InventoryTransactionType.ADJUST, -30, 오늘.minusDays(1));
 
-        assertThat(상품(service.advise(오늘), 1L).shippedQty()).isZero();
+        assertThat(상품(조언(), 1L).shippedQty()).isZero();
     }
 
     @Test
@@ -146,7 +154,7 @@ class PurchaseOrderAdviceServiceTest {
         재고(3L, "안 움직인 상품", 999);
         원장(3L, InventoryTransactionType.OPENING, 999, 오늘.minusDays(9));
 
-        assertThat(service.advise(오늘))
+        assertThat(조언())
                 .extracting(ProductAdvice::productId)
                 .containsExactly(2L, 1L, 3L);
     }
@@ -162,10 +170,28 @@ class PurchaseOrderAdviceServiceTest {
                 오늘.minusDays(20).atTime(9, 0));
         poRepo.flush();
 
-        var lastOrder = 상품(service.advise(오늘), 1L).lastOrder();
+        var lastOrder = 상품(조언(), 1L).lastOrder();
 
         assertThat(lastOrder.purchaseOrderId()).isEqualTo(최근);
         assertThat(lastOrder.quantity()).isEqualTo(40);
         assertThat(lastOrder.leadTimeDays()).isNull();   // 아직 입고 전
+    }
+
+    @Test
+    void 같은_날_발주가_둘이면_나중에_만든_쪽이_직전_발주다() {
+        재고(1L, "상품 1", 50);
+        원장(1L, InventoryTransactionType.OPENING, 50, 오늘.minusDays(9));
+
+        Long 먼저 = purchaseOrderService.create(List.of(new PurchaseOrderLine(1L, 10)), "먼저");
+        Long 나중 = purchaseOrderService.create(List.of(new PurchaseOrderLine(1L, 40)), "나중");
+        // 먼저 낸 발주가 당일에 입고까지 끝나 닫힌다. 목록 정렬(열린 것 먼저)을 그대로 순회하면
+        // 닫힌 #먼저를 나중에 만나고, 일 단위 비교로는 그쪽이 이겨 미입고 #나중이 패널에서 사라진다.
+        PurchaseOrder 먼저Po = purchaseOrderService.findWithItems(먼저);
+        purchaseOrderService.receive(먼저, Map.of(먼저Po.getItems().get(0).getId(), 10));
+
+        var lastOrder = 상품(조언(), 1L).lastOrder();
+
+        assertThat(lastOrder.purchaseOrderId()).isEqualTo(나중);
+        assertThat(lastOrder.receivedOn()).isNull();
     }
 }

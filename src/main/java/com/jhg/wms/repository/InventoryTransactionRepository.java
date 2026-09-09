@@ -57,6 +57,12 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
 
     // 발주 근거 패널의 일평균 분모용. 창 길이가 아니라 그 상품의 원장이 실제로 존재한 날부터 세야
     // 10일치를 30일로 나눠 소진 예상일이 3배 길어지는 사고가 안 난다.
+    //
+    // ponytail: WHERE가 없어 원장 전체를 훑는다(이 앱에서 가장 빨리 크는 테이블이다).
+    // 창(30일)으로 자를 수는 없다 — 이 값의 뜻이 "그 상품 원장이 언제 시작했나"라서,
+    // 창 안의 첫 행으로 바꾸면 오래된 상품이 창 시작이 아니라 창 안 첫 거래일부터 세어져
+    // 분모가 줄고 일평균이 부풀며, 창 내내 조용한 상품은 아예 목록에서 빠진다.
+    // 무거워지면 (product_id, created_at) 인덱스, 그래도 모자라면 Inventory에 첫 기록일 컬럼.
     @Query("SELECT t.productId, MIN(t.createdAt) FROM InventoryTransaction t GROUP BY t.productId")
     List<Object[]> findFirstRecordedAtByProduct();
 
