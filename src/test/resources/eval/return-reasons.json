@@ -39,6 +39,10 @@
   { "id": "other-12", "reason": "판매자분이 보내라고 하셔서요", "expectedCategory": "OTHER", "note": "일반화 검사 — 이유가 적혀 있는데 그것이 반품 사유가 아니다. 프롬프트 3번 줄(이유 없는 요청)과 다른 모양" },
   { "id": "other-13", "reason": "실수로 두 번 주문했어요", "expectedCategory": "OTHER", "note": "라벨 확정(사람 판단, 2026-09-09) — 마음이 바뀐 게 아니라 처음부터 착오이므로 OTHER다. 모델은 4회차에 CHANGED_MIND+HIGH로 갔다" },
 
+  { "id": "other-15", "reason": "수량을 잘못 눌러서 하나 더 왔어요", "expectedCategory": "OTHER", "note": "주문 착오 일반화 — 수량 착오. WRONG_ITEM(수량 불일치)과 갈라야 한다. 여기선 창고가 아니라 고객이 잘못 눌렀다" },
+  { "id": "other-16", "reason": "장바구니에서 엉뚱한 걸 골랐네요", "expectedCategory": "OTHER", "note": "주문 착오 일반화 — 상품 선택 착오. WRONG_ITEM(다른 물건이 옴)과 갈라야 한다" },
+  { "id": "other-17", "reason": "주소를 잘못 넣어서 다시 주문했습니다", "expectedCategory": "OTHER", "note": "주문 착오 일반화 — 배송지 착오. other-13(중복 주문)과 다른 모양" },
+
   { "id": "mind-11", "reason": "배송이 일주일이나 늦어서 이제 필요 없어졌어요", "expectedCategory": "CHANGED_MIND", "note": "우선순위 탐침 — 배송 불만과 필요 없어짐이 한 문장에 다 있다. 사람 판단: 상황이 변해 필요가 없어졌으므로 변심이다. 프롬프트의 OTHER 첫 줄(배송 불만)이 이걸 삼키면 그 줄이 과하게 넓은 것" },
   { "id": "mind-09", "reason": "다른 데서 더 싸게 팔길래요", "expectedCategory": "CHANGED_MIND", "note": "과교정 검사 — 변심 근거가 가격의 형태로 있다. 좁힌 정의가 이걸 OTHER로 밀어내면 지나친 것. 라벨 논쟁적" },
   { "id": "mind-10", "reason": "그냥 안 쓸 것 같아서요", "expectedCategory": "CHANGED_MIND", "note": "과교정 검사 — 표면은 other-02·03(\"그냥\")과 닮았지만 필요 변화가 적혀 있다. 막연한 불만족과 진짜 변심을 가르는지" }
