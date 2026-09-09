@@ -37,7 +37,7 @@
   { "id": "other-10", "reason": "주문 취소했는데 그대로 배송됐어요", "expectedCategory": "OTHER", "note": "일반화 검사 — 주문 상태 오류. 배송·결제·응대 어디도 아니다" },
   { "id": "other-11", "reason": "회사에서 이런 건 반입이 안 된다고 하네요", "expectedCategory": "OTHER", "note": "일반화 검사 — 외부 규정. 하자도 변심도 아니다" },
   { "id": "other-12", "reason": "판매자분이 보내라고 하셔서요", "expectedCategory": "OTHER", "note": "일반화 검사 — 이유가 적혀 있는데 그것이 반품 사유가 아니다. 프롬프트 3번 줄(이유 없는 요청)과 다른 모양" },
-  { "id": "other-13", "reason": "실수로 두 번 주문했어요", "expectedCategory": "OTHER", "note": "라벨 논쟁적 — 마음이 바뀐 게 아니라 처음부터 착오다. CHANGED_MIND로 볼지는 업무 규칙" },
+  { "id": "other-13", "reason": "실수로 두 번 주문했어요", "expectedCategory": "OTHER", "note": "라벨 확정(사람 판단, 2026-09-09) — 마음이 바뀐 게 아니라 처음부터 착오이므로 OTHER다. 모델은 4회차에 CHANGED_MIND+HIGH로 갔다" },
 
   { "id": "mind-11", "reason": "배송이 일주일이나 늦어서 이제 필요 없어졌어요", "expectedCategory": "CHANGED_MIND", "note": "우선순위 탐침 — 배송 불만과 필요 없어짐이 한 문장에 다 있다. 사람 판단: 상황이 변해 필요가 없어졌으므로 변심이다. 프롬프트의 OTHER 첫 줄(배송 불만)이 이걸 삼키면 그 줄이 과하게 넓은 것" },
   { "id": "mind-09", "reason": "다른 데서 더 싸게 팔길래요", "expectedCategory": "CHANGED_MIND", "note": "과교정 검사 — 변심 근거가 가격의 형태로 있다. 좁힌 정의가 이걸 OTHER로 밀어내면 지나친 것. 라벨 논쟁적" },
