@@ -3,8 +3,10 @@ package com.jhg.wms.config;
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jhg.wms.client.ClaudePurchaseOrderBriefingGenerator;
 import com.jhg.wms.client.ClaudePurchaseOrderMemoClassifier;
 import com.jhg.wms.client.ClaudeReturnReasonClassifier;
+import com.jhg.wms.service.PurchaseOrderBriefingGenerator;
 import com.jhg.wms.service.PurchaseOrderMemoClassifier;
 import com.jhg.wms.service.ReturnReasonClassifier;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +61,26 @@ public class AiConfig {
 
         log.info("발주 메모 자동 분류 활성: model={} maxTokens={} timeout={}", model, maxTokens, timeout);
         return new ClaudePurchaseOrderMemoClassifier(anthropicClient(apiKey, timeout), objectMapper, model, maxTokens);
+    }
+
+    /**
+     * 발주 브리핑 생성기. 키가 없으면 이것만 꺼진 채 기동하는 것은 분류 둘과 같다.
+     * 다만 타임아웃·max-tokens는 따로 받는다 — 문단 생성은 분류와 크기가 다르다.
+     */
+    @Bean
+    public PurchaseOrderBriefingGenerator purchaseOrderBriefingGenerator(
+            @Value("${wms.ai.api-key:}") String apiKey,
+            @Value("${wms.ai.model}") String model,
+            @Value("${wms.ai.briefing-max-tokens}") long maxTokens,
+            @Value("${wms.ai.briefing-timeout}") Duration timeout) {
+
+        if (apiKey == null || apiKey.isBlank()) {
+            log.info("ANTHROPIC_API_KEY 미설정 — 발주 브리핑을 끈 채로 기동합니다.");
+            return snapshot -> Optional.empty();
+        }
+
+        log.info("발주 브리핑 활성: model={} maxTokens={} timeout={}", model, maxTokens, timeout);
+        return new ClaudePurchaseOrderBriefingGenerator(anthropicClient(apiKey, timeout), model, maxTokens);
     }
 
     /**
