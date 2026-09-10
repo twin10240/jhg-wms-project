@@ -84,10 +84,24 @@ public class ClaudePurchaseOrderBriefingGenerator implements PurchaseOrderBriefi
             sb.append("  직전 발주: ")
               .append(r.lastOrderId() == null ? "없음"
                       : "#" + r.lastOrderId() + " " + r.lastOrderedOn() + " " + r.lastOrderQty() + "개"
-                        + " (" + snapshot.daysSinceLastOrder(r) + "일 전)")
+                        + " (" + snapshot.daysSinceLastOrder(r) + "일 전, " + receiptLabel(r) + ")")
               .append("\n\n");
         }
         return sb.toString().trim();
+    }
+
+    /**
+     * 입고 여부 문구. 측정 3회차에서 모델이 "그때 100개를 받았으나"라며 입고를 단정했다 —
+     * 표는 발주 수량만 줬지 입고 여부는 준 적이 없었다. "미입고"를 다른 상태와 헷갈릴 수 없게
+     * 풀어 쓴다.
+     */
+    private static String receiptLabel(BriefingSnapshot.Row r) {
+        return switch (r.lastOrderStatus()) {
+            case ORDERED -> "아직 입고되지 않음";
+            case PARTIALLY_RECEIVED -> "일부만 입고(" + r.lastOrderReceivedOn() + ")";
+            case RECEIVED -> "입고 완료(" + r.lastOrderReceivedOn() + ")";
+            case CANCELLED -> "발주 취소됨";
+        };
     }
 
     private static String readResource(String path) {

@@ -8,19 +8,19 @@
         "rows": [
           {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
            "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
-           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-22"},
           {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
            "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
-           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-17"},
           {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
-           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-12"},
           {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
            "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
-           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-03"},
           {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
            "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
-           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-17"}
         ]
       }
     },
@@ -32,19 +32,19 @@
         "rows": [
           {"productId": 21, "productName": "박스", "shippedQty": 300, "sampleDays": 30,
            "dailyAverage": 10.0, "availableQty": 5, "daysToStockout": 0.5,
-           "lastOrderId": 610, "lastOrderedOn": "2026-08-01", "lastOrderQty": 400},
+           "lastOrderId": 610, "lastOrderedOn": "2026-08-01", "lastOrderQty": 400, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-03"},
           {"productId": 22, "productName": "완충재", "shippedQty": 210, "sampleDays": 30,
            "dailyAverage": 7.0, "availableQty": 8, "daysToStockout": 1.1,
-           "lastOrderId": 611, "lastOrderedOn": "2026-07-20", "lastOrderQty": 300},
+           "lastOrderId": 611, "lastOrderedOn": "2026-07-20", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-22"},
           {"productId": 23, "productName": "청 테이프", "shippedQty": 180, "sampleDays": 30,
            "dailyAverage": 6.0, "availableQty": 16, "daysToStockout": 2.7,
-           "lastOrderId": 612, "lastOrderedOn": "2026-07-15", "lastOrderQty": 250},
+           "lastOrderId": 612, "lastOrderedOn": "2026-07-15", "lastOrderQty": 250, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-17"},
           {"productId": 24, "productName": "마스킹테이프", "shippedQty": 90, "sampleDays": 30,
            "dailyAverage": 3.0, "availableQty": 120, "daysToStockout": 40.0,
-           "lastOrderId": 613, "lastOrderedOn": "2026-06-01", "lastOrderQty": 150},
+           "lastOrderId": 613, "lastOrderedOn": "2026-06-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-03"},
           {"productId": 25, "productName": "에어캡", "shippedQty": 45, "sampleDays": 30,
            "dailyAverage": 1.5, "availableQty": 90, "daysToStockout": 60.0,
-           "lastOrderId": 614, "lastOrderedOn": "2026-05-15", "lastOrderQty": 120}
+           "lastOrderId": 614, "lastOrderedOn": "2026-05-15", "lastOrderQty": 120, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-17"}
         ]
       }
     },
@@ -56,19 +56,19 @@
         "rows": [
           {"productId": 31, "productName": "복사용지", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 75, "daysToStockout": 15.0,
-           "lastOrderId": 701, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+           "lastOrderId": 701, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-03"},
           {"productId": 32, "productName": "클립", "shippedQty": 90, "sampleDays": 30,
            "dailyAverage": 3.0, "availableQty": 60, "daysToStockout": 20.0,
-           "lastOrderId": 702, "lastOrderedOn": "2026-06-20", "lastOrderQty": 100},
+           "lastOrderId": 702, "lastOrderedOn": "2026-06-20", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-22"},
           {"productId": 33, "productName": "포스트잇", "shippedQty": 60, "sampleDays": 30,
            "dailyAverage": 2.0, "availableQty": 50, "daysToStockout": 25.0,
-           "lastOrderId": 703, "lastOrderedOn": "2026-06-10", "lastOrderQty": 80},
+           "lastOrderId": 703, "lastOrderedOn": "2026-06-10", "lastOrderQty": 80, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-12"},
           {"productId": 34, "productName": "커터칼", "shippedQty": 30, "sampleDays": 30,
            "dailyAverage": 1.0, "availableQty": 30, "daysToStockout": 30.0,
-           "lastOrderId": 704, "lastOrderedOn": "2026-05-20", "lastOrderQty": 40},
+           "lastOrderId": 704, "lastOrderedOn": "2026-05-20", "lastOrderQty": 40, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-22"},
           {"productId": 35, "productName": "화이트보드마커", "shippedQty": 21, "sampleDays": 30,
            "dailyAverage": 0.7, "availableQty": 25, "daysToStockout": 35.7,
-           "lastOrderId": 705, "lastOrderedOn": "2026-05-05", "lastOrderQty": 30}
+           "lastOrderId": 705, "lastOrderedOn": "2026-05-05", "lastOrderQty": 30, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-07"}
         ]
       }
     },
@@ -80,19 +80,19 @@
         "rows": [
           {"productId": 41, "productName": "행사용품 A", "shippedQty": 0, "sampleDays": 30,
            "dailyAverage": 0.0, "availableQty": 40, "daysToStockout": null,
-           "lastOrderId": 700, "lastOrderedOn": "2026-05-01", "lastOrderQty": 40},
+           "lastOrderId": 700, "lastOrderedOn": "2026-05-01", "lastOrderQty": 40, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-03"},
           {"productId": 42, "productName": "박스테이프(중)", "shippedQty": 120, "sampleDays": 30,
            "dailyAverage": 4.0, "availableQty": 6, "daysToStockout": 1.5,
-           "lastOrderId": 720, "lastOrderedOn": "2026-08-01", "lastOrderQty": 100},
+           "lastOrderId": 720, "lastOrderedOn": "2026-08-01", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-03"},
           {"productId": 43, "productName": "PE봉투", "shippedQty": 75, "sampleDays": 30,
            "dailyAverage": 2.5, "availableQty": 50, "daysToStockout": 20.0,
-           "lastOrderId": 721, "lastOrderedOn": "2026-07-05", "lastOrderQty": 80},
+           "lastOrderId": 721, "lastOrderedOn": "2026-07-05", "lastOrderQty": 80, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-07"},
           {"productId": 44, "productName": "고무밴드", "shippedQty": 45, "sampleDays": 30,
            "dailyAverage": 1.5, "availableQty": 45, "daysToStockout": 30.0,
-           "lastOrderId": 722, "lastOrderedOn": "2026-06-15", "lastOrderQty": 60},
+           "lastOrderId": 722, "lastOrderedOn": "2026-06-15", "lastOrderQty": 60, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-17"},
           {"productId": 45, "productName": "종이컵", "shippedQty": 210, "sampleDays": 30,
            "dailyAverage": 7.0, "availableQty": 70, "daysToStockout": 10.0,
-           "lastOrderId": 723, "lastOrderedOn": "2026-06-01", "lastOrderQty": 200}
+           "lastOrderId": 723, "lastOrderedOn": "2026-06-01", "lastOrderQty": 200, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-03"}
         ]
       }
     },
@@ -107,16 +107,16 @@
            "lastOrderId": null, "lastOrderedOn": null, "lastOrderQty": null},
           {"productId": 52, "productName": "집게", "shippedQty": 90, "sampleDays": 30,
            "dailyAverage": 3.0, "availableQty": 8, "daysToStockout": 2.7,
-           "lastOrderId": 650, "lastOrderedOn": "2026-07-20", "lastOrderQty": 100},
+           "lastOrderId": 650, "lastOrderedOn": "2026-07-20", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-22"},
           {"productId": 53, "productName": "스테이플러심", "shippedQty": 45, "sampleDays": 30,
            "dailyAverage": 1.5, "availableQty": 45, "daysToStockout": 30.0,
-           "lastOrderId": 640, "lastOrderedOn": "2026-06-01", "lastOrderQty": 60},
+           "lastOrderId": 640, "lastOrderedOn": "2026-06-01", "lastOrderQty": 60, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-03"},
           {"productId": 54, "productName": "메모패드", "shippedQty": 30, "sampleDays": 30,
            "dailyAverage": 1.0, "availableQty": 40, "daysToStockout": 40.0,
-           "lastOrderId": 630, "lastOrderedOn": "2026-05-15", "lastOrderQty": 50},
+           "lastOrderId": 630, "lastOrderedOn": "2026-05-15", "lastOrderQty": 50, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-17"},
           {"productId": 55, "productName": "형광펜", "shippedQty": 120, "sampleDays": 30,
            "dailyAverage": 4.0, "availableQty": 100, "daysToStockout": 25.0,
-           "lastOrderId": 620, "lastOrderedOn": "2026-05-01", "lastOrderQty": 150}
+           "lastOrderId": 620, "lastOrderedOn": "2026-05-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-03"}
         ]
       }
     },
@@ -128,19 +128,19 @@
         "rows": [
           {"productId": 61, "productName": "정전기 방지 봉투", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 10, "daysToStockout": 2.0,
-           "lastOrderId": 900, "lastOrderedOn": "2026-09-08", "lastOrderQty": 200},
+           "lastOrderId": 900, "lastOrderedOn": "2026-09-08", "lastOrderQty": 200, "lastOrderStatus": "ORDERED", "lastOrderReceivedOn": null},
           {"productId": 62, "productName": "청소용 물티슈", "shippedQty": 60, "sampleDays": 30,
            "dailyAverage": 2.0, "availableQty": 60, "daysToStockout": 30.0,
-           "lastOrderId": 500, "lastOrderedOn": "2026-03-01", "lastOrderQty": 80},
+           "lastOrderId": 500, "lastOrderedOn": "2026-03-01", "lastOrderQty": 80, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-03-03"},
           {"productId": 63, "productName": "라텍스장갑", "shippedQty": 90, "sampleDays": 30,
            "dailyAverage": 3.0, "availableQty": 45, "daysToStockout": 15.0,
-           "lastOrderId": 510, "lastOrderedOn": "2026-04-01", "lastOrderQty": 100},
+           "lastOrderId": 510, "lastOrderedOn": "2026-04-01", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-04-03"},
           {"productId": 64, "productName": "종이박스(대)", "shippedQty": 210, "sampleDays": 30,
            "dailyAverage": 7.0, "availableQty": 140, "daysToStockout": 20.0,
-           "lastOrderId": 520, "lastOrderedOn": "2026-04-15", "lastOrderQty": 300},
+           "lastOrderId": 520, "lastOrderedOn": "2026-04-15", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-04-17"},
           {"productId": 65, "productName": "종이박스(소)", "shippedQty": 180, "sampleDays": 30,
            "dailyAverage": 6.0, "availableQty": 120, "daysToStockout": 20.0,
-           "lastOrderId": 530, "lastOrderedOn": "2026-05-01", "lastOrderQty": 250}
+           "lastOrderId": 530, "lastOrderedOn": "2026-05-01", "lastOrderQty": 250, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-03"}
         ]
       }
     },
@@ -152,19 +152,19 @@
         "rows": [
           {"productId": 71, "productName": "신상 다이어리", "shippedQty": 20, "sampleDays": 4,
            "dailyAverage": 5.0, "availableQty": 10, "daysToStockout": 2.0,
-           "lastOrderId": 300, "lastOrderedOn": "2026-08-25", "lastOrderQty": 50},
+           "lastOrderId": 300, "lastOrderedOn": "2026-08-25", "lastOrderQty": 50, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-27"},
           {"productId": 72, "productName": "신상 스티커", "shippedQty": 12, "sampleDays": 4,
            "dailyAverage": 3.0, "availableQty": 30, "daysToStockout": 10.0,
-           "lastOrderId": 310, "lastOrderedOn": "2026-08-20", "lastOrderQty": 40},
+           "lastOrderId": 310, "lastOrderedOn": "2026-08-20", "lastOrderQty": 40, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-22"},
           {"productId": 73, "productName": "신상 마스킹테이프", "shippedQty": 8, "sampleDays": 4,
            "dailyAverage": 2.0, "availableQty": 40, "daysToStockout": 20.0,
-           "lastOrderId": 320, "lastOrderedOn": "2026-08-18", "lastOrderQty": 60},
+           "lastOrderId": 320, "lastOrderedOn": "2026-08-18", "lastOrderQty": 60, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-20"},
           {"productId": 74, "productName": "신상 클립보드", "shippedQty": 4, "sampleDays": 4,
            "dailyAverage": 1.0, "availableQty": 20, "daysToStockout": 20.0,
-           "lastOrderId": 330, "lastOrderedOn": "2026-08-10", "lastOrderQty": 30},
+           "lastOrderId": 330, "lastOrderedOn": "2026-08-10", "lastOrderQty": 30, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-12"},
           {"productId": 75, "productName": "신상 파일첩", "shippedQty": 16, "sampleDays": 4,
            "dailyAverage": 4.0, "availableQty": 60, "daysToStockout": 15.0,
-           "lastOrderId": 340, "lastOrderedOn": "2026-08-05", "lastOrderQty": 80}
+           "lastOrderId": 340, "lastOrderedOn": "2026-08-05", "lastOrderQty": 80, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-07"}
         ]
       }
     },
@@ -176,7 +176,7 @@
         "rows": [
           {"productId": 81, "productName": "특수 포장재", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 6, "daysToStockout": 1.2,
-           "lastOrderId": 950, "lastOrderedOn": "2026-08-01", "lastOrderQty": 100}
+           "lastOrderId": 950, "lastOrderedOn": "2026-08-01", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-03"}
         ]
       }
     },
@@ -190,19 +190,19 @@
         "rows": [
           {"productId": 21, "productName": "박스", "shippedQty": 300, "sampleDays": 30,
            "dailyAverage": 10.0, "availableQty": 5, "daysToStockout": 0.5,
-           "lastOrderId": 610, "lastOrderedOn": "2026-08-01", "lastOrderQty": 400},
+           "lastOrderId": 610, "lastOrderedOn": "2026-08-01", "lastOrderQty": 400, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-03"},
           {"productId": 22, "productName": "완충재", "shippedQty": 210, "sampleDays": 30,
            "dailyAverage": 7.0, "availableQty": 8, "daysToStockout": 1.1,
-           "lastOrderId": 611, "lastOrderedOn": "2026-07-20", "lastOrderQty": 300},
+           "lastOrderId": 611, "lastOrderedOn": "2026-07-20", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-22"},
           {"productId": 23, "productName": "청 테이프", "shippedQty": 180, "sampleDays": 30,
            "dailyAverage": 6.0, "availableQty": 16, "daysToStockout": 2.7,
-           "lastOrderId": 612, "lastOrderedOn": "2026-07-15", "lastOrderQty": 250},
+           "lastOrderId": 612, "lastOrderedOn": "2026-07-15", "lastOrderQty": 250, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-17"},
           {"productId": 24, "productName": "마스킹테이프", "shippedQty": 90, "sampleDays": 30,
            "dailyAverage": 3.0, "availableQty": 120, "daysToStockout": 40.0,
-           "lastOrderId": 613, "lastOrderedOn": "2026-06-01", "lastOrderQty": 150},
+           "lastOrderId": 613, "lastOrderedOn": "2026-06-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-03"},
           {"productId": 25, "productName": "에어캡", "shippedQty": 45, "sampleDays": 30,
            "dailyAverage": 1.5, "availableQty": 90, "daysToStockout": 60.0,
-           "lastOrderId": 614, "lastOrderedOn": "2026-05-15", "lastOrderQty": 120}
+           "lastOrderId": 614, "lastOrderedOn": "2026-05-15", "lastOrderQty": 120, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-05-17"}
         ]
       }
     },
@@ -216,19 +216,19 @@
         "rows": [
           {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
            "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
-           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-22"},
           {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
            "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
-           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-17"},
           {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
-           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-12"},
           {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
            "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
-           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-03"},
           {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
            "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
-           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-17"}
         ]
       }
     },
@@ -242,19 +242,19 @@
         "rows": [
           {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
            "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
-           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-22"},
           {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
            "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
-           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-17"},
           {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
-           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-12"},
           {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
            "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
-           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-03"},
           {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
            "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
-           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-17"}
         ]
       }
     },
@@ -268,19 +268,19 @@
         "rows": [
           {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
            "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
-           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-22"},
           {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
            "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
-           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-17"},
           {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
            "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
-           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-12"},
           {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
            "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
-           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-07-03"},
           {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
            "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
-           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-06-17"}
         ]
       }
     },
@@ -294,10 +294,10 @@
         "rows": [
           {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
            "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
-           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-22"},
           {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
            "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
-           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100}
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100, "lastOrderStatus": "RECEIVED", "lastOrderReceivedOn": "2026-08-17"}
         ]
       }
     }

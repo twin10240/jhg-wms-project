@@ -1,6 +1,7 @@
 package com.jhg.wms.eval;
 
 import com.jhg.wms.domain.BriefingSnapshot;
+import com.jhg.wms.domain.PurchaseOrderStatus;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -14,10 +15,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GroundingScorerTest {
 
     // 일평균 3.2333, 소진 예상 4.6875, 가용 15, 출고 97, 표본 30일, 직전 발주 #900 · 50개
+    // 입고일은 9월 6일이다 — 날짜는 연·월·일이 각각 토큰으로 정확 집합에 들어가므로 날짜
+    // 하나가 아래 세탁 회귀 테스트의 canary를 조용히 근거 있는 값으로 만든다(3일로 뒀다가
+    // "3"을 기대하는 테스트 둘이 깨졌다). 6일은 표의 어떤 값과도 겹치지 않는다. 같은 이유로
+    // 입고가 논점이 아닌 나머지 픽스처는 미입고(ORDERED·입고일 없음)로 둬 토큰을 안 늘린다.
     private final BriefingSnapshot snapshot = new BriefingSnapshot(
             LocalDate.of(2026, 9, 10),
             List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
-                    900L, LocalDate.of(2026, 9, 1), 50)));
+                    900L, LocalDate.of(2026, 9, 1), 50,
+                    PurchaseOrderStatus.RECEIVED, LocalDate.of(2026, 9, 6))));
 
     @Test
     void 표에_있는_값을_그대로_쓰면_통과한다() {
@@ -68,7 +74,8 @@ class GroundingScorerTest {
         var wholeNumberSnapshot = new BriefingSnapshot(
                 LocalDate.of(2026, 9, 10),
                 List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 8.0, 15, 4.6875,
-                        900L, LocalDate.of(2026, 9, 1), 50)));
+                        900L, LocalDate.of(2026, 9, 1), 50,
+                    PurchaseOrderStatus.ORDERED, null)));
 
         var r = GroundingScorer.score("하루 8개씩 나갑니다.", wholeNumberSnapshot);
 
@@ -169,7 +176,8 @@ class GroundingScorerTest {
         var lastOrderedOn08 = new BriefingSnapshot(
                 LocalDate.of(2026, 9, 10),
                 List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
-                        900L, LocalDate.of(2026, 9, 8), 50)));
+                        900L, LocalDate.of(2026, 9, 8), 50,
+                    PurchaseOrderStatus.ORDERED, null)));
 
         var r = GroundingScorer.score("2026-09-08에 발주했습니다.", lastOrderedOn08);
 
@@ -183,7 +191,8 @@ class GroundingScorerTest {
         var lastOrderedOn08 = new BriefingSnapshot(
                 LocalDate.of(2026, 9, 10),
                 List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
-                        900L, LocalDate.of(2026, 9, 8), 50)));
+                        900L, LocalDate.of(2026, 9, 8), 50,
+                    PurchaseOrderStatus.ORDERED, null)));
 
         var r = GroundingScorer.score("2026-09-05에 발주했습니다.", lastOrderedOn08);
 
@@ -197,7 +206,8 @@ class GroundingScorerTest {
         var qty8Snapshot = new BriefingSnapshot(
                 LocalDate.of(2026, 9, 10),
                 List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 8, 4.6875,
-                        900L, LocalDate.of(2026, 9, 1), 50)));
+                        900L, LocalDate.of(2026, 9, 1), 50,
+                    PurchaseOrderStatus.ORDERED, null)));
 
         var ok = GroundingScorer.score("가용 08개", qty8Snapshot);
         var no = GroundingScorer.score("가용 08개", snapshot); // snapshot의 availableQty는 15
@@ -223,7 +233,8 @@ class GroundingScorerTest {
         var a4Snapshot = new BriefingSnapshot(
                 LocalDate.of(2026, 9, 10),
                 List.of(new BriefingSnapshot.Row(3L, "A4용지", 240, 30L, 8.0, 12, 1.5,
-                        812L, LocalDate.of(2026, 8, 20), 200)));
+                        812L, LocalDate.of(2026, 8, 20), 200,
+                    PurchaseOrderStatus.ORDERED, null)));
 
         var r = GroundingScorer.score("A4용지는 가용이 12개뿐입니다.", a4Snapshot);
 
@@ -241,9 +252,21 @@ class GroundingScorerTest {
         var eightyOneSnapshot = new BriefingSnapshot(
                 LocalDate.of(2026, 9, 10),
                 List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
-                        900L, LocalDate.of(2026, 8, 1), 50)));
+                        900L, LocalDate.of(2026, 8, 1), 50,
+                    PurchaseOrderStatus.ORDERED, null)));
 
         var r = GroundingScorer.score("직전 발주 이후 이미 40일 이상 경과했습니다.", eightyOneSnapshot);
+
+        assertThat(r.ungrounded()).isEmpty();
+    }
+
+    // 측정 3회차 사고 이후 표에 입고일을 추가했다. exactValues()에 넣지 않으면 모델이 방금
+    // 표에서 읽은 입고일("9월 6일")을 그대로 인용해도 근거 없는 숫자로 잡힌다 — 이 변경의
+    // 취지와 정반대다. exactValues()의 lastOrderReceivedOn 추가를 되돌리면 이 테스트가
+    // 실패해야 한다(직접 되돌려 레드를 확인하고 복원함).
+    @Test
+    void 입고일을_인용하면_통과한다() {
+        var r = GroundingScorer.score("9월 6일에 입고했습니다.", snapshot);
 
         assertThat(r.ungrounded()).isEmpty();
     }

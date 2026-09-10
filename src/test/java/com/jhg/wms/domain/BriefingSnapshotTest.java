@@ -47,6 +47,36 @@ class BriefingSnapshotTest {
         assertThat(row.lastOrderedOn()).isNull();
         assertThat(row.lastOrderQty()).isNull();
         assertThat(row.daysToStockout()).isNull();
+        assertThat(row.lastOrderStatus()).isNull();
+        assertThat(row.lastOrderReceivedOn()).isNull();
+    }
+
+    // 측정 3회차 사고: 모델이 "직전 발주가 100개를 받았으나"라며 입고를 단정했다. 표에
+    // 입고 여부가 없어서 벌어진 일이라 상태·입고일이 스냅샷까지 제대로 실려야 한다.
+    @Test
+    void 직전_발주_상태와_입고일을_담는다() {
+        var advice = new ProductAdvice(7L, "G", 60, 30L, 2.0, 20, 5, 15, 1.0,
+                new LastOrder(900L, PurchaseOrderStatus.RECEIVED, LocalDate.of(2026, 9, 1), 50,
+                        LocalDate.of(2026, 9, 3), 2L));
+
+        var row = BriefingSnapshot.of(LocalDate.of(2026, 9, 10), List.of(advice), 5).rows().get(0);
+
+        assertThat(row.lastOrderStatus()).isEqualTo(PurchaseOrderStatus.RECEIVED);
+        assertThat(row.lastOrderReceivedOn()).isEqualTo(LocalDate.of(2026, 9, 3));
+    }
+
+    // 아직 입고되지 않은 발주는 상태만 있고 입고일은 null이다 — 이게 바로 이 변경의 요점이다:
+    // 발주 수량이 있다고 해서 입고를 지어내면 안 된다.
+    @Test
+    void 미입고_발주는_입고일이_null이다() {
+        var advice = new ProductAdvice(7L, "G", 60, 30L, 2.0, 20, 5, 15, 1.0,
+                new LastOrder(900L, PurchaseOrderStatus.ORDERED, LocalDate.of(2026, 9, 1), 50,
+                        null, null));
+
+        var row = BriefingSnapshot.of(LocalDate.of(2026, 9, 10), List.of(advice), 5).rows().get(0);
+
+        assertThat(row.lastOrderStatus()).isEqualTo(PurchaseOrderStatus.ORDERED);
+        assertThat(row.lastOrderReceivedOn()).isNull();
     }
 
     // 두 차례 평가에서 모델이 매번 지어낸 값이 이 경과일이었다 — 표에 없어서 계산했다.
@@ -69,7 +99,8 @@ class BriefingSnapshotTest {
     @Test
     void 당일_발주면_0일이다() {
         var row = new BriefingSnapshot.Row(1L, "A", 60, 30L, 2.0, 15, 1.0,
-                900L, LocalDate.of(2026, 9, 10), 50);
+                900L, LocalDate.of(2026, 9, 10), 50,
+                PurchaseOrderStatus.ORDERED, null);
         var snapshot = new BriefingSnapshot(LocalDate.of(2026, 9, 10), List.of(row));
 
         assertThat(snapshot.daysSinceLastOrder(row)).isEqualTo(0L);

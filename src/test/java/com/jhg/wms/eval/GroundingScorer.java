@@ -174,6 +174,13 @@ public final class GroundingScorer {
                 s.add(String.valueOf(r.lastOrderedOn().getMonthValue()));
                 s.add(String.valueOf(r.lastOrderedOn().getDayOfMonth()));
             }
+            // 입고일도 exactValues에 넣는다 — 안 넣으면 모델이 방금 표에서 읽은 입고일을
+            // 그대로 인용해도 환각으로 잡힌다. 상태(lastOrderStatus)는 숫자가 아니라 넣을 것이 없다.
+            if (r.lastOrderReceivedOn() != null) {
+                s.add(String.valueOf(r.lastOrderReceivedOn().getYear()));
+                s.add(String.valueOf(r.lastOrderReceivedOn().getMonthValue()));
+                s.add(String.valueOf(r.lastOrderReceivedOn().getDayOfMonth()));
+            }
         }
         s.add(String.valueOf(snapshot.generatedOn().getYear()));
         s.add(String.valueOf(snapshot.generatedOn().getMonthValue()));

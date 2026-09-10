@@ -21,11 +21,17 @@ public record BriefingSnapshot(LocalDate generatedOn, List<Row> rows) {
     /**
      * @param daysToStockout 일평균이 0이면 null이다 — 0일이 아니라 잴 것이 없다는 뜻이다.
      *                       {@link ProductAdvice}의 규약을 그대로 잇는다.
+     * @param lastOrderStatus 직전 발주가 없으면 null. 입고 여부를 파생시킬 수 없는 원본 데이터라
+     *                        {@code daysSinceLastOrder}와 달리 접근자가 아니라 실제 필드다 —
+     *                        측정 3회차에서 모델이 "직전 발주 100개를 받았으나"라고 입고를
+     *                        단정한 사고 이후 추가했다. 표에 없으면 모델이 지어낸다.
+     * @param lastOrderReceivedOn 상태가 RECEIVED·PARTIALLY_RECEIVED가 아니면 null(= 미입고).
      */
     public record Row(Long productId, String productName,
                       int shippedQty, long sampleDays, double dailyAverage,
                       int availableQty, Double daysToStockout,
-                      Long lastOrderId, LocalDate lastOrderedOn, Integer lastOrderQty) {}
+                      Long lastOrderId, LocalDate lastOrderedOn, Integer lastOrderQty,
+                      PurchaseOrderStatus lastOrderStatus, LocalDate lastOrderReceivedOn) {}
 
     /** 근거 패널이 이미 소진 임박 순으로 정렬해 주므로 여기서 다시 정렬하지 않는다. */
     public static BriefingSnapshot of(LocalDate generatedOn, List<ProductAdvice> advice, int topN) {
@@ -35,7 +41,9 @@ public record BriefingSnapshot(LocalDate generatedOn, List<Row> rows) {
                 a.availableQty(), a.daysToStockout(),
                 a.lastOrder() == null ? null : a.lastOrder().purchaseOrderId(),
                 a.lastOrder() == null ? null : a.lastOrder().orderedOn(),
-                a.lastOrder() == null ? null : a.lastOrder().quantity())).toList();
+                a.lastOrder() == null ? null : a.lastOrder().quantity(),
+                a.lastOrder() == null ? null : a.lastOrder().status(),
+                a.lastOrder() == null ? null : a.lastOrder().receivedOn())).toList();
         return new BriefingSnapshot(generatedOn, rows);
     }
 
