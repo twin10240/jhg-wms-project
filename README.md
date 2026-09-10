@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/twin10240/jhg-wms-project/actions/workflows/ci.yml/badge.svg)](https://github.com/twin10240/jhg-wms-project/actions/workflows/ci.yml)
 
+<!-- system-integration caller verification -->
+
 **주문 시스템과 창고 시스템을 물리적으로 분리하고, 그 사이에서 재고 정합성을 지키는 WMS입니다.**
 
 주문(OMS)과 재고(WMS)를 별개 애플리케이션·별개 DB로 나누면 "재고가 몇 개인가"라는 질문에 두 개의 답이 생길 위험이 따라옵니다. 이 프로젝트는 **재고의 정본을 WMS 한 곳에 두고**, OMS는 그 재고를 실시간으로 조회·차감하기만 하도록 경계를 그었습니다. 그리고 그 경계 위에서 **예약 모델**(가용 = 실물 − 예약)로 오버셀을 막고, **모든 재고 이동을 원장에 남겨** "이 수량이 왜 이렇게 됐는지"를 역추적할 수 있게 했습니다.
