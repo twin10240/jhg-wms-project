@@ -47,14 +47,29 @@ class BriefingEvalTest {
 
         List<BriefingEvalCase> cases = BriefingEvalCase.loadAll("eval/briefing-cases.json");
         List<BriefingReportWriter.CaseScore> scores = new ArrayList<>();
-        String 실제모델 = MODEL;
+        String 생성모델 = MODEL;
+        String 판정모델 = MODEL;
+        int failedGenerations = 0;
+        int failedJudgeCalls = 0;
+        long inputTokens = 0;
+        long outputTokens = 0;
 
         for (BriefingEvalCase c : cases) {
             // 네거티브는 생성하지 않는다. 본문이 이미 있다.
-            String body = c.isNegative() ? c.body()
-                    : generator.generate(c.snapshot()).map(PurchaseOrderBriefingGenerator.Briefing::body)
-                            .orElse(null);
+            String body;
+            if (c.isNegative()) {
+                body = c.body();
+            } else {
+                Optional<PurchaseOrderBriefingGenerator.Briefing> generated = generator.generate(c.snapshot());
+                body = generated.map(PurchaseOrderBriefingGenerator.Briefing::body).orElse(null);
+                if (generated.isPresent()) {
+                    생성모델 = generated.get().model();
+                    inputTokens += generated.get().inputTokens();
+                    outputTokens += generated.get().outputTokens();
+                }
+            }
             if (body == null) {
+                failedGenerations++;
                 scores.add(new BriefingReportWriter.CaseScore(c.id(), c.isNegative(), 0, List.of(),
                         Map.of(), List.of(), "생성 실패", null));
                 continue;
@@ -71,13 +86,19 @@ class BriefingEvalTest {
                     Optional<BriefingJudge.Verdict> v = judge.judge(body, c.snapshot());
                     if (v.isPresent()) {
                         verdicts.add(v.get().items());
-                        실제모델 = v.get().model();
+                        판정모델 = v.get().model();
+                        inputTokens += v.get().inputTokens();
+                        outputTokens += v.get().outputTokens();
                     }
                 }
+                // 3회 중 몇 번이 실패했는지 표에서 사라지지 않게 여기서 센다.
+                failedJudgeCalls += JUDGE_REPEATS - verdicts.size();
                 List<String> items = c.isNegative() ? List.of(c.failingItem()) : BriefingJudge.ITEMS;
                 for (String item : items) {
                     // 항목 하나 = 값이 YES/NO 둘뿐인 분류. 기존 집계를 그대로 쓴다.
-                    var source = new EvalCase(c.id() + ":" + item, "", "YES", c.note());
+                    // expectedCategory는 toCaseResult의 다수결/흔들림 계산에만 쓰이고 여기선
+                    // 정답 비교를 하지 않으므로, 네거티브의 실제 기대값(NO)을 그대로 맞춰 둔다.
+                    var source = new EvalCase(c.id() + ":" + item, "", c.isNegative() ? "NO" : "YES", c.note());
                     var observations = verdicts.stream()
                             .map(v -> new EvalObservation(source.id(),
                                     Boolean.TRUE.equals(v.get(item)) ? "YES" : "NO",
@@ -96,7 +117,8 @@ class BriefingEvalTest {
                     c.note() == null ? "" : c.note(), body));
         }
 
-        String report = BriefingReportWriter.render(실제모델, JUDGE_REPEATS, scores);
+        String report = BriefingReportWriter.render(생성모델, 판정모델, JUDGE_REPEATS, scores,
+                failedGenerations, failedJudgeCalls, inputTokens, outputTokens);
         Files.createDirectories(REPORT.getParent());
         Files.writeString(REPORT, report);
         System.out.println(report);

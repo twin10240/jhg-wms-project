@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 @SpringBootTest
 @Transactional
@@ -57,6 +60,33 @@ class PurchaseOrderBriefingServiceTest {
 
         assertThat(saved).isFalse();
         assertThat(repository.findFirstByOrderByCreatedAtDesc()).isEmpty();
+    }
+
+    // 생성기 구현체가 예외를 던져도(타임아웃·직렬화 오류 등) 예외가 밖으로 새지 않는다.
+    @Test
+    void 생성기가_예외를_던지면_저장하지_않고_false를_낸다() {
+        var service = service(s -> { throw new RuntimeException("Claude 호출 실패"); });
+
+        boolean saved = service.generateAndSave(LocalDate.of(2026, 9, 10), List.of(advice(1, "볼펜")));
+
+        assertThat(saved).isFalse();
+        assertThat(repository.findFirstByOrderByCreatedAtDesc()).isEmpty();
+    }
+
+    // ClaudePurchaseOrderBriefingGenerator.generate는 내부에서 모든 예외를 삼켜 절대 던지지 않는다.
+    // 그래서 "브리핑이 없어도 발주 업무는 돈다"는 계약이 실제로 기대는 곳은 생성이 아니라
+    // 저장 경로(objectMapper.writeValueAsString / repository.save)다 — 그쪽이 던져도 안전한지 본다.
+    @Test
+    void 저장이_실패해도_예외가_새지_않고_false를_낸다() {
+        var failingRepository = mock(PurchaseOrderBriefingRepository.class);
+        given(failingRepository.save(any())).willThrow(new RuntimeException("DB 연결 끊김"));
+        var service = new PurchaseOrderBriefingService(
+                s -> Optional.of(new PurchaseOrderBriefingGenerator.Briefing("볼펜을 먼저 넣으세요.", "haiku", 400, 90)),
+                failingRepository, objectMapper);
+
+        boolean saved = service.generateAndSave(LocalDate.of(2026, 9, 10), List.of(advice(1, "볼펜")));
+
+        assertThat(saved).isFalse();
     }
 
     // 근거가 아예 없으면 모델을 부르지 않는다 — 부를 이유도 없고 토큰만 쓴다.
