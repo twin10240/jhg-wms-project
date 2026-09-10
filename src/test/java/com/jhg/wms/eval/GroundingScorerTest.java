@@ -69,6 +69,15 @@ class GroundingScorerTest {
         assertThat(no.ungrounded()).containsExactly("901");
     }
 
+    // 일평균 3.2333이 정수 3으로 반올림된다고 해서 "발주 #3"이 통과하면 안 된다 —
+    // 진짜 발주 번호는 900이다. 이게 exact/measures 분리가 막아야 하는 충돌이다.
+    @Test
+    void 발주_번호는_실측치_반올림과_충돌해도_잡는다() {
+        var r = GroundingScorer.score("발주 #3을 참고하세요.", snapshot);
+
+        assertThat(r.ungrounded()).contains("3");
+    }
+
     // 창 길이 30일과 상위 5개는 표에 없지만 환각이 아니다. 화이트리스트로 뺀다.
     // 다만 넓히면 진짜 환각도 통과하므로 이 둘만 둔다.
     @Test
@@ -78,6 +87,15 @@ class GroundingScorerTest {
         assertThat(r.ungrounded()).isEmpty();
     }
 
+    // 화이트리스트는 "상위 5개" 문구에 고정돼야 한다. 맨 숫자 "5"가 아무 데서나
+    // 통과하면 실제 가용 15개인데 "가용 5개"라고 써도 잡지 못한다.
+    @Test
+    void 화이트리스트_숫자는_문구_밖에서는_통과하지_않는다() {
+        var r = GroundingScorer.score("가용 5개입니다.", snapshot);
+
+        assertThat(r.ungrounded()).contains("5");
+    }
+
     @Test
     void 날짜는_표의_날짜와_맞아야_한다() {
         var ok = GroundingScorer.score("9월 1일에 발주했습니다.", snapshot);
@@ -85,6 +103,15 @@ class GroundingScorerTest {
 
         assertThat(ok.ungrounded()).isEmpty();
         assertThat(no.ungrounded()).contains("5");
+    }
+
+    // 출고량이 정수 97이어도 모델이 소수점을 붙여 "97.0"이라고 인용할 수 있다.
+    // 끝의 0을 떼면 정확 집합의 "97"과 같은 값이므로 통과해야 한다.
+    @Test
+    void 끝자리_0을_붙인_정수_인용도_통과한다() {
+        var r = GroundingScorer.score("이번에 97.0개가 나갔습니다.", snapshot);
+
+        assertThat(r.ungrounded()).isEmpty();
     }
 
     @Test
