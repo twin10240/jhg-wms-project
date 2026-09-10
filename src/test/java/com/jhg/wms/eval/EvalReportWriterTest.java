@@ -5,16 +5,20 @@ import com.jhg.wms.domain.ReturnCategory;
 import com.jhg.wms.domain.RmaDisposition;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class EvalReportWriterTest {
 
+    private static final List<String> 범주들 =
+            Arrays.stream(ReturnCategory.values()).map(Enum::name).toList();
+
     private EvalAggregator.CaseResult 결과(String id, ReturnCategory expected, ReturnCategory got) {
-        var c = new EvalCase(id, "사유 " + id, expected, "테스트용");
+        var c = new EvalCase(id, "사유 " + id, expected.name(), "테스트용");
         return EvalAggregator.toCaseResult(c, List.of(
-                new EvalObservation(id, got, Confidence.HIGH, RmaDisposition.DISPOSED, 1000, 40,
+                new EvalObservation(id, got.name(), Confidence.HIGH, RmaDisposition.DISPOSED, 1000, 40,
                         "claude-haiku-4-5-20251001")));
     }
 
@@ -24,7 +28,7 @@ class EvalReportWriterTest {
         var results = List.of(결과("a", ReturnCategory.DAMAGED, ReturnCategory.DAMAGED),
                               결과("b", ReturnCategory.OTHER, ReturnCategory.CHANGED_MIND));
         String report = EvalReportWriter.render(
-                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results));
+                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results, 범주들), 범주들);
 
         assertThat(report)
                 .contains("claude-haiku-4-5-20251001")
@@ -38,7 +42,7 @@ class EvalReportWriterTest {
     void 틀린_케이스를_id와_함께_나열한다() {
         var results = List.of(결과("b", ReturnCategory.OTHER, ReturnCategory.CHANGED_MIND));
         String report = EvalReportWriter.render(
-                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results));
+                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results, 범주들), 범주들);
 
         assertThat(report).contains("b").contains("OTHER").contains("CHANGED_MIND");
     }
@@ -51,16 +55,16 @@ class EvalReportWriterTest {
      */
     @Test
     void 케이스별로_관측_하나하나의_범주_처분_신뢰도를_낸다() {
-        var c = new EvalCase("x", "사유 x", ReturnCategory.DAMAGED, "테스트용");
+        var c = new EvalCase("x", "사유 x", ReturnCategory.DAMAGED.name(), "테스트용");
         var results = List.of(EvalAggregator.toCaseResult(c, List.of(
-                new EvalObservation("x", ReturnCategory.DAMAGED, Confidence.HIGH,
+                new EvalObservation("x", ReturnCategory.DAMAGED.name(), Confidence.HIGH,
                         RmaDisposition.DISPOSED, 100, 10, "claude-haiku-4-5-20251001"),
-                new EvalObservation("x", ReturnCategory.DAMAGED, Confidence.LOW,
+                new EvalObservation("x", ReturnCategory.DAMAGED.name(), Confidence.LOW,
                         RmaDisposition.RESTOCKED, 100, 10, "claude-haiku-4-5-20251001"),
                 EvalObservation.failed("x"))));
 
         String report = EvalReportWriter.render(
-                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results));
+                "claude-haiku-4-5-20251001", 3, results, EvalAggregator.summarize(results, 범주들), 범주들);
 
         assertThat(report).contains("케이스별 관측");
         String 절 = report.substring(report.indexOf("케이스별 관측"));
