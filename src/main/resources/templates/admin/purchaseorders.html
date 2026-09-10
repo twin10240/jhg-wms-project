@@ -28,6 +28,27 @@
     </p>
   </section>
 
+  <!-- 발주 브리핑. 근거 패널 상위 5개를 모델이 읽어 요약한 문단이다. 키가 없으면
+       버튼째 렌더하지 않는다(눌러도 안 되는 버튼을 보여주는 것보다 낫다) — ai-hint와
+       같은 계열이다: 원장 실측(.advice)이 아니라 모델이 낸 값이라 "참고" 태그를 단다. -->
+  <section class="ai-hint" th:if="${briefingEnabled}">
+    <h3>발주 브리핑 <span class="ai-hint__tag">참고</span></h3>
+    <form th:action="@{/admin/purchase-orders/briefing}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <button type="submit">브리핑 받기</button>
+    </form>
+    <div th:if="${briefing != null}">
+      <p th:text="${briefing.body}"></p>
+      <p class="ai-hint__note">
+        <span th:text="${briefing.model}">claude</span> ·
+        <span th:text="${#temporals.format(briefing.createdAt, 'yyyy-MM-dd HH:mm')}">—</span>
+      </p>
+    </div>
+    <p class="ai-hint__note">
+      위 표 상위 5개를 읽어 요약합니다. 참고용이며 발주 내용에 영향을 주지 않습니다.
+    </p>
+  </section>
+
   <h3 sec:authorize="hasRole('MANAGER')">발주 생성</h3>
   <form sec:authorize="hasRole('MANAGER')" th:action="@{/admin/purchase-orders}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

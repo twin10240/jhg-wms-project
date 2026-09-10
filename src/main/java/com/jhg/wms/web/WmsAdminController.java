@@ -4,6 +4,7 @@ import com.jhg.wms.domain.*;
 import com.jhg.wms.service.CycleCountService;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderAdviceService;
+import com.jhg.wms.service.PurchaseOrderBriefingService;
 import com.jhg.wms.service.PurchaseOrderMemoClassificationService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.PurchaseOrderService.PurchaseOrderLine;
@@ -12,6 +13,7 @@ import com.jhg.wms.service.ReturnAnalyticsService;
 import com.jhg.wms.service.RmaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -31,11 +33,20 @@ public class WmsAdminController {
     private final InventoryService inventoryService;
     private final PurchaseOrderService purchaseOrderService;
     private final PurchaseOrderAdviceService purchaseOrderAdviceService;
+    private final PurchaseOrderBriefingService purchaseOrderBriefingService;
     private final PurchaseOrderMemoClassificationService memoClassificationService;
     private final ReplenishmentRequestService replenishmentRequestService;
     private final RmaService rmaService;
     private final CycleCountService cycleCountService;
     private final ReturnAnalyticsService returnAnalyticsService;
+
+    // 키가 없으면 버튼을 아예 그리지 않는다 — 눌러도 안 되는 버튼을 보여주는 것보다 낫다.
+    @Value("${wms.ai.api-key:}")
+    private String aiApiKey;
+
+    private boolean isBriefingEnabled() {
+        return aiApiKey != null && !aiApiKey.isBlank();
+    }
 
     @GetMapping("/")
     public String dashboard(Model model) {
@@ -252,6 +263,8 @@ public class WmsAdminController {
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         // 근거 패널은 이미 올려둔 재고 행·발주 전건을 그대로 쓴다(상태 필터 전 목록이어야 한다).
         model.addAttribute("advice", purchaseOrderAdviceService.advise(LocalDate.now(), rows, allPos));
+        model.addAttribute("briefing", purchaseOrderBriefingService.findLatest().orElse(null));
+        model.addAttribute("briefingEnabled", isBriefingEnabled());
         return "admin/purchaseorders";
     }
 
@@ -265,6 +278,24 @@ public class WmsAdminController {
             ra.addFlashAttribute("successMessage", "발주 생성 완료. (발주 #" + poId + ")");
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/admin/purchase-orders";
+    }
+
+    /**
+     * 브리핑 생성. 근거는 GET 핸들러와 같은 방식으로 다시 만든다 —
+     * 리다이렉트 뒤의 GET이 최신 재고로 패널을 다시 그리므로 여기서 캐시할 것이 없다.
+     */
+    @PostMapping("/admin/purchase-orders/briefing")
+    public String generateBriefing(RedirectAttributes ra) {
+        List<InventoryRowResponse> rows = inventoryService.findAllRows();
+        var advice = purchaseOrderAdviceService.advise(
+                LocalDate.now(), rows, purchaseOrderService.findAllWithItems());
+
+        if (purchaseOrderBriefingService.generateAndSave(LocalDate.now(), advice)) {
+            ra.addFlashAttribute("successMessage", "브리핑을 만들었습니다.");
+        } else {
+            ra.addFlashAttribute("errorMessage", "브리핑을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");
         }
         return "redirect:/admin/purchase-orders";
     }
