@@ -144,4 +144,20 @@ class EvalAggregatorTest {
         assertThat(summary.inputTokens()).isEqualTo(2000);
         assertThat(summary.outputTokens()).isEqualTo(80);
     }
+
+    // 처분 없는 평가(발주 메모)의 관측은 disposition이 null이다. 맵에 null 키로 들어가면
+    // 리포트의 "처분 절을 내지 않는다" 가드(비어 있는가)가 뚫려 `null` 분포가 찍힌다.
+    @Test
+    void 처분이_없는_관측은_처분_분포에_들어가지_않는다() {
+        var result = EvalAggregator.toCaseResult(
+                케이스("d", ReturnCategory.DAMAGED),
+                List.of(관측("d", ReturnCategory.DAMAGED, Confidence.HIGH, null),
+                        관측("d", ReturnCategory.DAMAGED, Confidence.HIGH, null),
+                        관측("d", ReturnCategory.DAMAGED, Confidence.HIGH, null)));
+
+        var summary = EvalAggregator.summarize(List.of(result), 범주들);
+
+        assertThat(summary.dispositionByCategory()).isEmpty();
+        assertThat(summary.confidenceDistribution()).containsEntry(Confidence.HIGH, 3);
+    }
 }

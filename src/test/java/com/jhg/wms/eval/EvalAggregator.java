@@ -70,8 +70,11 @@ public final class EvalAggregator {
                 if (!o.succeeded()) { failed++; continue; }
                 in += o.inputTokens();
                 out += o.outputTokens();
-                byCategory.computeIfAbsent(o.category(), k -> new LinkedHashMap<>())
-                        .merge(o.disposition(), 1, Integer::sum);
+                // 처분이 없는 평가(발주 메모)는 여기 넣지 않는다 — null을 키로 넣으면 맵이
+                // 비지 않아 리포트가 처분 절을 `null` 분포로 찍는다.
+                if (o.disposition() != null)
+                    byCategory.computeIfAbsent(o.category(), k -> new LinkedHashMap<>())
+                            .merge(o.disposition(), 1, Integer::sum);
                 confAll.merge(o.confidence(), 1, Integer::sum);
                 if (r.unstable()) confUnstable.merge(o.confidence(), 1, Integer::sum);
             }
