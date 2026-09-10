@@ -55,8 +55,8 @@ class BriefingEvalTest {
                     : generator.generate(c.snapshot()).map(PurchaseOrderBriefingGenerator.Briefing::body)
                             .orElse(null);
             if (body == null) {
-                scores.add(new BriefingReportWriter.CaseScore(c.id(), c.isNegative(), 0, 0,
-                        Map.of(), List.of(), "생성 실패"));
+                scores.add(new BriefingReportWriter.CaseScore(c.id(), c.isNegative(), 0, List.of(),
+                        Map.of(), List.of(), "생성 실패", null));
                 continue;
             }
 
@@ -92,8 +92,8 @@ class BriefingEvalTest {
             }
 
             scores.add(new BriefingReportWriter.CaseScore(c.id(), c.isNegative(),
-                    grounding.total(), grounding.ungrounded().size(), majority, unstable,
-                    c.note() == null ? "" : c.note()));
+                    grounding.total(), grounding.ungrounded(), majority, unstable,
+                    c.note() == null ? "" : c.note(), body));
         }
 
         String report = BriefingReportWriter.render(실제모델, JUDGE_REPEATS, scores);
