@@ -69,6 +69,10 @@ wms:
     model: ${WMS_AI_MODEL:claude-haiku-4-5}
     max-tokens: 1024
     timeout: 20s
+    # 브리핑은 문단이라 출력 토큰이 분류(약 120)보다 훨씬 크고, 사용자가 화면에서 기다린다.
+    # 분류 값을 그대로 쓰면 문단이 중간에서 잘린다.
+    briefing-max-tokens: 2048
+    briefing-timeout: 60s
 
 ---
 # 스키마 리셋용: --spring.profiles.active=local

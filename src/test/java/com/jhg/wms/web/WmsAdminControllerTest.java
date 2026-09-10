@@ -5,6 +5,7 @@ import com.jhg.wms.config.SecurityConfig;
 import com.jhg.wms.domain.*;
 import com.jhg.wms.service.InventoryService;
 import com.jhg.wms.service.PurchaseOrderAdviceService;
+import com.jhg.wms.service.PurchaseOrderBriefingService;
 import com.jhg.wms.service.PurchaseOrderMemoClassificationService;
 import com.jhg.wms.service.PurchaseOrderService;
 import com.jhg.wms.service.ReplenishmentRequestService;
@@ -57,6 +58,7 @@ class WmsAdminControllerTest {
     @MockitoBean InventoryService inventoryService;
     @MockitoBean PurchaseOrderService purchaseOrderService;
     @MockitoBean PurchaseOrderAdviceService purchaseOrderAdviceService;
+    @MockitoBean PurchaseOrderBriefingService purchaseOrderBriefingService;
     @MockitoBean PurchaseOrderMemoClassificationService memoClassificationService;
     @MockitoBean ReplenishmentRequestService replenishmentRequestService;
     @MockitoBean RmaService rmaService;

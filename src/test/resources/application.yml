@@ -84,3 +84,7 @@ wms:
     model: claude-haiku-4-5
     max-tokens: 1024
     timeout: 20s
+    # api-key가 비어 있어 실제로 쓰이진 않지만, 이 파일이 main의 wms.ai를 통째로 덮으므로
+    # briefing 전용 키도 여기 없으면 빈 생성 시 플레이스홀더 해석에서 컨텍스트 로딩이 실패한다.
+    briefing-max-tokens: 2048
+    briefing-timeout: 60s
