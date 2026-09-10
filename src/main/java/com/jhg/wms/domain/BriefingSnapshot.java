@@ -3,6 +3,7 @@ package com.jhg.wms.domain;
 import com.jhg.wms.service.PurchaseOrderAdviceService.ProductAdvice;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -36,5 +37,13 @@ public record BriefingSnapshot(LocalDate generatedOn, List<Row> rows) {
                 a.lastOrder() == null ? null : a.lastOrder().orderedOn(),
                 a.lastOrder() == null ? null : a.lastOrder().quantity())).toList();
         return new BriefingSnapshot(generatedOn, rows);
+    }
+
+    /**
+     * 직전 발주 이후 경과일. 회귀 평가 두 차례에서 모델이 매번 지어낸 값이 정확히 이것이었다
+     * — 표에 없어서 계산했다. 저장 필드가 아니라 파생 접근자인 이유는 클래스 javadoc 참조.
+     */
+    public Long daysSinceLastOrder(Row r) {
+        return r.lastOrderedOn() == null ? null : ChronoUnit.DAYS.between(r.lastOrderedOn(), generatedOn());
     }
 }

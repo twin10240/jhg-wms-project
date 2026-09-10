@@ -166,6 +166,8 @@ public final class GroundingScorer {
             s.add(String.valueOf(r.availableQty()));
             if (r.lastOrderId() != null) s.add(String.valueOf(r.lastOrderId()));
             if (r.lastOrderQty() != null) s.add(String.valueOf(r.lastOrderQty()));
+            Long daysSinceLastOrder = snapshot.daysSinceLastOrder(r);
+            if (daysSinceLastOrder != null) s.add(String.valueOf(daysSinceLastOrder));
             if (r.lastOrderedOn() != null) {
                 s.add(String.valueOf(r.lastOrderedOn().getYear()));
                 s.add(String.valueOf(r.lastOrderedOn().getMonthValue()));

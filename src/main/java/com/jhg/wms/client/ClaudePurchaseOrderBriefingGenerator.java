@@ -83,7 +83,8 @@ public class ClaudePurchaseOrderBriefingGenerator implements PurchaseOrderBriefi
               .append("\n");
             sb.append("  직전 발주: ")
               .append(r.lastOrderId() == null ? "없음"
-                      : "#" + r.lastOrderId() + " " + r.lastOrderedOn() + " " + r.lastOrderQty() + "개")
+                      : "#" + r.lastOrderId() + " " + r.lastOrderedOn() + " " + r.lastOrderQty() + "개"
+                        + " (" + snapshot.daysSinceLastOrder(r) + "일 전)")
               .append("\n\n");
         }
         return sb.toString().trim();
