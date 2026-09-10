@@ -1,5 +1,6 @@
 package com.jhg.wms.eval;
 
+import com.jhg.wms.domain.PurchaseOrderStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -52,5 +53,19 @@ class BriefingEvalCaseLoadTest {
                 .distinct().toList();
 
         assertThat(urgentCounts).hasSizeGreaterThan(2);
+    }
+
+    // 입고되지 않은 발주(ORDERED·CANCELLED)에 입고일이 남아 있으면 "미입고인데 입고일이
+    // 있다"는 모순이 조용히 평가셋에 들어간다 — 이 필드를 추가한 이유 자체를 스스로 어기는
+    // 셈이다. 나중에 케이스를 추가·수정할 때 이 모순을 컴파일이 아니라 테스트가 잡는다.
+    @Test
+    void 미입고_상태면_입고일이_없다() {
+        assertThat(cases.stream().flatMap(c -> c.snapshot().rows().stream())
+                .filter(r -> r.lastOrderStatus() != null))
+                .allSatisfy(r -> {
+                    boolean receivedType = r.lastOrderStatus() == PurchaseOrderStatus.RECEIVED
+                            || r.lastOrderStatus() == PurchaseOrderStatus.PARTIALLY_RECEIVED;
+                    if (!receivedType) assertThat(r.lastOrderReceivedOn()).isNull();
+                });
     }
 }

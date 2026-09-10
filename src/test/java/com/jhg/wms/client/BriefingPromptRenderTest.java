@@ -1,6 +1,7 @@
 package com.jhg.wms.client;
 
 import com.jhg.wms.domain.BriefingSnapshot;
+import com.jhg.wms.domain.PurchaseOrderStatus;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -15,7 +16,9 @@ class BriefingPromptRenderTest {
 
     private BriefingSnapshot.Row row(long id, String name, Double days, Long lastId) {
         return new BriefingSnapshot.Row(id, name, 60, 30L, 2.0, 15, days,
-                lastId, lastId == null ? null : LocalDate.of(2026, 9, 1), lastId == null ? null : 50);
+                lastId, lastId == null ? null : LocalDate.of(2026, 9, 1), lastId == null ? null : 50,
+                lastId == null ? null : PurchaseOrderStatus.RECEIVED,
+                lastId == null ? null : LocalDate.of(2026, 9, 3));
     }
 
     @Test
@@ -40,19 +43,37 @@ class BriefingPromptRenderTest {
     // 여기와 채점기가 어긋나면 정상 인용이 환각으로 잡힌다.
     // 두 차례 평가에서 모델이 이 경과일을 지어냈다 — 이제 표에 직접 준다. 렌더 형식을 고정한다.
     @Test
-    void 직전_발주_줄에_경과일을_보여준다() {
+    void 직전_발주_줄에_경과일과_입고_완료를_보여준다() {
         var r = new BriefingSnapshot.Row(1L, "A4용지", 240, 30L, 8.0, 12, 1.5,
-                812L, LocalDate.of(2026, 8, 20), 200);
+                812L, LocalDate.of(2026, 8, 20), 200,
+                PurchaseOrderStatus.RECEIVED, LocalDate.of(2026, 8, 22));
 
         String rendered = ClaudePurchaseOrderBriefingGenerator.renderInput(
                 new BriefingSnapshot(LocalDate.of(2026, 9, 10), List.of(r)));
 
-        assertThat(rendered).contains("직전 발주: #812 2026-08-20 200개 (21일 전)");
+        assertThat(rendered).contains(
+                "직전 발주: #812 2026-08-20 200개 (21일 전, 입고 완료(2026-08-22))");
+    }
+
+    // 측정 3회차 사고: 모델이 미입고 발주를 "받았다"고 단정했다. 표가 상태를 "아직
+    // 입고되지 않음"이라고 명시해야 그 단정이 재발하지 않는다 — 이 변경의 요점.
+    @Test
+    void 직전_발주_줄에_미입고를_명확히_보여준다() {
+        var r = new BriefingSnapshot.Row(1L, "A4용지", 240, 30L, 8.0, 12, 1.5,
+                812L, LocalDate.of(2026, 8, 20), 200,
+                PurchaseOrderStatus.ORDERED, null);
+
+        String rendered = ClaudePurchaseOrderBriefingGenerator.renderInput(
+                new BriefingSnapshot(LocalDate.of(2026, 9, 10), List.of(r)));
+
+        assertThat(rendered).contains(
+                "직전 발주: #812 2026-08-20 200개 (21일 전, 아직 입고되지 않음)");
     }
 
     @Test
     void 일평균은_소수_한_자리로_쓴다() {
-        var r = new BriefingSnapshot.Row(3L, "테이프", 97, 30L, 3.2333, 10, 3.09, null, null, null);
+        var r = new BriefingSnapshot.Row(3L, "테이프", 97, 30L, 3.2333, 10, 3.09, null, null, null,
+                null, null);
 
         String rendered = ClaudePurchaseOrderBriefingGenerator.renderInput(
                 new BriefingSnapshot(LocalDate.of(2026, 9, 10), List.of(r)));
