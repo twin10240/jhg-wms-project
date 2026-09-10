@@ -126,7 +126,33 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 
 로그인 페이지는 `http://localhost:8081/login`. 운영에서는 셋 다 환경변수로 주입하며, 비어 있으면 기동이 실패합니다(fail-fast).
 
-## 운영 배포 (Railway)
+## 운영 배포
+
+두 경로가 있습니다. **Railway는 중단 상태**이고, 현재 공개 데모는 **개발 머신 + 터널**로 띄웁니다.
+
+### 현재: 개발 머신 공개 데모 (docker compose + Tailscale Funnel)
+
+아래 [로드밸런싱 데모](#로컬-로드밸런싱-데모-docker-compose) 스택을 그대로 공개합니다.
+단일 인스턴스가 아니라 **nginx + 인스턴스 3개 구성이 공개 주소에서 그대로 도는 것**이 이 방식의 이유입니다.
+
+```bash
+colima start --cpu 4 --memory 6     # 컨테이너 런타임(Docker Desktop 대신)
+docker compose up -d --build
+tailscale funnel --bg 8090          # → https://<머신>.<tailnet>.ts.net
+tailscale funnel --https=443 off    # 공개 중지
+```
+
+- **자격증명은 `.env`로 준다**(`.gitignore` 대상). `PGPASSWORD`, `WMS_BASIC_USER`/`_PASSWORD`,
+  `WMS_OPERATOR_USER`/`_PASSWORD`, `WMS_MANAGER_USER`/`_PASSWORD`, `OMS_CALLBACK_USER`/`_PASSWORD`.
+  **`.env` 없이 공개하면 compose 기본값(`wms/wms`·`operator/operator`)이 그대로 공개 계정이 됩니다.**
+- **포트는 `NGINX_PORT`(기본 8090)**. 로컬에서 OMS(8080)·WMS 단독 기동(8081)이 이미 쓰고 있어 비켜 둡니다.
+- **TLS를 끊는 프록시가 앞에 서므로** `prod`는 `server.forward-headers-strategy: framework`,
+  nginx는 들어온 `X-Forwarded-Proto`를 덮어쓰지 않고 통과시킵니다. 없으면 폼 로그인 리다이렉트가
+  `http://`로 나가 **공개 주소에서만** 깨집니다(로컬에선 재현되지 않습니다).
+- **머신이 잠들거나 꺼지면 링크도 죽습니다.** 재부팅 후 자동 기동은 걸려 있지 않습니다.
+- DB는 compose의 Postgres **컨테이너 볼륨**이라 로컬 개발 DB(`wms`)와 분리됩니다.
+
+### 과거: Railway
 
 > 배포 설정과 과거 운영 검증 기록은 보존돼 있지만 **현재 Railway 서비스는 중단 상태**입니다.
 
@@ -661,10 +687,11 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 ## 로컬 로드밸런싱 데모 (docker-compose)
 
 WMS 웹 티어를 3개 인스턴스로 수평 확장하고 Nginx로 분산하는 로컬 데모입니다.
-**Railway 배포 경로와 무관** — `railway.json`은 `Dockerfile` 하나만 쓰므로 `docker-compose.yml`·`nginx/`는 무시됩니다.
+**Railway 배포 경로와는 무관합니다** — `railway.json`은 `Dockerfile` 하나만 쓰므로 `docker-compose.yml`·`nginx/`를 무시합니다.
+반면 **현재 공개 데모는 이 스택을 그대로 씁니다**(위 [운영 배포](#운영-배포)).
 
 ```
-  요청 → nginx(:8080) → wms1/wms2/wms3(:8081) → postgres(공유 DB)
+  요청 → nginx(:8090) → wms1/wms2/wms3(:8081) → postgres(공유 DB)
                                               → redis(공유 세션 · 분산 락)
 ```
 
@@ -672,9 +699,12 @@ WMS 웹 티어를 3개 인스턴스로 수평 확장하고 Nginx로 분산하는
 
 ```bash
 docker compose up --build      # 6개 컨테이너: postgres, redis, wms1~3, nginx
-# 접속: http://localhost:8080  (폼 로그인: operator/operator 또는 manager/manager)
+# 접속: http://localhost:8090  (폼 로그인 기본값: operator/operator 또는 manager/manager)
 docker compose down            # 정리
 ```
+
+포트는 `NGINX_PORT`로 바꿉니다(기본 8090 — 로컬 OMS가 8080, WMS 단독 기동이 8081을 씁니다).
+계정·비밀번호는 `.env`로 덮습니다. **공개 주소에 붙일 때는 `.env`가 필수**입니다(위 [운영 배포](#운영-배포) 참조).
 
 ### 핵심 설계 — 수평 확장을 막는 상태(state) 2곳을 제거
 
@@ -692,7 +722,7 @@ docker compose down            # 정리
 
 ```bash
 # ① 로드밸런싱 — 매 요청 처리 인스턴스를 X-Served-By 헤더로 확인
-curl -s -u wms:wms -D - -o /dev/null http://localhost:8080/api/inventory/rows | grep -i X-Served-By
+curl -s -u wms:wms -D - -o /dev/null http://localhost:8090/api/inventory/rows | grep -i X-Served-By
 
 # ② 분산 락 — 정확히 1개 인스턴스만 시딩, 나머지는 skip
 docker compose logs wms1 wms2 wms3 | grep -E "시드 완료|시딩 skip"
