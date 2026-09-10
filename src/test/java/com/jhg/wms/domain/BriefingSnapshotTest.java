@@ -48,4 +48,30 @@ class BriefingSnapshotTest {
         assertThat(row.lastOrderQty()).isNull();
         assertThat(row.daysToStockout()).isNull();
     }
+
+    // 두 차례 평가에서 모델이 매번 지어낸 값이 이 경과일이었다 — 표에 없어서 계산했다.
+    // 이제 표에 값을 주므로 직접 계산해서 맞는지 검증한다.
+    @Test
+    void 직전_발주_이후_경과일을_계산한다() {
+        var snapshot = BriefingSnapshot.of(LocalDate.of(2026, 9, 10), List.of(advice(1, "A", 1.0)), 1);
+
+        assertThat(snapshot.daysSinceLastOrder(snapshot.rows().get(0))).isEqualTo(9L);
+    }
+
+    @Test
+    void 직전_발주가_없으면_경과일도_null이다() {
+        var noLast = new ProductAdvice(7L, "G", 0, 5L, 0.0, 3, 0, 3, null, null);
+        var snapshot = BriefingSnapshot.of(LocalDate.of(2026, 9, 10), List.of(noLast), 1);
+
+        assertThat(snapshot.daysSinceLastOrder(snapshot.rows().get(0))).isNull();
+    }
+
+    @Test
+    void 당일_발주면_0일이다() {
+        var row = new BriefingSnapshot.Row(1L, "A", 60, 30L, 2.0, 15, 1.0,
+                900L, LocalDate.of(2026, 9, 10), 50);
+        var snapshot = new BriefingSnapshot(LocalDate.of(2026, 9, 10), List.of(row));
+
+        assertThat(snapshot.daysSinceLastOrder(row)).isEqualTo(0L);
+    }
 }

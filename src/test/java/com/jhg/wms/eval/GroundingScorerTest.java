@@ -207,6 +207,23 @@ class GroundingScorerTest {
         assertThat(r.total()).isEqualTo(1);
     }
 
+    // 두 차례 평가에서 모델이 지어낸 값이 경과일이었다("직전 발주가 8월 1일이었으므로 이미
+    // 40일 이상 경과했으며"). 이제 렌더가 표에 직접 주므로(renderInput의 "(N일 전)") 그
+    // 값을 인용하면 환각이 아니라 정상 인용이어야 한다. 다른 필드 값(7·97·30·15·900·50·
+    // 8·1·2026·9·10)과 겹치지 않는 40을 골라 exactValues()의 추가 없이는 반드시 잡히게
+    // 했다 — exactValues()에서 이 추가를 되돌리면 이 테스트가 실패해야 한다.
+    @Test
+    void 직전_발주_경과일을_인용하면_통과한다() {
+        var eightyOneSnapshot = new BriefingSnapshot(
+                LocalDate.of(2026, 9, 10),
+                List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
+                        900L, LocalDate.of(2026, 8, 1), 50)));
+
+        var r = GroundingScorer.score("직전 발주 이후 이미 40일 이상 경과했습니다.", eightyOneSnapshot);
+
+        assertThat(r.ungrounded()).isEmpty();
+    }
+
     @Test
     void 숫자가_하나도_없으면_total이_0이고_clean이다() {
         var r = GroundingScorer.score("지금 급한 상품은 없습니다.", snapshot);

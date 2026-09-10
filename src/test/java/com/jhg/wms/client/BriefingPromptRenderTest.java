@@ -38,6 +38,18 @@ class BriefingPromptRenderTest {
 
     // 일평균은 소수 1자리로 고정한다. 렌더가 3.2를 주면 채점기의 근거 집합도 3.2 기준이 된다 —
     // 여기와 채점기가 어긋나면 정상 인용이 환각으로 잡힌다.
+    // 두 차례 평가에서 모델이 이 경과일을 지어냈다 — 이제 표에 직접 준다. 렌더 형식을 고정한다.
+    @Test
+    void 직전_발주_줄에_경과일을_보여준다() {
+        var r = new BriefingSnapshot.Row(1L, "A4용지", 240, 30L, 8.0, 12, 1.5,
+                812L, LocalDate.of(2026, 8, 20), 200);
+
+        String rendered = ClaudePurchaseOrderBriefingGenerator.renderInput(
+                new BriefingSnapshot(LocalDate.of(2026, 9, 10), List.of(r)));
+
+        assertThat(rendered).contains("직전 발주: #812 2026-08-20 200개 (21일 전)");
+    }
+
     @Test
     void 일평균은_소수_한_자리로_쓴다() {
         var r = new BriefingSnapshot.Row(3L, "테이프", 97, 30L, 3.2333, 10, 3.09, null, null, null);
