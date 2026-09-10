@@ -15,9 +15,9 @@ class BriefingEvalCaseLoadTest {
     private final List<BriefingEvalCase> cases = BriefingEvalCase.loadAll("eval/briefing-cases.json");
 
     @Test
-    void 정상_여덟_건과_네거티브_네_건이다() {
+    void 정상_여덟_건과_네거티브_다섯_건이다() {
         assertThat(cases.stream().filter(c -> !c.isNegative())).hasSize(8);
-        assertThat(cases.stream().filter(BriefingEvalCase::isNegative)).hasSize(4);
+        assertThat(cases.stream().filter(BriefingEvalCase::isNegative)).hasSize(5);
     }
 
     @Test

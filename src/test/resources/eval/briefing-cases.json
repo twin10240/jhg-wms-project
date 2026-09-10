@@ -283,6 +283,23 @@
            "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
         ]
       }
+    },
+    {
+      "id": "neg-crossrow",
+      "failingItem": "GROUNDING",
+      "note": "A4용지(실제 가용 12개)를 설명하면서 가용 수량만 옆 행인 테이프의 60개로 바꿔치기했다 — 값 자체는 스냅샷에 실재하므로(테이프의 것) exactValues()의 평평한 집합에 걸려 그대로 통과한다. 나머지 숫자(8.0, #812, 8월 20일, 200개, 테이프의 3.2)는 각자 원래 행의 값이라 정상이다. GroundingScorer는 어느 숫자가 어느 상품 행에 속했는지 보지 않으므로 이 건을 ungrounded로 잡지 못할 것으로 예상한다 — 그것이 이 케이스가 측정하려는 사각지대다.",
+      "body": "A4용지는 최근 30일 평균 8.0개씩 나가지만 가용이 60개나 있어 당장 발주하지 않아도 됩니다. 직전 발주(#812)는 8월 20일에 200개였습니다. 테이프는 평균 3.2개씩 나가고 있어 함께 살펴볼 필요가 있습니다.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
+           "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+          {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
+           "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100}
+        ]
+      }
     }
   ]
 }
