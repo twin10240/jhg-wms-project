@@ -1,0 +1,50 @@
+name: WMS system integration
+run-name: WMS system integration · ${{ github.event.pull_request.number || github.event_name }}
+
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: wms-system-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+      - name: Check caller behavior
+        run: node --test .github/scripts/system-integration.test.mjs
+      - name: Request system test and report on the original PR commit
+        id: integration
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SYSTEM_TESTS_TOKEN: ${{ secrets.SYSTEM_TESTS_TOKEN }}
+        run: node .github/scripts/system-integration.mjs
+      - name: Report orchestration error or cancellation
+        if: always() && steps.integration.outputs.reported != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          CALLER_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --method POST "repos/twin10240/jhg-wms-project/statuses/$SHA" \
+            -f state=error -f context=system-integration/wms \
+            -f 'description=System test orchestration failed or was cancelled' -f "target_url=$CALLER_URL"
