@@ -149,7 +149,17 @@ tailscale funnel --https=443 off    # 공개 중지
 - **TLS를 끊는 프록시가 앞에 서므로** `prod`는 `server.forward-headers-strategy: framework`,
   nginx는 들어온 `X-Forwarded-Proto`를 덮어쓰지 않고 통과시킵니다. 없으면 폼 로그인 리다이렉트가
   `http://`로 나가 **공개 주소에서만** 깨집니다(로컬에선 재현되지 않습니다).
-- **머신이 잠들거나 꺼지면 링크도 죽습니다.** 재부팅 후 자동 기동은 걸려 있지 않습니다.
+- **공개용 데모 계정은 권한이 낮은 `OPERATOR`로 만듭니다**(`.env`의 `WMS_OPERATOR_*`).
+  승인·취소·완료 같은 상태 변경은 `MANAGER` 전용이라(`SecurityConfig`), 데모 계정으로는 열람과
+  기본 조작만 됩니다. `MANAGER` 비밀번호는 공개하지 않습니다.
+- **AI 기능(반품 분류·발주 메모 분류·발주 브리핑)은 공개 스택에서 꺼져 있습니다.**
+  compose가 `ANTHROPIC_API_KEY`를 컨테이너에 주지 않아 `wms.ai.api-key`가 비고, 그러면 분류·브리핑만
+  비활성인 채로 기동합니다(창고 업무는 그대로 돕니다 — `AiConfig`). **공개 주소에서는 방문자의
+  클릭마다 실비가 나가기 때문에 의도적으로 끕니다.** 세 기능은 로컬 실행에서 키를 주고 확인합니다.
+- **자동 기동**: `brew services start colima`(로그인 시 런타임 기동) + compose 전 서비스의
+  `restart: unless-stopped`. 런타임이 뜨면 컨테이너 6개가 스스로 복귀합니다.
+  Funnel 설정은 tailscaled에 저장돼 데몬이 다시 뜰 때 복원됩니다.
+  **다만 머신이 잠들거나 꺼져 있는 동안은 링크도 죽습니다.**
 - DB는 compose의 Postgres **컨테이너 볼륨**이라 로컬 개발 DB(`wms`)와 분리됩니다.
 
 ### 과거: Railway
