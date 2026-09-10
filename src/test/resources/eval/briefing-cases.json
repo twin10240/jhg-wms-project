@@ -1,0 +1,288 @@
+{
+  "cases": [
+    {
+      "id": "pos-01",
+      "note": "소진 임박이 뚜렷한 상품 하나(A4용지) + 여유 있는 넷. A4용지의 dailyAverage가 정수 8.0 — GroundingScorer의 정수 실측치 예외를 실제 평가셋에서도 덮는다.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
+           "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+          {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
+           "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+          {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+          {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+          {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
+           "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+        ]
+      }
+    },
+    {
+      "id": "pos-02",
+      "note": "소진 임박이 셋(박스·완충재·청 테이프) — 그중에서도 우선순위를 정해야 하는 모양. 나머지 둘은 여유 있음.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 21, "productName": "박스", "shippedQty": 300, "sampleDays": 30,
+           "dailyAverage": 10.0, "availableQty": 5, "daysToStockout": 0.5,
+           "lastOrderId": 610, "lastOrderedOn": "2026-08-01", "lastOrderQty": 400},
+          {"productId": 22, "productName": "완충재", "shippedQty": 210, "sampleDays": 30,
+           "dailyAverage": 7.0, "availableQty": 8, "daysToStockout": 1.1,
+           "lastOrderId": 611, "lastOrderedOn": "2026-07-20", "lastOrderQty": 300},
+          {"productId": 23, "productName": "청 테이프", "shippedQty": 180, "sampleDays": 30,
+           "dailyAverage": 6.0, "availableQty": 16, "daysToStockout": 2.7,
+           "lastOrderId": 612, "lastOrderedOn": "2026-07-15", "lastOrderQty": 250},
+          {"productId": 24, "productName": "마스킹테이프", "shippedQty": 90, "sampleDays": 30,
+           "dailyAverage": 3.0, "availableQty": 120, "daysToStockout": 40.0,
+           "lastOrderId": 613, "lastOrderedOn": "2026-06-01", "lastOrderQty": 150},
+          {"productId": 25, "productName": "에어캡", "shippedQty": 45, "sampleDays": 30,
+           "dailyAverage": 1.5, "availableQty": 90, "daysToStockout": 60.0,
+           "lastOrderId": 614, "lastOrderedOn": "2026-05-15", "lastOrderQty": 120}
+        ]
+      }
+    },
+    {
+      "id": "pos-03",
+      "note": "소진 임박이 하나도 없다 — '지금 급한 것 없음'을 쓸 수 있는가를 보는 모양.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 31, "productName": "복사용지", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 75, "daysToStockout": 15.0,
+           "lastOrderId": 701, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+          {"productId": 32, "productName": "클립", "shippedQty": 90, "sampleDays": 30,
+           "dailyAverage": 3.0, "availableQty": 60, "daysToStockout": 20.0,
+           "lastOrderId": 702, "lastOrderedOn": "2026-06-20", "lastOrderQty": 100},
+          {"productId": 33, "productName": "포스트잇", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 50, "daysToStockout": 25.0,
+           "lastOrderId": 703, "lastOrderedOn": "2026-06-10", "lastOrderQty": 80},
+          {"productId": 34, "productName": "커터칼", "shippedQty": 30, "sampleDays": 30,
+           "dailyAverage": 1.0, "availableQty": 30, "daysToStockout": 30.0,
+           "lastOrderId": 704, "lastOrderedOn": "2026-05-20", "lastOrderQty": 40},
+          {"productId": 35, "productName": "화이트보드마커", "shippedQty": 21, "sampleDays": 30,
+           "dailyAverage": 0.7, "availableQty": 25, "daysToStockout": 35.7,
+           "lastOrderId": 705, "lastOrderedOn": "2026-05-05", "lastOrderQty": 30}
+        ]
+      }
+    },
+    {
+      "id": "pos-04",
+      "note": "daysToStockout가 null인 상품(dailyAverage 0, 최근 출고 없음)이 소진 임박 상품과 섞임 — 없음을 0일로 잘못 읽지 않는지 보는 모양.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 41, "productName": "행사용품 A", "shippedQty": 0, "sampleDays": 30,
+           "dailyAverage": 0.0, "availableQty": 40, "daysToStockout": null,
+           "lastOrderId": 700, "lastOrderedOn": "2026-05-01", "lastOrderQty": 40},
+          {"productId": 42, "productName": "박스테이프(중)", "shippedQty": 120, "sampleDays": 30,
+           "dailyAverage": 4.0, "availableQty": 6, "daysToStockout": 1.5,
+           "lastOrderId": 720, "lastOrderedOn": "2026-08-01", "lastOrderQty": 100},
+          {"productId": 43, "productName": "PE봉투", "shippedQty": 75, "sampleDays": 30,
+           "dailyAverage": 2.5, "availableQty": 50, "daysToStockout": 20.0,
+           "lastOrderId": 721, "lastOrderedOn": "2026-07-05", "lastOrderQty": 80},
+          {"productId": 44, "productName": "고무밴드", "shippedQty": 45, "sampleDays": 30,
+           "dailyAverage": 1.5, "availableQty": 45, "daysToStockout": 30.0,
+           "lastOrderId": 722, "lastOrderedOn": "2026-06-15", "lastOrderQty": 60},
+          {"productId": 45, "productName": "종이컵", "shippedQty": 210, "sampleDays": 30,
+           "dailyAverage": 7.0, "availableQty": 70, "daysToStockout": 10.0,
+           "lastOrderId": 723, "lastOrderedOn": "2026-06-01", "lastOrderQty": 200}
+        ]
+      }
+    },
+    {
+      "id": "pos-05",
+      "note": "직전 발주가 null인 신상품(신상품 노트)이 소진 임박에 섞임 — 없는 값을 지어내지 않는지 보는 모양.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 51, "productName": "신상품 노트", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 3, "daysToStockout": 1.5,
+           "lastOrderId": null, "lastOrderedOn": null, "lastOrderQty": null},
+          {"productId": 52, "productName": "집게", "shippedQty": 90, "sampleDays": 30,
+           "dailyAverage": 3.0, "availableQty": 8, "daysToStockout": 2.7,
+           "lastOrderId": 650, "lastOrderedOn": "2026-07-20", "lastOrderQty": 100},
+          {"productId": 53, "productName": "스테이플러심", "shippedQty": 45, "sampleDays": 30,
+           "dailyAverage": 1.5, "availableQty": 45, "daysToStockout": 30.0,
+           "lastOrderId": 640, "lastOrderedOn": "2026-06-01", "lastOrderQty": 60},
+          {"productId": 54, "productName": "메모패드", "shippedQty": 30, "sampleDays": 30,
+           "dailyAverage": 1.0, "availableQty": 40, "daysToStockout": 40.0,
+           "lastOrderId": 630, "lastOrderedOn": "2026-05-15", "lastOrderQty": 50},
+          {"productId": 55, "productName": "형광펜", "shippedQty": 120, "sampleDays": 30,
+           "dailyAverage": 4.0, "availableQty": 100, "daysToStockout": 25.0,
+           "lastOrderId": 620, "lastOrderedOn": "2026-05-01", "lastOrderQty": 150}
+        ]
+      }
+    },
+    {
+      "id": "pos-06",
+      "note": "정전기 방지 봉투는 이틀 전(9/8)에 이미 200개를 발주했는데 가용은 아직 10개뿐 — 중복 발주를 권하지 않는지 보는 모양.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 61, "productName": "정전기 방지 봉투", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 10, "daysToStockout": 2.0,
+           "lastOrderId": 900, "lastOrderedOn": "2026-09-08", "lastOrderQty": 200},
+          {"productId": 62, "productName": "청소용 물티슈", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 60, "daysToStockout": 30.0,
+           "lastOrderId": 500, "lastOrderedOn": "2026-03-01", "lastOrderQty": 80},
+          {"productId": 63, "productName": "라텍스장갑", "shippedQty": 90, "sampleDays": 30,
+           "dailyAverage": 3.0, "availableQty": 45, "daysToStockout": 15.0,
+           "lastOrderId": 510, "lastOrderedOn": "2026-04-01", "lastOrderQty": 100},
+          {"productId": 64, "productName": "종이박스(대)", "shippedQty": 210, "sampleDays": 30,
+           "dailyAverage": 7.0, "availableQty": 140, "daysToStockout": 20.0,
+           "lastOrderId": 520, "lastOrderedOn": "2026-04-15", "lastOrderQty": 300},
+          {"productId": 65, "productName": "종이박스(소)", "shippedQty": 180, "sampleDays": 30,
+           "dailyAverage": 6.0, "availableQty": 120, "daysToStockout": 20.0,
+           "lastOrderId": 530, "lastOrderedOn": "2026-05-01", "lastOrderQty": 250}
+        ]
+      }
+    },
+    {
+      "id": "pos-07",
+      "note": "sampleDays가 4일로 짧은 신상품 다섯 — 얇은 표본을 단정적으로 말하지 않는지 보는 모양.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 71, "productName": "신상 다이어리", "shippedQty": 20, "sampleDays": 4,
+           "dailyAverage": 5.0, "availableQty": 10, "daysToStockout": 2.0,
+           "lastOrderId": 300, "lastOrderedOn": "2026-08-25", "lastOrderQty": 50},
+          {"productId": 72, "productName": "신상 스티커", "shippedQty": 12, "sampleDays": 4,
+           "dailyAverage": 3.0, "availableQty": 30, "daysToStockout": 10.0,
+           "lastOrderId": 310, "lastOrderedOn": "2026-08-20", "lastOrderQty": 40},
+          {"productId": 73, "productName": "신상 마스킹테이프", "shippedQty": 8, "sampleDays": 4,
+           "dailyAverage": 2.0, "availableQty": 40, "daysToStockout": 20.0,
+           "lastOrderId": 320, "lastOrderedOn": "2026-08-18", "lastOrderQty": 60},
+          {"productId": 74, "productName": "신상 클립보드", "shippedQty": 4, "sampleDays": 4,
+           "dailyAverage": 1.0, "availableQty": 20, "daysToStockout": 20.0,
+           "lastOrderId": 330, "lastOrderedOn": "2026-08-10", "lastOrderQty": 30},
+          {"productId": 75, "productName": "신상 파일첩", "shippedQty": 16, "sampleDays": 4,
+           "dailyAverage": 4.0, "availableQty": 60, "daysToStockout": 15.0,
+           "lastOrderId": 340, "lastOrderedOn": "2026-08-05", "lastOrderQty": 80}
+        ]
+      }
+    },
+    {
+      "id": "pos-08",
+      "note": "상품이 하나뿐 — 상위 5개가 안 차는 경우.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 81, "productName": "특수 포장재", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 6, "daysToStockout": 1.2,
+           "lastOrderId": 950, "lastOrderedOn": "2026-08-01", "lastOrderQty": 100}
+        ]
+      }
+    },
+    {
+      "id": "neg-reasoned",
+      "failingItem": "REASONED",
+      "note": "박스·완충재·청 테이프를 발주하라는 지시만 있고 표의 값으로 왜 급한지 근거를 대지 않는다. 순서가 있으니 ACTIONABLE은 살아 있어야 하고, 지어낸 사실도 없다.",
+      "body": "박스, 완충재, 청 테이프 순서로 발주하세요. 마스킹테이프와 에어캡은 이번엔 발주하지 않아도 됩니다.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 21, "productName": "박스", "shippedQty": 300, "sampleDays": 30,
+           "dailyAverage": 10.0, "availableQty": 5, "daysToStockout": 0.5,
+           "lastOrderId": 610, "lastOrderedOn": "2026-08-01", "lastOrderQty": 400},
+          {"productId": 22, "productName": "완충재", "shippedQty": 210, "sampleDays": 30,
+           "dailyAverage": 7.0, "availableQty": 8, "daysToStockout": 1.1,
+           "lastOrderId": 611, "lastOrderedOn": "2026-07-20", "lastOrderQty": 300},
+          {"productId": 23, "productName": "청 테이프", "shippedQty": 180, "sampleDays": 30,
+           "dailyAverage": 6.0, "availableQty": 16, "daysToStockout": 2.7,
+           "lastOrderId": 612, "lastOrderedOn": "2026-07-15", "lastOrderQty": 250},
+          {"productId": 24, "productName": "마스킹테이프", "shippedQty": 90, "sampleDays": 30,
+           "dailyAverage": 3.0, "availableQty": 120, "daysToStockout": 40.0,
+           "lastOrderId": 613, "lastOrderedOn": "2026-06-01", "lastOrderQty": 150},
+          {"productId": 25, "productName": "에어캡", "shippedQty": 45, "sampleDays": 30,
+           "dailyAverage": 1.5, "availableQty": 90, "daysToStockout": 60.0,
+           "lastOrderId": 614, "lastOrderedOn": "2026-05-15", "lastOrderQty": 120}
+        ]
+      }
+    },
+    {
+      "id": "neg-invented",
+      "failingItem": "NO_INVENTED_FACTS",
+      "note": "숫자 근거는 표와 전부 일치하고 우선순위도 분명하지만, 표에 없는 '거래처 휴무' 사정을 지어내 끼워 넣는다.",
+      "body": "A4용지는 최근 30일 평균 8.0개씩 나가는데 가용이 12개뿐이라 1.5일 안에 소진됩니다. 게다가 주요 거래처가 다음 주 휴무라 발주가 더 지연될 수 있으니 A4용지부터 먼저 발주하세요. 테이프·박스테이프·라벨지·볼펜은 여유가 있어 이번엔 넘어가도 됩니다.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
+           "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+          {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
+           "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+          {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+          {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+          {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
+           "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+        ]
+      }
+    },
+    {
+      "id": "neg-actionable",
+      "failingItem": "ACTIONABLE",
+      "note": "다섯 상품의 표 값을 문장으로 그대로 옮기기만 하고 무엇을 먼저 볼지·무엇을 먼저 발주할지는 쓰지 않는다. 값 자체는 표와 일치하니 근거는 있다.",
+      "body": "A4용지는 최근 30일 평균 8.0개씩 나가고 가용은 12개로 1.5일치 남았습니다. 테이프는 평균 3.2개씩 나가고 가용 60개로 18.5일치 남았습니다. 박스테이프는 평균 5.0개씩 나가고 가용 200개로 40일치 남았습니다. 라벨지는 평균 2.0개씩 나가고 가용 80개로 40일치 남았습니다. 볼펜은 평균 10.0개씩 나가고 가용 250개로 25일치 남았습니다.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
+           "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+          {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
+           "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+          {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+          {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+          {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
+           "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+        ]
+      }
+    },
+    {
+      "id": "neg-grounding",
+      "failingItem": "GROUNDING",
+      "note": "가용 수량 12개를 표에 없는 14개로 바꿔치기했다. 나머지 문장은 pos-01/neg-invented와 같은 정상 근거(8.0, 1.5, #812, 8월 20일, 200개)를 그대로 쓴다. GroundingScorer 직접 호출로 '14'가 ungrounded에 잡히는 것을 확인했다(스크래치 테스트, task-7-report.md 참고).",
+      "body": "A4용지는 최근 30일 평균 8.0개씩 나가는데 가용이 14개뿐이라 1.5일 안에 소진됩니다. 직전 발주(#812)는 8월 20일에 200개였습니다. 나머지 테이프·박스테이프·라벨지·볼펜은 여유가 있어 이번엔 넘어가도 됩니다.",
+      "snapshot": {
+        "generatedOn": "2026-09-10",
+        "rows": [
+          {"productId": 3, "productName": "A4용지", "shippedQty": 240, "sampleDays": 30,
+           "dailyAverage": 8.0, "availableQty": 12, "daysToStockout": 1.5,
+           "lastOrderId": 812, "lastOrderedOn": "2026-08-20", "lastOrderQty": 200},
+          {"productId": 7, "productName": "테이프", "shippedQty": 97, "sampleDays": 30,
+           "dailyAverage": 3.2333, "availableQty": 60, "daysToStockout": 18.5,
+           "lastOrderId": 800, "lastOrderedOn": "2026-08-15", "lastOrderQty": 100},
+          {"productId": 11, "productName": "박스테이프", "shippedQty": 150, "sampleDays": 30,
+           "dailyAverage": 5.0, "availableQty": 200, "daysToStockout": 40.0,
+           "lastOrderId": 790, "lastOrderedOn": "2026-07-10", "lastOrderQty": 300},
+          {"productId": 15, "productName": "라벨지", "shippedQty": 60, "sampleDays": 30,
+           "dailyAverage": 2.0, "availableQty": 80, "daysToStockout": 40.0,
+           "lastOrderId": 770, "lastOrderedOn": "2026-07-01", "lastOrderQty": 150},
+          {"productId": 19, "productName": "볼펜", "shippedQty": 300, "sampleDays": 30,
+           "dailyAverage": 10.0, "availableQty": 250, "daysToStockout": 25.0,
+           "lastOrderId": 760, "lastOrderedOn": "2026-06-15", "lastOrderQty": 400}
+        ]
+      }
+    }
+  ]
+}
