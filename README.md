@@ -13,7 +13,7 @@
 | 통신 채널 | 5개 (조회 · 이행 · 통지 · 보상 · 반품 결과) |
 | 재고 원장 | `OPENING / RECEIVE / SHIP / ADJUST / RETURN / COUNT` — 불변식 Σdelta == onHand, 행위자 기록 |
 | 접근제어 | 폼 로그인 + `OPERATOR`/`MANAGER` 롤, `/api`는 서비스 계정 Basic |
-| 테스트 | 512개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
+| 테스트 | 518개 (도메인 · 서비스 · MockMvc 슬라이스 · 실서블릿 보안 통합 · **실제 동시 요청 경합**) |
 
 > 📄 **[프로젝트 포트폴리오](docs/portfolio/portfolio.html)** — 두 시스템을 나눈 배경, 설계 결정 3가지, 동작 흐름(화면 캡처), 회복탄력성·인프라, 겪은 문제와 고도화 전략을 한 문서로 정리했습니다.
 > GitHub은 HTML을 렌더링하지 않으니, 파일을 내려받아 브라우저로 열어보세요.
@@ -336,6 +336,8 @@ CANCELLED ── 재입고 불가
 범주는 `URGENT_STOCKOUT`·`ROUTINE`·`DEMAND_EVENT`·`SUPPLIER`·`QUALITY`·`OTHER`입니다.
 **OMS 보충 요청으로 만들어진 발주는 분류하지 않습니다** — 그 메모는 사람이 쓴 문장이 아니라
 `ReplenishmentRequestService`가 조립한 문자열이라 분류할 것이 없습니다(연결된 요청 링크로 걸러냅니다).
+
+품질은 30건 평가셋으로 1회차를 측정했습니다(28/30) — [측정 결과](docs/wms-purchase-order-memo-eval.md).
 
 ### 반품 (RMA, S5)
 
