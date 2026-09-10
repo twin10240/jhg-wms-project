@@ -36,9 +36,28 @@ class GroundingScorerTest {
         assertThat(r.ungrounded()).isEmpty();
     }
 
+    // 렌더는 소수 1자리로 보여준다(3.2333 → "3.2"). "3"은 모델이 스스로 반올림해 지어낸
+    // 자릿수지 표의 값이 아니다 — 세 차례 재발한 세탁 버그(발주 #3, 가용은 5개)의 근본
+    // 원인이 바로 이 정수 반올림을 인정하던 규칙이었다. [의도적 반전: 이 테스트는 과거
+    // "정수로_반올림한_인용도_통과한다"로 정반대를 검증했다. 프로젝트 오너의 결정으로 뒤집었다.]
     @Test
-    void 정수로_반올림한_인용도_통과한다() {
+    void 소수점_없는_정수_인용은_실측치가_정수일_때만_통과한다() {
         var r = GroundingScorer.score("하루 3개쯤 나갑니다.", snapshot);
+
+        assertThat(r.ungrounded()).contains("3");
+    }
+
+    // 실측치가 우연히 정수로 딱 떨어지면(렌더가 "8.0"으로 보여줬을 값) 정수 인용은 표를
+    // 그대로 옮긴 것이므로 통과해야 한다. 이 예외가 없으면 일평균이 정수인 상품마다
+    // 정상적인 정수 인용을 전부 오탐으로 잡는다.
+    @Test
+    void 실측치가_정수일_때는_정수_인용도_통과한다() {
+        var wholeNumberSnapshot = new BriefingSnapshot(
+                LocalDate.of(2026, 9, 10),
+                List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 8.0, 15, 4.6875,
+                        900L, LocalDate.of(2026, 9, 1), 50)));
+
+        var r = GroundingScorer.score("하루 8개씩 나갑니다.", wholeNumberSnapshot);
 
         assertThat(r.ungrounded()).isEmpty();
     }
@@ -70,12 +89,24 @@ class GroundingScorerTest {
     }
 
     // 일평균 3.2333이 정수 3으로 반올림된다고 해서 "발주 #3"이 통과하면 안 된다 —
-    // 진짜 발주 번호는 900이다. 이게 exact/measures 분리가 막아야 하는 충돌이다.
+    // 진짜 발주 번호는 900이다. 예전엔 ID_PHRASE 위치 게이팅으로 막았지만, 지금은 정수
+    // 인용이 실측치의 소수 1자리 반올림과 같을 때만 통과하는 규칙 자체가 이 세탁을 막는다
+    // (3.2333의 소수 1자리는 3.2 ≠ 정수 3).
     @Test
     void 발주_번호는_실측치_반올림과_충돌해도_잡는다() {
         var r = GroundingScorer.score("발주 #3을 참고하세요.", snapshot);
 
         assertThat(r.ungrounded()).contains("3");
+    }
+
+    // "가용은 5개"처럼 조사가 붙으면 접두어 정규식은 못 걸러도, 정수 인용 규칙 자체가
+    // 막아야 한다(소진 예상 4.6875의 소수 1자리는 4.7 ≠ 정수 5). 조사 우회가 실제로
+    // 재발했던 사례라 표면형이 아니라 규칙으로 막혔는지 확인하는 회귀 테스트다.
+    @Test
+    void 조사가_붙어도_실측치_반올림_세탁은_잡는다() {
+        var r = GroundingScorer.score("가용은 5개입니다.", snapshot);
+
+        assertThat(r.ungrounded()).contains("5");
     }
 
     // 창 길이 30일과 상위 5개는 표에 없지만 환각이 아니다. 화이트리스트로 뺀다.

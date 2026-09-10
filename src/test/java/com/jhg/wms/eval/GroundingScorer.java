@@ -15,50 +15,49 @@ import java.util.regex.Pattern;
 /**
  * 생성문의 숫자를 스냅샷의 값과 대조한다. <b>모델을 부르지 않는다</b> — 확정적이고 공짜다.
  *
- * <p>근거 집합은 둘이다. 식별자·수량(상품 번호·발주 번호·가용)과 날짜는 <b>정확히</b> 일치해야
- * 하고, 실측치(일평균·소진 예상)만 반올림을 인정한다. 하지만 이 구분은 숫자 문자열만으로는
- * 지킬 수 없다 — 값이 아니라 <b>문장 속 위치</b>가 자리를 정한다. "상품 #7", "발주 #900",
- * "가용 15개"처럼 렌더러가 실제로 쓰는 접두어({@link #ID_PHRASE}) 바로 뒤, 그리고
- * "9월 5일"의 월·일 자리({@link #DATE_PHRASE})는 정확 집합하고만 대조하고, 반올림·화이트리스트
- * 경로를 아예 타지 않는다. 이 게이팅이 없으면 일평균 3.2333이 정수 3으로 반올림되면서
- * "발주 #3" 같은 환각이 통과하고, 소진 예상 4.6875가 5로 반올림되면서 "가용 5개"(실제 15개)
- * 같은 환각도 통과한다 — 둘 다 실측치 반올림 경로가 위치와 무관하게 모든 숫자를 대상으로 돌기
- * 때문이다.
+ * <p>세 차례의 리뷰가 같은 버그를 세 번 잡았다: 어떤 자리의 숫자가 <i>다른</i> 필드의 값을
+ * 반올림한 것과 우연히 같아지면서 세탁됐다. 처음엔 "발주 #3"(진짜 발주 900, 일평균 3.2333이
+ * 정수로 반올림되면 3), 다음엔 "9월 5일" 같은 조작된 날짜, 이번엔 조사가 붙은 "가용은 5개"
+ * (진짜 가용 15, 소진 예상 4.6875가 반올림되면 5)가 어떤 접두어 정규식에도 안 걸려서 또
+ * 통과했다. 매번 위치를 잡는 정규식(DATE_PHRASE, ID_PHRASE)을 하나 더 추가하는 패치였고,
+ * 매번 다른 표면형이 그 정규식을 피해갔다 — 문제는 표면형이 아니라 <b>실측치를 정수로
+ * 반올림한 값을 통째로 인정하는 규칙 자체</b>였다.
  *
- * <p>화이트리스트(창 길이 30일, 상위 5개)도 같은 이유로 문구에 고정했다({@link #WINDOW_PHRASE},
- * {@link #TOPN_PHRASE}). "최근 30일"·"상위 5개" 자리에서만 인정하고, 맨 숫자 "5"는 더 이상
- * 아무 데서나 통과하지 않는다.
+ * <p>그래서 위치 게이팅을 더 쌓는 대신 규칙을 바꿨다. 렌더러
+ * ({@code ClaudePurchaseOrderBriefingGenerator.renderInput})는 일평균·소진 예상을 항상
+ * 소수 1자리로 보여준다({@code String.format("%.1f", ...)}) — 즉 모델이 실제로 본 값은
+ * "3.2"였지 "3"이 아니다. 프롬프트도 "숫자는 표에 있는 값만 쓴다. 더하거나 나누거나 평균
+ * 내지 않는다"고 못박는다. 그러므로 인용된 숫자에 소수점이 있으면(자릿수 d≥1) 종전대로 그
+ * 자릿수에 맞춰 반올림해 맞춰보고, 소수점 없는 정수 인용(d=0)은 실측치를 소수 1자리로
+ * 반올림한 값이 이미 정수와 같을 때만(예: 8.0) 인정한다 — 그럴 때만 정수 인용이 표를 그대로
+ * 옮긴 것이고, 아니면 모델이 스스로 반올림해서 지어낸 것이다.
+ * <ul>
+ *   <li>3.2333 → 소수 1자리 3.2 ≠ 정수 3 → "3" 불인정 (발주 세탁 차단)</li>
+ *   <li>4.6875 → 소수 1자리 4.7 ≠ 정수 5 → "5" 불인정 ("가용은 5개" 차단)</li>
+ *   <li>8.0 → 소수 1자리 8.0 = 정수 8 → "8" 인정 (진짜 정수 실측치는 정상 통과)</li>
+ * </ul>
  *
- * <p><b>남은 구멍:</b> "최근 출고"(shippedQty)와 "표본"(sampleDays)은 접두어로 게이팅하지
- * 않았다 — 이 스냅샷에서는 실측치 반올림값(3, 5, 3.2, 4.7)과 겹치지 않아 테스트가 못 잡는다.
- * 값이 겹치는 스냅샷이 오면 "최근 출고 5개"(실제 다른 값) 같은 환각이 통과할 수 있다. 넓히려면
- * ID_PHRASE에 같은 방식으로 추가하면 된다.
+ * <p>이 규칙 하나가 식별자·날짜 접두어를 잡던 DATE_PHRASE·ID_PHRASE를 대체한다. 정수로
+ * 반올림해서 세탁하는 경로 자체가 막히므로 "이 숫자가 문장 어디에 있었는가"를 더 볼 필요가
+ * 없다 — 두 패턴과 위치 게이팅 인프라(exactOnlyPositions)를 통째로 삭제했다. 화이트리스트
+ * ({@link #WINDOW_PHRASE}, {@link #TOPN_PHRASE})는 남겨뒀다 — "상위 5개"의 5는 어떤 값의
+ * 반올림도 아니라 애초에 근거 집합에 없는 숫자라서, 새 규칙으로도 걸러지지 않고 그대로
+ * 오탐이 나기 때문이다.
  *
- * <p>반올림 규칙: 인용된 숫자의 소수 자릿수에 맞춰 근거값을 반올림해 비교한다.
- * 3.2333은 "3.23"·"3.2"·"3" 모두 정상 인용이고 "3.4"는 아니다.
+ * <p><b>남은 구멍:</b> 실측치가 우연히 정수로 딱 떨어지는 스냅샷(예: dailyAverage 8.0)에서는,
+ * 그 정수와 같은 숫자를 엉뚱한 자리(잘못된 상품 번호·발주 번호·날짜)에 써도 이 채점기가
+ * 걸러내지 못한다 — 위치 게이팅을 없앴으므로 값만 보고는 "표의 그 실측치를 인용한 것"과
+ * "다른 필드를 가리키다 우연히 같은 정수가 된 것"을 구분할 수 없다. 정수 실측치가 있어야만
+ * 성립하는 경우라 드물지만 이론적으로는 열려 있다. 같은 이유로 "최근 출고"(shippedQty)와
+ * "표본"(sampleDays)도 접두어로 게이팅하지 않는다 — 둘 다 정확 집합에만 있어 반올림 경로를
+ * 타지 않지만, 값이 겹치는 다른 필드의 정수 인용과는 구분되지 않는다.
+ *
+ * <p>반올림 규칙(d≥1): 인용된 숫자의 소수 자릿수에 맞춰 근거값을 반올림해 비교한다.
+ * 3.2333은 "3.23"·"3.2" 모두 정상 인용이고 "3.4"는 아니다.
  */
 public final class GroundingScorer {
 
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
-
-    /**
-     * "9월 5일" 같은 날짜 표기의 월·일 숫자를 잡아낸다. 이 숫자들은 화이트리스트("5")나
-     * 반올림된 실측치(4.6875 → 5)와 우연히 겹칠 수 있으므로, 날짜 표기 안에서는 정확한
-     * 날짜 집합({@link #exactValues})하고만 대조한다 — 그렇지 않으면 "9월 5일" 같은
-     * 조작된 날짜가 소진 예상 반올림값과 우연히 맞아떨어져 통과해 버린다.
-     */
-    private static final Pattern DATE_PHRASE = Pattern.compile("(\\d+)월\\s*(\\d+)일");
-
-    /**
-     * 렌더러({@code ClaudePurchaseOrderBriefingGenerator.renderInput})가 실제로 내보내는
-     * 식별자·수량 접두어. "#"은 상품 번호·발주 번호 모두에 렌더러가 직접 붙이는 표기라 가장
-     * 흔하고, "발주"·"상품"·"가용"은 모델이 접두어를 살려 인용할 때의 문구다. 이 접두어 바로
-     * 뒤의 숫자는 정확 집합하고만 대조한다 — 화이트리스트도, 실측치 반올림도 타지 않는다.
-     * 그렇지 않으면 "발주 #3"이 일평균 3.2333의 반올림과, "가용 #5"가 소진 예상 4.6875의
-     * 반올림과 우연히 맞아떨어져 통과해 버린다.
-     */
-    private static final Pattern ID_PHRASE =
-            Pattern.compile("(?:#|발주\\s*#?|상품\\s*#?|가용\\s*:?\\s*)(\\d+)");
 
     /** "최근 30일"의 창 길이(WINDOW_DAYS). 이 문구 안의 숫자만 화이트리스트로 인정한다. */
     private static final Pattern WINDOW_PHRASE = Pattern.compile("최근\\s*(\\d+)일");
@@ -81,7 +80,6 @@ public final class GroundingScorer {
     public static Result score(String body, BriefingSnapshot snapshot) {
         Set<String> exact = exactValues(snapshot);
         List<Double> measures = measureValues(snapshot);
-        Set<Integer> exactOnlyPositions = exactOnlyPositions(body);
         Set<Integer> whitelistPositions = whitelistPositions(body);
 
         List<String> ungrounded = new ArrayList<>();
@@ -90,29 +88,10 @@ public final class GroundingScorer {
         while (m.find()) {
             String token = m.group();
             total++;
-            boolean exactOnly = exactOnlyPositions.contains(m.start());
             boolean whitelisted = whitelistPositions.contains(m.start());
-            if (!grounded(token, exact, measures, exactOnly, whitelisted)) ungrounded.add(token);
+            if (!grounded(token, exact, measures, whitelisted)) ungrounded.add(token);
         }
         return new Result(total, ungrounded);
-    }
-
-    /**
-     * 정확 집합하고만 대조해야 하는 자리: 날짜 표기("9월 5일")의 월·일 숫자, 그리고
-     * 식별자·수량 접두어({@link #ID_PHRASE}) 바로 뒤의 숫자.
-     */
-    private static Set<Integer> exactOnlyPositions(String body) {
-        Set<Integer> positions = new HashSet<>();
-        Matcher dm = DATE_PHRASE.matcher(body);
-        while (dm.find()) {
-            positions.add(dm.start(1));
-            positions.add(dm.start(2));
-        }
-        Matcher im = ID_PHRASE.matcher(body);
-        while (im.find()) {
-            positions.add(im.start(1));
-        }
-        return positions;
     }
 
     /** 화이트리스트 문구("최근 30일", "상위 5개") 안의 숫자가 시작하는 본문 위치. */
@@ -130,18 +109,26 @@ public final class GroundingScorer {
     }
 
     private static boolean grounded(String token, Set<String> exact, List<Double> measures,
-                                     boolean exactOnly, boolean whitelisted) {
+                                     boolean whitelisted) {
         if (exact.contains(token)) return true;
         if (exact.contains(stripTrailingZeros(token))) return true;
-        // 식별자·수량·날짜 자리는 화이트리스트·실측치 반올림과 우연히 겹쳐도 인정하지 않는다.
-        if (exactOnly) return false;
         if (whitelisted) return true;
 
         int decimals = token.contains(".") ? token.length() - token.indexOf('.') - 1 : 0;
         BigDecimal quoted = new BigDecimal(token);
         for (double v : measures) {
-            if (BigDecimal.valueOf(v).setScale(decimals, RoundingMode.HALF_UP)
-                    .compareTo(quoted) == 0) return true;
+            BigDecimal value = BigDecimal.valueOf(v);
+            if (decimals == 0) {
+                // 정수 인용은 렌더가 보여준 소수 1자리 표현 자체가 정수일 때만 인정한다.
+                // 그렇지 않으면(예: 3.2333 → 3.2) 모델이 스스로 반올림한 숫자를 표 값으로
+                // 위장하는 것이다 — 이게 세 차례 재발한 세탁 버그의 근본 원인이었다.
+                BigDecimal roundedTo1 = value.setScale(1, RoundingMode.HALF_UP);
+                BigDecimal roundedTo0 = value.setScale(0, RoundingMode.HALF_UP);
+                if (roundedTo1.compareTo(roundedTo0) != 0) continue;
+                if (roundedTo0.compareTo(quoted) == 0) return true;
+            } else if (value.setScale(decimals, RoundingMode.HALF_UP).compareTo(quoted) == 0) {
+                return true;
+            }
         }
         return false;
     }
