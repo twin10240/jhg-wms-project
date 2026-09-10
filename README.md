@@ -337,7 +337,7 @@ CANCELLED ── 재입고 불가
 **OMS 보충 요청으로 만들어진 발주는 분류하지 않습니다** — 그 메모는 사람이 쓴 문장이 아니라
 `ReplenishmentRequestService`가 조립한 문자열이라 분류할 것이 없습니다(연결된 요청 링크로 걸러냅니다).
 
-품질은 30건 평가셋으로 1회차를 측정했습니다(28/30) — [측정 결과](docs/wms-purchase-order-memo-eval.md).
+품질은 30건 평가셋으로 2회차까지 측정했습니다(28/30 → 29/30) — [측정 결과](docs/wms-purchase-order-memo-eval.md).
 
 ### 반품 (RMA, S5)
 
