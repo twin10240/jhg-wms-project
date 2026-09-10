@@ -145,6 +145,22 @@ class GroundingScorerTest {
         assertThat(r.ungrounded()).isEmpty();
     }
 
+    // "A4용지"의 4처럼 상품명에 박힌 숫자를 인용으로 오독하면 안 된다. 실제 평가셋
+    // (pos-01, neg-invented, neg-grounding)의 상품명이라 회귀하면 그 케이스들의 환각률이
+    // 전부 체계적으로 부풀어 오른다.
+    @Test
+    void 상품명에_박힌_숫자는_인용으로_잡지_않는다() {
+        var a4Snapshot = new BriefingSnapshot(
+                LocalDate.of(2026, 9, 10),
+                List.of(new BriefingSnapshot.Row(3L, "A4용지", 240, 30L, 8.0, 12, 1.5,
+                        812L, LocalDate.of(2026, 8, 20), 200)));
+
+        var r = GroundingScorer.score("A4용지는 가용이 12개뿐입니다.", a4Snapshot);
+
+        assertThat(r.ungrounded()).isEmpty();
+        assertThat(r.total()).isEqualTo(1);
+    }
+
     @Test
     void 숫자가_하나도_없으면_total이_0이고_clean이다() {
         var r = GroundingScorer.score("지금 급한 상품은 없습니다.", snapshot);
