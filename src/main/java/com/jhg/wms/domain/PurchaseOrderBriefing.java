@@ -46,6 +46,10 @@ public class PurchaseOrderBriefing {
 
     public static PurchaseOrderBriefing create(String body, String inputSnapshot,
                                                String model, int inputTokens, int outputTokens) {
+        if (body == null || body.isBlank()) throw new IllegalArgumentException("body는 필수입니다.");
+        if (inputSnapshot == null || inputSnapshot.isBlank()) throw new IllegalArgumentException("inputSnapshot은 필수입니다.");
+        if (model == null || model.isBlank()) throw new IllegalArgumentException("model은 필수입니다.");
+
         PurchaseOrderBriefing b = new PurchaseOrderBriefing();
         b.body = body;
         b.inputSnapshot = inputSnapshot;
