@@ -36,6 +36,19 @@ class GroundingScorerTest {
         assertThat(r.ungrounded()).isEmpty();
     }
 
+    // [의도적 반전] 코드(GroundingScorer.grounded)와 옛 javadoc은 "3.2333은 '3.23'·'3.2'
+    // 모두 정상 인용"이라고 명시하고 있었다 — 이 정의대로면 "3.23"은 통과해야 했다. 하지만
+    // 렌더(renderInput)는 소수 1자리(%.1f)만 보여준다. 모델이 "3.23"을 썼다면 렌더가 보여준
+    // 적 없는 정밀도를 스스로 지어낸 것 — 세 차례 재발한 반올림 세탁 버그와 같은 종류의
+    // 문제를, 반올림이 아니라 반대 방향(정밀도 추가)으로 저지른 것이다. 프로젝트 오너의
+    // 결정으로 규칙을 뒤집었다: 이 테스트는 옛 규칙이 살아있었다면 실패했을 것이다.
+    @Test
+    void 소수_두_자리_인용은_렌더가_보여준_적_없는_정밀도라_잡는다() {
+        var r = GroundingScorer.score("일평균 3.23개씩 나갑니다.", snapshot);
+
+        assertThat(r.ungrounded()).contains("3.23");
+    }
+
     // 렌더는 소수 1자리로 보여준다(3.2333 → "3.2"). "3"은 모델이 스스로 반올림해 지어낸
     // 자릿수지 표의 값이 아니다 — 세 차례 재발한 세탁 버그(발주 #3, 가용은 5개)의 근본
     // 원인이 바로 이 정수 반올림을 인정하던 규칙이었다. [의도적 반전: 이 테스트는 과거
@@ -125,6 +138,17 @@ class GroundingScorerTest {
         var r = GroundingScorer.score("가용 5개입니다.", snapshot);
 
         assertThat(r.ungrounded()).contains("5");
+    }
+
+    // WINDOW_PHRASE 화이트리스트는 삭제했다. 표본 일수(sampleDays=30)는 exactValues()에
+    // 항상 들어있어 "최근 30일"은 화이트리스트 없이도 통과한다(위 창_길이와_목록_개수_테스트로
+    // 이미 검증). 화이트리스트가 유일하게 판정을 바꾸던 경우는 표에 없는 창 길이를 모델이
+    // 지어냈을 때뿐이었다 — 그게 바로 근거 없는 숫자이므로, 이제는 잡혀야 한다.
+    @Test
+    void 표에_없는_창_길이는_잡는다() {
+        var r = GroundingScorer.score("최근 45일 기준으로 봤습니다.", snapshot);
+
+        assertThat(r.ungrounded()).contains("45");
     }
 
     @Test
