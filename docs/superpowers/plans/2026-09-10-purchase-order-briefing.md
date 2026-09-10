@@ -847,41 +847,38 @@ EOF
 ```java
 package com.jhg.wms.web;
 
-import com.jhg.wms.service.PurchaseOrderBriefingService;
+import com.jhg.wms.config.DbUserDetailsService;
+import com.jhg.wms.service.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-
-import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@WebMvcTest(WmsAdminController.class)
 class PurchaseOrderBriefingControllerTest {
 
-    @Autowired private WebApplicationContext context;
-    @MockBean private PurchaseOrderBriefingService briefingService;
+    @Autowired MockMvc mvc;
 
-    private MockMvc mvc() {
-        return MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    }
+    @MockitoBean PurchaseOrderBriefingService briefingService;
+    @MockitoBean PurchaseOrderAdviceService purchaseOrderAdviceService;
+    @MockitoBean PurchaseOrderService purchaseOrderService;
+    @MockitoBean InventoryService inventoryService;
+    @MockitoBean DbUserDetailsService userDetailsService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void 브리핑_생성은_발주_목록으로_리다이렉트한다() throws Exception {
         given(briefingService.generateAndSave(any(), any())).willReturn(true);
 
-        mvc().perform(post("/admin/purchase-orders/briefing").with(csrf()))
+        mvc.perform(post("/admin/purchase-orders/briefing").with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/purchase-orders"))
                 .andExpect(flash().attributeExists("successMessage"));
@@ -893,7 +890,7 @@ class PurchaseOrderBriefingControllerTest {
     void 생성_실패는_에러_메시지만_남기고_같은_화면으로_돌아간다() throws Exception {
         given(briefingService.generateAndSave(any(), any())).willReturn(false);
 
-        mvc().perform(post("/admin/purchase-orders/briefing").with(csrf()))
+        mvc.perform(post("/admin/purchase-orders/briefing").with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/purchase-orders"))
                 .andExpect(flash().attributeExists("errorMessage"));
@@ -901,15 +898,15 @@ class PurchaseOrderBriefingControllerTest {
 
     @Test
     void 인증_없이는_거부한다() throws Exception {
-        mvc().perform(post("/admin/purchase-orders/briefing").with(csrf()))
+        mvc.perform(post("/admin/purchase-orders/briefing").with(csrf()))
                 .andExpect(status().is3xxRedirection());
     }
 }
 ```
 
-`csrf()` import는 `org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf`다. 파일 상단에 `import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;`를 더한다.
+**`@MockBean`이 아니라 `@MockitoBean`이다** — Spring Boot 3.5.5에서 `@MockBean`은 deprecated이고, 이 저장소의 web 테스트는 전부 `@WebMvcTest` + `@MockitoBean`을 쓴다(`CycleCountAdminControllerTest` 참조).
 
-**먼저 기존 MockMvc 테스트 하나를 열어 이 저장소의 방식과 맞추라:** `grep -rln 'MockMvc' src/test/java/com/jhg/wms/web/ | head -3`. 다른 파일이 `@WebMvcTest`나 다른 셋업을 쓰면 **그쪽을 따른다.** 위 코드는 그 확인 뒤에 맞춰 고칠 것.
+`@WebMvcTest(WmsAdminController.class)`는 그 컨트롤러가 의존하는 빈을 **전부** 목으로 채워야 뜬다. 위 목록으로 안 뜨면 에러 메시지가 빠진 빈을 지목하므로 그것을 더한다.
 
 - [ ] **Step 2: 실패를 확인한다**
 
