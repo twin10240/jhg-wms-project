@@ -43,3 +43,6 @@ Microsoft/
 
 # macOS
 .DS_Store
+
+# 공개 배포용 자격증명 — 절대 커밋하지 않는다.
+.env

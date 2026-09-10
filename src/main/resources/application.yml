@@ -102,6 +102,11 @@ spring:
       hibernate:
         format_sql: false
         default_batch_fetch_size: 100
+# TLS를 끊는 프록시(nginx·터널)가 앞에 서면 앱이 보는 스킴은 http다. 그대로 두면 폼 로그인
+# 리다이렉트가 http:// 절대 주소로 나가 공개 HTTPS 주소에서만 깨진다 — 로컬에선 안 보인다.
+# framework: Spring이 X-Forwarded-* 를 반영해 URL을 만든다(프록시가 그 헤더를 주는 것이 전제).
+server:
+  forward-headers-strategy: framework
 # 로컬 기본값(wms/wms) 없이 오버라이드 — 미설정 시 플레이스홀더 해석 실패로 기동 자체가 막힌다.
 oms:
   callback:

@@ -9,17 +9,26 @@ x-wms-base: &wms-base
     context: .
     dockerfile: Dockerfile
   # prod: Postgres 데이터소스 / scale: Redis 공유 세션 + 분산 락
+  # 자격증명은 전부 .env로 덮을 수 있다(기본값은 로컬 데모용 wms/wms·operator/manager).
+  # 공개 주소에 붙이는 순간 이 기본값은 공개된 계정과 같으므로 .env가 필수다.
   environment: &wms-env
     SPRING_PROFILES_ACTIVE: prod,scale
     PGHOST: postgres
     PGPORT: "5432"
     PGDATABASE: wms
     PGUSER: wms
-    PGPASSWORD: wms
+    PGPASSWORD: ${PGPASSWORD:-wms}
     REDIS_HOST: redis
     REDIS_PORT: "6379"
-    WMS_BASIC_USER: wms
-    WMS_BASIC_PASSWORD: wms
+    WMS_BASIC_USER: ${WMS_BASIC_USER:-wms}
+    WMS_BASIC_PASSWORD: ${WMS_BASIC_PASSWORD:-wms}
+    # prod 프로파일은 아래 넷에 기본값이 없다 — 안 주면 기동 자체가 막힌다.
+    WMS_OPERATOR_USER: ${WMS_OPERATOR_USER:-operator}
+    WMS_OPERATOR_PASSWORD: ${WMS_OPERATOR_PASSWORD:-operator}
+    WMS_MANAGER_USER: ${WMS_MANAGER_USER:-manager}
+    WMS_MANAGER_PASSWORD: ${WMS_MANAGER_PASSWORD:-manager}
+    OMS_CALLBACK_USER: ${OMS_CALLBACK_USER:-wms}
+    OMS_CALLBACK_PASSWORD: ${OMS_CALLBACK_PASSWORD:-wms}
   depends_on:
     postgres:
       condition: service_healthy
@@ -33,7 +42,7 @@ services:
     environment:
       POSTGRES_DB: wms
       POSTGRES_USER: wms
-      POSTGRES_PASSWORD: wms
+      POSTGRES_PASSWORD: ${PGPASSWORD:-wms}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wms -d wms"]
       interval: 5s
@@ -71,8 +80,10 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    # 로컬에서 OMS가 8080, WMS 단독 기동이 8081을 이미 쓰므로 공개용 스택은 비켜서 뜬다.
+    # NGINX_PORT로 덮을 수 있다(.env).
     ports:
-      - "8080:80"
+      - "${NGINX_PORT:-8090}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
