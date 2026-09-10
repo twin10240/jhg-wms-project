@@ -26,23 +26,31 @@ import java.util.regex.Pattern;
  * <p>그래서 위치 게이팅을 더 쌓는 대신 규칙을 바꿨다. 렌더러
  * ({@code ClaudePurchaseOrderBriefingGenerator.renderInput})는 일평균·소진 예상을 항상
  * 소수 1자리로 보여준다({@code String.format("%.1f", ...)}) — 즉 모델이 실제로 본 값은
- * "3.2"였지 "3"이 아니다. 프롬프트도 "숫자는 표에 있는 값만 쓴다. 더하거나 나누거나 평균
- * 내지 않는다"고 못박는다. 그러므로 인용된 숫자에 소수점이 있으면(자릿수 d≥1) 종전대로 그
- * 자릿수에 맞춰 반올림해 맞춰보고, 소수점 없는 정수 인용(d=0)은 실측치를 소수 1자리로
- * 반올림한 값이 이미 정수와 같을 때만(예: 8.0) 인정한다 — 그럴 때만 정수 인용이 표를 그대로
- * 옮긴 것이고, 아니면 모델이 스스로 반올림해서 지어낸 것이다.
+ * "3.2"였지 "3"도 "3.23"도 아니다. 프롬프트도 "숫자는 표에 있는 값만 쓴다. 더하거나 나누거나
+ * 평균 내지 않는다"고 못박는다. 그러므로 인용된 숫자가 소수 1자리(d=1)면 그 자리에서
+ * 반올림해 맞춰보고, 소수점 없는 정수 인용(d=0)은 실측치를 소수 1자리로 반올림한 값이 이미
+ * 정수와 같을 때만(예: 8.0) 인정한다 — 그럴 때만 정수 인용이 표를 그대로 옮긴 것이고, 아니면
+ * 모델이 스스로 반올림해서 지어낸 것이다. 소수 2자리 이상(d≥2)은 렌더가 보여준 적 없는
+ * 정밀도이므로 실측치와 무관하게 무조건 근거 없음으로 잡는다 — d=0에 적용했던 것과 같은
+ * 논리를, 반대쪽 자릿수에도 적용한 것뿐이다.
  * <ul>
  *   <li>3.2333 → 소수 1자리 3.2 ≠ 정수 3 → "3" 불인정 (발주 세탁 차단)</li>
  *   <li>4.6875 → 소수 1자리 4.7 ≠ 정수 5 → "5" 불인정 ("가용은 5개" 차단)</li>
  *   <li>8.0 → 소수 1자리 8.0 = 정수 8 → "8" 인정 (진짜 정수 실측치는 정상 통과)</li>
+ *   <li>3.2333 → "3.23"은 렌더가 준 적 없는 소수 2자리 정밀도라 불인정 (모델이 본 것보다
+ *       더 정밀한 값을 지어내는 경로 차단)</li>
  * </ul>
  *
  * <p>이 규칙 하나가 식별자·날짜 접두어를 잡던 DATE_PHRASE·ID_PHRASE를 대체한다. 정수로
  * 반올림해서 세탁하는 경로 자체가 막히므로 "이 숫자가 문장 어디에 있었는가"를 더 볼 필요가
- * 없다 — 두 패턴과 위치 게이팅 인프라(exactOnlyPositions)를 통째로 삭제했다. 화이트리스트
- * ({@link #WINDOW_PHRASE}, {@link #TOPN_PHRASE})는 남겨뒀다 — "상위 5개"의 5는 어떤 값의
- * 반올림도 아니라 애초에 근거 집합에 없는 숫자라서, 새 규칙으로도 걸러지지 않고 그대로
- * 오탐이 나기 때문이다.
+ * 없다 — 두 패턴과 위치 게이팅 인프라(exactOnlyPositions)를 통째로 삭제했다. 화이트리스트는
+ * {@link #TOPN_PHRASE} 하나만 남겼다 — "상위 5개"의 5는 어떤 값의 반올림도 아니라 애초에
+ * 근거 집합에 없는 숫자라서, 새 규칙으로도 걸러지지 않고 그대로 오탐이 나기 때문이다.
+ * WINDOW_PHRASE("최근 N일"의 N)는 삭제했다 — sampleDays가 exactValues()에 무조건
+ * 들어가므로 진짜 표본 일수를 인용하면 화이트리스트 없이도 이미 통과했고, 화이트리스트가
+ * 판정을 바꾸는 유일한 경우는 인용된 창 길이가 정확 집합에도 실측치에도 없을 때 — 즉
+ * 모델이 지어낸 창 길이일 때뿐이었다. 그건 근거 없는 숫자의 정의 그 자체라, 화이트리스트는
+ * 진짜 환각을 하나도 못 잡아내면서 그런 환각을 그대로 통과시키는 구멍이었다.
  *
  * <p><b>남은 구멍:</b> 실측치가 우연히 정수로 딱 떨어지는 스냅샷(예: dailyAverage 8.0)에서는,
  * 그 정수와 같은 숫자를 엉뚱한 자리(잘못된 상품 번호·발주 번호·날짜)에 써도 이 채점기가
@@ -61,9 +69,6 @@ import java.util.regex.Pattern;
  * 못한다 — 한글이 비단어 문자라 그 자리엔 여전히 경계가 성립하기 때문이다. 현재 평가셋의
  * 상품명 중에는 그런 표기가 없어 실무상 열린 문제는 아니다.
  *
- * <p>반올림 규칙(d≥1): 인용된 숫자의 소수 자릿수에 맞춰 근거값을 반올림해 비교한다.
- * 3.2333은 "3.23"·"3.2" 모두 정상 인용이고 "3.4"는 아니다.
- *
  * <p>실제 평가 1회차에서 8건의 브리핑에 걸쳐 10개의 "근거 없는 숫자"가 잡혔는데, 대부분은
  * 환각이 아니라 앞자리 0이 붙은 날짜 구성요소였다. 렌더러가 {@code LocalDate}를 그대로
  * 이어붙여 ISO 형식("2026-08-01")을 보여주므로 모델은 "08"·"01"을 본 그대로 인용하는데,
@@ -80,9 +85,6 @@ public final class GroundingScorer {
     // "A4"처럼 영문자 바로 뒤에 붙은 숫자만 걸러지고 "#900"·"15개"처럼 비단어 문자
     // 옆의 숫자는 그대로 걸린다.
     private static final Pattern NUMBER = Pattern.compile("\\b\\d+(?:\\.\\d+)?\\b");
-
-    /** "최근 30일"의 창 길이(WINDOW_DAYS). 이 문구 안의 숫자만 화이트리스트로 인정한다. */
-    private static final Pattern WINDOW_PHRASE = Pattern.compile("최근\\s*(\\d+)일");
 
     /** "상위 5개"의 상품 수(TOP_N). 이 문구 안의 숫자만 화이트리스트로 인정한다. */
     private static final Pattern TOPN_PHRASE = Pattern.compile("상위\\s*(\\d+)개");
@@ -116,13 +118,9 @@ public final class GroundingScorer {
         return new Result(total, ungrounded);
     }
 
-    /** 화이트리스트 문구("최근 30일", "상위 5개") 안의 숫자가 시작하는 본문 위치. */
+    /** 화이트리스트 문구("상위 5개") 안의 숫자가 시작하는 본문 위치. */
     private static Set<Integer> whitelistPositions(String body) {
         Set<Integer> positions = new HashSet<>();
-        Matcher wm = WINDOW_PHRASE.matcher(body);
-        while (wm.find()) {
-            positions.add(wm.start(1));
-        }
         Matcher tm = TOPN_PHRASE.matcher(body);
         while (tm.find()) {
             positions.add(tm.start(1));
@@ -149,7 +147,10 @@ public final class GroundingScorer {
                 BigDecimal roundedTo0 = value.setScale(0, RoundingMode.HALF_UP);
                 if (roundedTo1.compareTo(roundedTo0) != 0) continue;
                 if (roundedTo0.compareTo(quoted) == 0) return true;
-            } else if (value.setScale(decimals, RoundingMode.HALF_UP).compareTo(quoted) == 0) {
+            } else if (decimals == 1
+                    && value.setScale(1, RoundingMode.HALF_UP).compareTo(quoted) == 0) {
+                // 렌더가 실제로 보여주는 자릿수(소수 1자리)와 같을 때만 인정한다. 소수
+                // 2자리 이상(d≥2)은 렌더가 준 적 없는 정밀도라 아래로 빠져 불인정된다.
                 return true;
             }
         }
