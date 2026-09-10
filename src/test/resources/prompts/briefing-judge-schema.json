@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "REASONED": { "type": "boolean" },
+    "NO_INVENTED_FACTS": { "type": "boolean" },
+    "ACTIONABLE": { "type": "boolean" }
+  },
+  "required": ["REASONED", "NO_INVENTED_FACTS", "ACTIONABLE"],
+  "additionalProperties": false
+}
