@@ -136,6 +136,52 @@ class GroundingScorerTest {
         assertThat(no.ungrounded()).contains("5");
     }
 
+    // 렌더러는 LocalDate를 그대로 이어붙여 ISO 형식("2026-09-08")을 보여주므로 모델이
+    // "08"을 그대로 인용해도 정확 집합의 "8"(getMonthValue())과 문자열이 달라 오탐이 났다.
+    // 실제 평가 1회차에서 8건의 브리핑에 걸쳐 잡힌 10개의 "환각" 대부분이 이 앞자리 0
+    // 날짜였다 — 모델이 화면에 보인 그대로 옮겼을 뿐인데 헤드라인 지표를 부풀렸다.
+    @Test
+    void 앞자리_0이_붙은_날짜_인용은_통과한다() {
+        var lastOrderedOn08 = new BriefingSnapshot(
+                LocalDate.of(2026, 9, 10),
+                List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
+                        900L, LocalDate.of(2026, 9, 8), 50)));
+
+        var r = GroundingScorer.score("2026-09-08에 발주했습니다.", lastOrderedOn08);
+
+        assertThat(r.ungrounded()).isEmpty();
+    }
+
+    // 앞자리 0을 지운다고 해서 틀린 날짜까지 통과하면 안 된다 — 모델이 날짜를 지어내는
+    // 진짜 환각은 여전히 잡아야 한다.
+    @Test
+    void 앞자리_0을_지워도_틀린_날짜는_잡는다() {
+        var lastOrderedOn08 = new BriefingSnapshot(
+                LocalDate.of(2026, 9, 10),
+                List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 15, 4.6875,
+                        900L, LocalDate.of(2026, 9, 8), 50)));
+
+        var r = GroundingScorer.score("2026-09-05에 발주했습니다.", lastOrderedOn08);
+
+        assertThat(r.ungrounded()).contains("05");
+    }
+
+    // 앞자리 0을 지운 값이 다른 필드와 우연히 같아지는 것도 막는다. 가용 8개일 때 "08"은
+    // 인용으로 정상이지만, 가용 15개일 때 "08"은 여전히 근거 없는 숫자다.
+    @Test
+    void 앞자리_0이_붙은_수량도_실제_값과_맞아야_한다() {
+        var qty8Snapshot = new BriefingSnapshot(
+                LocalDate.of(2026, 9, 10),
+                List.of(new BriefingSnapshot.Row(7L, "테이프", 97, 30L, 3.2333, 8, 4.6875,
+                        900L, LocalDate.of(2026, 9, 1), 50)));
+
+        var ok = GroundingScorer.score("가용 08개", qty8Snapshot);
+        var no = GroundingScorer.score("가용 08개", snapshot); // snapshot의 availableQty는 15
+
+        assertThat(ok.ungrounded()).isEmpty();
+        assertThat(no.ungrounded()).contains("08");
+    }
+
     // 출고량이 정수 97이어도 모델이 소수점을 붙여 "97.0"이라고 인용할 수 있다.
     // 끝의 0을 떼면 정확 집합의 "97"과 같은 값이므로 통과해야 한다.
     @Test

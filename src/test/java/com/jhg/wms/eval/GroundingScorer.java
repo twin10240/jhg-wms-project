@@ -63,6 +63,15 @@ import java.util.regex.Pattern;
  *
  * <p>반올림 규칙(d≥1): 인용된 숫자의 소수 자릿수에 맞춰 근거값을 반올림해 비교한다.
  * 3.2333은 "3.23"·"3.2" 모두 정상 인용이고 "3.4"는 아니다.
+ *
+ * <p>실제 평가 1회차에서 8건의 브리핑에 걸쳐 10개의 "근거 없는 숫자"가 잡혔는데, 대부분은
+ * 환각이 아니라 앞자리 0이 붙은 날짜 구성요소였다. 렌더러가 {@code LocalDate}를 그대로
+ * 이어붙여 ISO 형식("2026-08-01")을 보여주므로 모델은 "08"·"01"을 본 그대로 인용하는데,
+ * 정확 집합은 {@code getMonthValue()}처럼 앞자리 0 없는 정수를 담아("8"·"1") 문자열이 달라
+ * 오탐이 났다. 끝자리 0({@link #stripTrailingZeros})의 반대 문제라 같은 자리에
+ * {@link #stripLeadingZeros}로 고쳤다 — 정수 인용만 앞자리 0을 지우고 다시 대조하며,
+ * "0" 한 글자는 모든 값과 같아지지 않도록 그대로 둔다. 이 헤드라인 지표("환각 있는 브리핑
+ * n/N")는 이 아티팩트들 때문에 실제보다 부풀려져 있었다.
  */
 public final class GroundingScorer {
 
@@ -125,6 +134,7 @@ public final class GroundingScorer {
                                      boolean whitelisted) {
         if (exact.contains(token)) return true;
         if (exact.contains(stripTrailingZeros(token))) return true;
+        if (exact.contains(stripLeadingZeros(token))) return true;
         if (whitelisted) return true;
 
         int decimals = token.contains(".") ? token.length() - token.indexOf('.') - 1 : 0;
@@ -181,5 +191,20 @@ public final class GroundingScorer {
     private static String stripTrailingZeros(String token) {
         if (!token.contains(".")) return token;
         return new BigDecimal(token).stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 렌더러({@code renderInput})는 날짜를 {@code LocalDate}를 그대로 이어붙여 보여주므로
+     * ISO 형식("2026-08-01")이 되고, 월·일이 한 자리면 "08"·"01"처럼 0으로 채워진다.
+     * 반면 정확 집합은 {@code getMonthValue()}·{@code getDayOfMonth()}를 {@code String.valueOf}로
+     * 담아 "8"·"1"이다. 모델이 본 그대로("08")를 인용해도 문자열이 달라 오탐이 났다 —
+     * 정수 토큰만(소수점 있는 토큰은 이미 measures 경로에서 BigDecimal로 정상 비교되므로
+     * 건드리지 않는다) 앞자리 0을 지우고 다시 대조한다. "0" 한 글자는 그대로 둬 모든 값에
+     * 걸리지 않게 한다.
+     */
+    private static String stripLeadingZeros(String token) {
+        if (token.contains(".") || token.length() <= 1) return token;
+        String stripped = token.replaceFirst("^0+", "");
+        return stripped.isEmpty() ? "0" : stripped;
     }
 }
