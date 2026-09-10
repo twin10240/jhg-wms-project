@@ -64,7 +64,10 @@ class PurchaseOrderBriefingControllerTest {
 
     @Test
     void 인증_없이는_거부한다() throws Exception {
+        // is3xxRedirection()만 보면 시큐리티를 통째로 빼도 통과한다 — 실제로 /login으로
+        // 보내는지(webChain의 formLogin.loginPage) 목적지까지 확인한다.
         mvc.perform(post("/admin/purchase-orders/briefing").with(csrf()))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
     }
 }
