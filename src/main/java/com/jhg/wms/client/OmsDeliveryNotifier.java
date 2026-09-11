@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 배송 완료 콜백 — 창고가 기록한 배송 완료 사실을 OMS에 통지해 Delivery를 DELIVERED로 올린다.
@@ -21,17 +22,20 @@ import java.util.UUID;
 public class OmsDeliveryNotifier {
 
     private final RestClient restClient;
+    private final AtomicBoolean failFirstCallback;
 
     public OmsDeliveryNotifier(RestClient.Builder builder,
                                @Value("${oms.base-url}") String baseUrl,
                                @Value("${oms.callback.user}") String callbackUser,
-                               @Value("${oms.callback.password}") String callbackPassword) {
+                               @Value("${oms.callback.password}") String callbackPassword,
+                               @Value("${OMS_CALLBACK_FAIL_FIRST:false}") boolean failFirstCallback) {
         if (callbackUser.isBlank() || callbackPassword.isBlank()) {
             throw new IllegalStateException("oms.callback.user/password must not be blank");
         }
         this.restClient = builder.baseUrl(baseUrl)
                 .defaultHeaders(headers -> headers.setBasicAuth(callbackUser, callbackPassword))
                 .build();
+        this.failFirstCallback = new AtomicBoolean(failFirstCallback);
     }
 
     /**
@@ -53,6 +57,9 @@ public class OmsDeliveryNotifier {
     // afterCommit에서 던진 예외는 커밋 호출자까지 전파되므로 반드시 여기서 삼킨다.
     void send(UUID requestKey, Long orderId, Instant deliveredAt) {
         try {
+            if (failFirstCallback.compareAndSet(true, false)) {
+                throw new IllegalStateException("첫 OMS 배송 콜백 장애를 주입했습니다.");
+            }
             restClient.post()
                     .uri("/api/delivery-events")
                     .body(new DeliveryEvent(requestKey, orderId, deliveredAt))
