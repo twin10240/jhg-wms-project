@@ -129,6 +129,7 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 ## 운영 배포
 
 두 경로가 있습니다. **Railway는 중단 상태**이고, 현재 공개 데모는 **개발 머신 + 터널**로 띄웁니다.
+터널은 Tailscale Funnel과 Cloudflare Tunnel 중 하나를 쓰며, **둘 다 같은 compose 스택(:8090)을 가리킵니다.**
 
 ### 현재: 개발 머신 공개 데모 (docker compose + Tailscale Funnel)
 
@@ -161,6 +162,33 @@ tailscale funnel --https=443 off    # 공개 중지
   Funnel 설정은 tailscaled에 저장돼 데몬이 다시 뜰 때 복원됩니다.
   **다만 머신이 잠들거나 꺼져 있는 동안은 링크도 죽습니다.**
 - DB는 compose의 Postgres **컨테이너 볼륨**이라 로컬 개발 DB(`wms`)와 분리됩니다.
+
+### 대안: Cloudflare Tunnel (보유 도메인 사용)
+
+같은 스택을 가리키되 주소를 `*.ts.net` 대신 보유 도메인의 서브도메인으로 노출합니다.
+
+```bash
+brew install cloudflared
+cloudflared tunnel login                       # 브라우저에서 zone 선택
+cloudflared tunnel create <터널이름>
+cloudflared tunnel route dns <터널이름> wms.<도메인>
+cloudflared service install                    # user launch agent 등록
+```
+
+- **ingress는 `~/.cloudflared/config.yml`에 둔다.** 호스트네임 하나당 규칙 한 줄이고 마지막에
+  `service: http_status:404` catch-all이 필요합니다. OMS·실시간 서비스까지 **터널 하나로 분기**하므로
+  서비스마다 터널을 만들 필요가 없습니다. 터널이 여러 개 필요한 경우는 서비스가 다른 기계에 있을 때뿐입니다.
+- **반드시 `:8090`(nginx)을 가리킨다.** 단독 기동(:8081)은 로컬 개발 DB를 쓰고 `ANTHROPIC_API_KEY`가
+  주입돼 있어, 그쪽을 공개하면 **위의 AI 차단 정책이 그대로 무력화됩니다.**
+- **`cloudflared service install`이 만든 launch agent는 그대로 두면 뜨지 않습니다.**
+  `ProgramArguments`에 바이너리만 들어가고 `tunnel run`이 빠져 exit 1로 죽습니다.
+  `plutil -replace ProgramArguments -json`으로 `--config <경로> tunnel run <터널이름>`을 채운 뒤
+  `launchctl unload/load` 해야 합니다. 재설치하면 이 수정이 날아갑니다.
+- user launch agent라 **로그인한 동안에만** 동작합니다. 부팅 직후부터 필요하면 root로 설치합니다.
+  로그는 `~/Library/Logs/com.cloudflare.cloudflared.{err,out}.log`.
+- 무료 플랜 제약은 **요청당 업로드 100MB**와 **프록시 응답 100초**입니다. WebSocket에는 적용되지 않습니다.
+- Tailscale Funnel과 동시에 켜 둘 수 있습니다. 같은 `:8090`을 두 경로가 바라볼 뿐입니다.
+- 공개 URL은 저장소에 적지 않습니다(Tailscale과 같은 이유 — 개인 머신을 가리키는 주소입니다).
 
 ### 과거: Railway
 
