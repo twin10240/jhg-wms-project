@@ -160,6 +160,16 @@ colima가 꺼지면 어떤 터널을 써도 502입니다.
   compose가 `ANTHROPIC_API_KEY`를 컨테이너에 주지 않아 `wms.ai.api-key`가 비고, 그러면 분류·브리핑만
   비활성인 채로 기동합니다(창고 업무는 그대로 돕니다 — `AiConfig`). **공개 주소에서는 방문자의
   클릭마다 실비가 나가기 때문에 의도적으로 끕니다.** 세 기능은 로컬 실행에서 키를 주고 확인합니다.
+  화면에 보이는 분류·브리핑은 **아래 시드 때 한 번 만들어 저장된 결과**입니다 — 방문자가 호출을 일으키지 않습니다.
+- **데모 데이터**: 빈 볼륨이면 `InitDb`가 재고 20개만 심어 반품·발주·실사 화면이 비어 있습니다.
+  아래 셋을 `WMS_BASE_URL=https://<공개 주소>`와 `.env` 계정으로 돌립니다(`docs/seed-*.sh`, 모두 앱 경로를 탑니다).
+  분류까지 채우려면 **시드 동안만** 키를 준 override로 `wms1~3`을 재생성하고(`up -d --no-deps --no-build`),
+  끝나면 override 없이 다시 재생성해 기동 로그의 `ANTHROPIC_API_KEY 미설정`을 확인합니다(호출 60여 회, 100원 안쪽).
+  1. `seed-return-demo.sh` — 출고 20건 + 반품 30건
+  2. `seed-purchase-order-memo-demo.sh` — 발주 30건(메모)
+  3. `seed-cycle-count-demo.sh` — 실사 5세션(`PSQL="docker exec -i jhg-wms-project-postgres-1 psql" PGARGS="-U wms -d wms"`)
+  4. 매니저로 발주 화면의 브리핑 생성 1회
+  **`:8090` 직결로는 발주 폼이 깨집니다** — nginx가 `Host`에서 포트를 떼어 리다이렉트가 `:80`으로 갑니다. 공개 주소(443)로 돌리십시오.
 - **자동 기동**: `brew services start colima`(로그인 시 런타임 기동) + compose 전 서비스의
   `restart: unless-stopped`. 런타임이 뜨면 컨테이너 6개가 스스로 복귀합니다.
   터널 쪽 자동 기동은 각 터널 절을 보십시오. **머신이 잠들거나 꺼져 있는 동안은 링크도 죽습니다.**
