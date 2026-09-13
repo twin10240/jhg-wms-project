@@ -128,20 +128,23 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 
 ## 운영 배포
 
-두 경로가 있습니다. **Railway는 중단 상태**이고, 현재 공개 데모는 **개발 머신 + 터널**로 띄웁니다.
-터널은 Tailscale Funnel과 Cloudflare Tunnel 중 하나를 쓰며, **둘 다 같은 compose 스택(:8090)을 가리킵니다.**
+**Railway는 중단 상태**이고, 현재 공개 데모는 **개발 머신 + 터널**로 띄웁니다.
+공개 스택은 하나(compose, `:8090`)이고 그 앞의 터널만 갈아끼웁니다 —
+**현재 경로는 Cloudflare Tunnel**이며 Tailscale Funnel은 2026-09-13에 중지했습니다.
 
-### 현재: 개발 머신 공개 데모 (docker compose + Tailscale Funnel)
+### 공개 스택 (docker compose)
 
 아래 [로드밸런싱 데모](#로컬-로드밸런싱-데모-docker-compose) 스택을 그대로 공개합니다.
 단일 인스턴스가 아니라 **nginx + 인스턴스 3개 구성이 공개 주소에서 그대로 도는 것**이 이 방식의 이유입니다.
 
 ```bash
 colima start --cpu 4 --memory 6     # 컨테이너 런타임(Docker Desktop 대신)
-docker compose up -d --build
-tailscale funnel --bg 8090          # → https://<머신>.<tailnet>.ts.net
-tailscale funnel --https=443 off    # 공개 중지
+docker compose up -d --build        # nginx(:8090) → wms1/2/3 → postgres·redis
 ```
+
+**터널을 무엇으로 바꾸든 이 스택은 그대로입니다.** 터널은 이미 열려 있는 `:8090`을
+인터넷에 이어줄 뿐이고, 그 포트를 여는 것은 colima 안의 컨테이너입니다 —
+colima가 꺼지면 어떤 터널을 써도 502입니다.
 
 - **자격증명은 `.env`로 준다**(`.gitignore` 대상). `PGPASSWORD`, `WMS_BASIC_USER`/`_PASSWORD`,
   `WMS_OPERATOR_USER`/`_PASSWORD`, `WMS_MANAGER_USER`/`_PASSWORD`, `OMS_CALLBACK_USER`/`_PASSWORD`.
@@ -159,13 +162,12 @@ tailscale funnel --https=443 off    # 공개 중지
   클릭마다 실비가 나가기 때문에 의도적으로 끕니다.** 세 기능은 로컬 실행에서 키를 주고 확인합니다.
 - **자동 기동**: `brew services start colima`(로그인 시 런타임 기동) + compose 전 서비스의
   `restart: unless-stopped`. 런타임이 뜨면 컨테이너 6개가 스스로 복귀합니다.
-  Funnel 설정은 tailscaled에 저장돼 데몬이 다시 뜰 때 복원됩니다.
-  **다만 머신이 잠들거나 꺼져 있는 동안은 링크도 죽습니다.**
+  터널 쪽 자동 기동은 각 터널 절을 보십시오. **머신이 잠들거나 꺼져 있는 동안은 링크도 죽습니다.**
 - DB는 compose의 Postgres **컨테이너 볼륨**이라 로컬 개발 DB(`wms`)와 분리됩니다.
 
-### 대안: Cloudflare Tunnel (보유 도메인 사용)
+### 현재 경로: Cloudflare Tunnel (보유 도메인)
 
-같은 스택을 가리키되 주소를 `*.ts.net` 대신 보유 도메인의 서브도메인으로 노출합니다.
+위 스택을 보유 도메인의 서브도메인으로 노출합니다.
 
 ```bash
 brew install cloudflared
@@ -187,7 +189,23 @@ cloudflared service install                    # user launch agent 등록
 - user launch agent라 **로그인한 동안에만** 동작합니다. 부팅 직후부터 필요하면 root로 설치합니다.
   로그는 `~/Library/Logs/com.cloudflare.cloudflared.{err,out}.log`.
 - 무료 플랜 제약은 **요청당 업로드 100MB**와 **프록시 응답 100초**입니다. WebSocket에는 적용되지 않습니다.
-- Tailscale Funnel과 동시에 켜 둘 수 있습니다. 같은 `:8090`을 두 경로가 바라볼 뿐입니다.
+- Tailscale Funnel과 동시에 켜 둘 수 있습니다(같은 `:8090`을 두 경로가 바라볼 뿐). 다만
+  **2026-09-13부터는 Cloudflare 하나만 운영합니다** — 도메인 주소 하나로 충분해서, 관리 지점을 줄였습니다.
+
+### 과거: Tailscale Funnel (2026-09-13 중지)
+
+계정도 도메인도 없이 공개 주소를 얻을 수 있어 처음 공개는 이쪽으로 했습니다. Cloudflare Tunnel로
+옮긴 뒤 중지했고, 되살리려면 아래 한 줄이면 됩니다(같은 `:8090`을 가리킵니다).
+
+```bash
+tailscale funnel --bg 8090          # → https://<머신>.<tailnet>.ts.net
+tailscale funnel --https=443 off    # 중지 — tailnet 접속(VNC 등)에는 영향 없음
+```
+
+- 주소는 **머신 이름 + tailnet 이름**이라 `tailscale set --hostname=<이름>`으로 바꿉니다.
+  바꾼 뒤에는 인증서가 새 이름으로 다시 나와야 하므로 **`tailscale serve reset` 후 다시 켜야** 합니다.
+- 공개하려면 tailnet에 **HTTPS Certificates**가 켜져 있어야 합니다. `tailscale cert <머신>.<tailnet>.ts.net`이
+  성공하면 준비된 것입니다. Funnel 승인 링크가 404면 브라우저가 다른 Tailscale 계정으로 로그인된 경우가 대부분입니다.
 - 공개 URL은 저장소에 적지 않습니다(Tailscale과 같은 이유 — 개인 머신을 가리키는 주소입니다).
 
 ### 과거: Railway
