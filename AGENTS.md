@@ -6,7 +6,8 @@ Claude Code·Codex 공용(`CLAUDE.md`는 이 파일을 불러온다). 사람용 
 ## 이 저장소
 
 - 재고 정본을 가진 WMS. 주문(OMS)은 `../jhg-commerce-project`, 시스템 테스트는 `../jhg-system-tests` — 별도 저장소·별도 DB.
-- OMS 코드는 여기서 고치지 않는다. 두 시스템은 README "통신 채널"의 계약으로만 맞춘다.
+- WMS는 Claude Code, OMS·realtime·system-tests는 Codex 담당이다. 옆 저장소는 커밋하지 않고 README "통신 채널"의 계약으로만 맞춘다.
+  필요한 변경은 요청 문서로 넘긴다 — 공개하면 안 되는 요청은 git 밖 `~/study/docs/codex-requests/`.
 - **이 저장소를 바꾸는 작업은 이 디렉터리에서 연다.** 상위 폴더(`~/study`, git 아님)에서 연 세션은 이 파일을 WMS 파일을 읽을 때에야 불러오고,
   워크트리 격리가 안 되며, 메모리·세션 기록도 따로 쌓여 다음 세션이 앞 작업을 못 찾는다(2026-09-13 실제로 겪음).
   옆 저장소 참조가 필요하면 `--add-dir ../jhg-commerce-project`로 붙인다.
@@ -51,6 +52,11 @@ Claude Code·Codex 공용(`CLAUDE.md`는 이 파일을 불러온다). 사람용 
 
 - 켜짐/꺼짐/해소됨 같은 상태를 문서·메모리에 적을 땐 **확인한 명령과 날짜를 같이** 적는다.
   병렬 세션이 서로의 최신 상태를 모른 채 틀린 사실을 남긴 적이 있다(이미 해소된 자동 기동 결손, 이미 끈 Funnel).
+- 옆 저장소 상태는 `git fetch` 후 원격 기본 브랜치로 판단한다. 로컬 체크아웃은 뒤처져 있다
+  (2026-09-14 로컬 `service-refs.json`만 보고 "기준이 옛 OMS"라 틀리게 판단했다).
+- **계약이 걸린 PR은 병합으로 끝나지 않는다.** 구현 병합 · system-tests 기준 갱신(Codex) · 기준 조합 통합 검증 · 공개 스택 배포를
+  [`../jhg-system-tests/docs/cross-repository-work.md`](../jhg-system-tests/docs/cross-repository-work.md) 양식으로 요청 문서에 따로 적는다.
+  PR의 `system-integration/wms` 성공은 그 SHA만 일시 교체한 검증이지 기준 갱신이 아니다. 문서만 바뀌면 기준 갱신이 불필요한 이유를 PR에 적는다.
 
 ## 어디를 읽나
 
