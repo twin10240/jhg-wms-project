@@ -55,8 +55,9 @@ public class RmaService {
 
         // ponytail: 누적은 아직 orderId로 센다. 재사용된 orderId에서는 옛 주문의 반품까지 세어
         // 과다 집계될 수 있는데, 과다 집계는 접수를 '거절'하는 방향이라 조용한 오답이 아니다
-        // (예약 선택이 틀리는 것과 달리 사람이 바로 안다). 모든 반품이 orderRequestKey를
-        // 싣게 되면 RmaReturn에 그 키를 저장하고 여기도 키 기준으로 바꾼다.
+        // (예약 선택이 틀리는 것과 달리 사람이 바로 안다). 키 기준으로 옮기려면 RmaReturn에 주문 키를
+        // 저장해야 하는데, 키 없는 기존 행이 집계에서 빠지면 과다 반품을 '받는' 쪽으로 틀린다.
+        // 기존 행을 채울 근거가 생기면 옮긴다.
         Map<Long, Integer> cumulative = cumulativeReturnQty(request.orderId());
         for (var entry : requestQtyByProduct.entrySet()) {
             int total = cumulative.getOrDefault(entry.getKey(), 0) + entry.getValue();
@@ -137,23 +138,13 @@ public class RmaService {
     // ── 내부 ──────────────────────────────────────────────────────
 
     /**
-     * 반품 대상 예약을 찾는다.
+     * 반품 대상 예약을 {@code orderRequestKey}로 <b>단건 조회</b>한다.
      *
-     * <p>{@code orderRequestKey}가 오면 <b>단건 조회</b>다. orderId는 유일하지 않아서
-     * (OMS DB 초기화로 재사용된다) "가장 최근 예약" 추측은 옛 주문의 반품을 새 주문에 붙이거나,
-     * 실제로 출고된 상품을 "출고 내역에 없다"고 거절한다 — 예약/출고 경로가 PR #23에서
-     * requestKey로 옮겨간 것과 같은 이유다.
-     *
-     * <p>키가 없으면 레거시 경로다. OMS가 모든 반품 요청에 키를 싣게 되면 이 분기와
-     * {@code findByOrderIdLatestFirstWithLock}을 같이 지운다.
+     * <p>orderId로는 찾지 않는다. orderId는 유일하지 않아서(OMS DB 초기화로 재사용된다)
+     * "가장 최근 예약" 추측은 옛 주문의 반품을 새 주문에 붙이거나, 실제로 출고된 상품을
+     * "출고 내역에 없다"고 거절했다. 그 레거시 경로는 OMS가 모든 반품에 키를 싣게 된 뒤(e6e6a35) 지웠다.
      */
     private Reservation findReservation(CreateRmaRequest request) {
-        if (!hasOrderRequestKey(request))
-            return reservationRepository.findByOrderIdLatestFirstWithLock(request.orderId())
-                    .stream().findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "예약이 없습니다. orderId=" + request.orderId()));
-
         UUID key = UUID.fromString(request.orderRequestKey());   // 형식은 validate에서 이미 걸렀다
         Reservation reservation = reservationRepository.findByRequestKeyWithLock(key)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -167,24 +158,20 @@ public class RmaService {
         return reservation;
     }
 
-    private static boolean hasOrderRequestKey(CreateRmaRequest request) {
-        return request.orderRequestKey() != null && !request.orderRequestKey().isBlank();
-    }
-
     private void validateCreateRequest(CreateRmaRequest request) {
         if (request.requestKey() == null || request.requestKey().isBlank())
             throw new IllegalArgumentException("requestKey는 필수입니다.");
         if (request.orderId() == null)
             throw new IllegalArgumentException("orderId는 필수입니다.");
+        if (request.orderRequestKey() == null || request.orderRequestKey().isBlank())
+            throw new IllegalArgumentException("orderRequestKey는 필수입니다.");
         if (request.items() == null || request.items().isEmpty())
             throw new IllegalArgumentException("품목이 없습니다.");
         // 형식은 경계에서 막는다. 안쪽에서 UUID.fromString이 터지면 400이어야 할 것이 500이 된다.
-        if (hasOrderRequestKey(request)) {
-            try {
-                UUID.fromString(request.orderRequestKey());
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("orderRequestKey는 UUID 형식이어야 합니다.");
-            }
+        try {
+            UUID.fromString(request.orderRequestKey());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("orderRequestKey는 UUID 형식이어야 합니다.");
         }
         for (var item : request.items()) {
             if (item.orderItemId() == null)
