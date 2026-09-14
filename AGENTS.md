@@ -43,7 +43,8 @@ Claude Code·Codex 공용(`CLAUDE.md`는 이 파일을 불러온다). 사람용 
 ## 비밀과 공개 스택
 
 - 공개 스택 자격증명은 루트 `.env`(gitignore). 값을 출력·커밋하지 않는다. 공개해도 되는 건 `demo` / `demo1234`(OPERATOR)뿐.
-- 공개 스택에 `ANTHROPIC_API_KEY`를 넣지 않는다. 예외(시드)는 README "공개 스택" 절 절차대로 하고, 끝나면 wms1~3 기동 로그의 `ANTHROPIC_API_KEY 미설정`을 확인한다.
+- 공개 스택에 `ANTHROPIC_API_KEY`를 넣지 않는다. 예외(시드)는 README "공개 스택" 절 절차대로 한다.
+- **공개 스택을 바꾼 뒤(재빌드·재생성·시드·터널 수정)엔 `docs/check-public-stack.sh`가 통과해야 끝이다.** AI 키, 이미지 최신성, 터널 대상, nginx 3대 순환, demo 로그인을 본다. 손 확인으로 대신하지 않는다.
 - `:8090` 직결로는 관리자 폼 POST 뒤 리다이렉트가 `:80`으로 간다(nginx가 `Host`에서 포트를 뗀다). 폼을 타는 스크립트는 공개 주소로 돌린다.
 
 ## 상태를 기록할 때

@@ -145,7 +145,11 @@ JDBC URL: `jdbc:postgresql://localhost:5432/wms` (테스트는 `wms_test`)
 ```bash
 colima start --cpu 4 --memory 6     # 컨테이너 런타임(Docker Desktop 대신)
 docker compose up -d --build        # nginx(:8090) → wms1/2/3 → postgres·redis
+docs/check-public-stack.sh          # 점검 — AI 키·이미지 최신성·터널 대상·3대 순환·demo 로그인
 ```
+
+코드가 바뀐 뒤 공개 스택을 갱신할 때는 한꺼번에 내리지 않고 한 대씩 재생성합니다:
+`docker compose build wms1 wms2 wms3` 후 `docker compose up -d --no-deps --no-build wms1`(기동 로그 `Started` 확인) → `wms2` → `wms3`.
 
 **터널을 무엇으로 바꾸든 이 스택은 그대로입니다.** 터널은 이미 열려 있는 `:8090`을
 인터넷에 이어줄 뿐이고, 그 포트를 여는 것은 colima 안의 컨테이너입니다 —
@@ -169,7 +173,7 @@ colima가 꺼지면 어떤 터널을 써도 502입니다.
 - **데모 데이터**: 빈 볼륨이면 `InitDb`가 재고 20개만 심어 반품·발주·실사 화면이 비어 있습니다.
   아래 셋을 `WMS_BASE_URL=https://<공개 주소>`와 `.env` 계정으로 돌립니다(`docs/seed-*.sh`, 모두 앱 경로를 탑니다).
   분류까지 채우려면 **시드 동안만** 키를 준 override로 `wms1~3`을 재생성하고(`up -d --no-deps --no-build`),
-  끝나면 override 없이 다시 재생성해 기동 로그의 `ANTHROPIC_API_KEY 미설정`을 확인합니다(호출 60여 회, 100원 안쪽).
+  끝나면 override 없이 다시 재생성하고 `docs/check-public-stack.sh`로 키가 빠졌는지 확인합니다(호출 60여 회, 100원 안쪽).
   1. `seed-return-demo.sh` — 출고 20건 + 반품 30건
   2. `seed-purchase-order-memo-demo.sh` — 발주 30건(메모)
   3. `seed-cycle-count-demo.sh` — 실사 5세션(`PSQL="docker exec -i jhg-wms-project-postgres-1 psql" PGARGS="-U wms -d wms"`)
