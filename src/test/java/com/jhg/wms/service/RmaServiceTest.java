@@ -60,7 +60,7 @@ class RmaServiceTest {
 
     private CreateRmaRequest req(String key, long orderId, String reason,
                                   List<CreateRmaRequest.Item> items) {
-        return new CreateRmaRequest(key, orderId, null, reason, items);
+        return new CreateRmaRequest(key, orderId, keyOf(orderId).toString(), reason, items);
     }
 
     private List<CreateRmaRequest.Item> items(long orderItemId, long productId, int qty) {
@@ -399,16 +399,25 @@ class RmaServiceTest {
         inventoryService.reserveAll(새예약, 100L, Map.of(2L, 5));
         inventoryService.shipAll(새예약, Map.of(2L, 5));
 
-        // 레거시 경로(키 없음)는 최신 예약만 본다 — 옛 주문의 상품 1이 "출고 내역에 없다"가 된다.
-        assertThatThrownBy(() -> rmaService.createReturn(
-                req(UUID.randomUUID().toString(), 100L, "불량", items(501, 1, 2))))
-                .hasMessageContaining("출고 내역에 없는 상품");
-
         var result = rmaService.createReturn(new CreateRmaRequest(
                 UUID.randomUUID().toString(), 100L, 옛예약.toString(), "불량", items(501, 1, 2)));
 
         assertThat(result.created()).isTrue();
         assertThat(result.rma().getItems()).hasSize(1);
+    }
+
+    @Test
+    void 주문_requestKey가_없으면_거부() {
+        seedAndShip(100L, Map.of(1L, 5));
+
+        // orderId만으로 예약을 고르는 추측 경로는 없앴다 — OMS가 e6e6a35부터 모든 반품에 키를 싣는다.
+        assertThatThrownBy(() -> rmaService.createReturn(new CreateRmaRequest(
+                UUID.randomUUID().toString(), 100L, null, "불량", items(501, 1, 2))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("orderRequestKey는 필수");
+        assertThatThrownBy(() -> rmaService.createReturn(new CreateRmaRequest(
+                UUID.randomUUID().toString(), 100L, " ", "불량", items(501, 1, 2))))
+                .hasMessageContaining("orderRequestKey는 필수");
     }
 
     @Test
