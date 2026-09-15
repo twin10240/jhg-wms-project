@@ -178,7 +178,7 @@ colima가 꺼지면 어떤 터널을 써도 502입니다.
   2. `seed-purchase-order-memo-demo.sh` — 발주 30건(메모)
   3. `seed-cycle-count-demo.sh` — 실사 5세션(`PSQL="docker exec -i jhg-wms-project-postgres-1 psql" PGARGS="-U wms -d wms"`)
   4. 매니저로 발주 화면의 브리핑 생성 1회
-  **`:8090` 직결로는 발주 폼이 깨집니다** — nginx가 `Host`에서 포트를 떼어 리다이렉트가 `:80`으로 갑니다. 공개 주소(443)로 돌리십시오.
+  **`:8090` 직결로는 발주 폼이 깨집니다** — nginx가 `Host`에서 포트를 떼어 리다이렉트가 `:80`으로 갑니다. 공개 주소(443)로 돌리십시오. 폼을 타는 2·3번은 `:8090` 주소를 받으면 시작 전에 멈춥니다.
 - **자동 기동**: `brew services start colima`(로그인 시 런타임 기동) + compose 전 서비스의
   `restart: unless-stopped`. 런타임이 뜨면 컨테이너 6개가 스스로 복귀합니다.
   터널 쪽 자동 기동은 각 터널 절을 보십시오. **머신이 잠들거나 꺼져 있는 동안은 링크도 죽습니다.**

@@ -23,6 +23,10 @@
 set -euo pipefail
 
 BASE="${WMS_BASE_URL:-http://localhost:8081}"
+# 공개 스택 :8090 직결은 nginx가 Host에서 포트를 떼어 폼 리다이렉트가 :80으로 간다(2026-09-13 겪음).
+case "$BASE" in *:8090|*:8090/*)
+  echo "WMS_BASE_URL이 :8090 직결입니다 — 폼 리다이렉트가 :80으로 가서 깨집니다. 공개 주소(https)로 돌리세요." >&2; exit 1;;
+esac
 # 실사는 제출자와 승인자가 달라야 한다 — "센 사람이 스스로 장부를 고치지 못한다"는 통제라
 # 같은 계정으로 제출·승인하면 approve가 거부한다(실측). 그래서 계정 둘을 쓴다.
 OP_USER="${WMS_OPERATOR_USER:-operator}"
