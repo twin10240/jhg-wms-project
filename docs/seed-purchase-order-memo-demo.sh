@@ -33,6 +33,10 @@
 set -euo pipefail
 
 BASE="${WMS_BASE_URL:-http://localhost:8081}"
+# 공개 스택 :8090 직결은 nginx가 Host에서 포트를 떼어 폼 리다이렉트가 :80으로 간다(2026-09-13 겪음).
+case "$BASE" in *:8090|*:8090/*)
+  echo "WMS_BASE_URL이 :8090 직결입니다 — 폼 리다이렉트가 :80으로 가서 깨집니다. 공개 주소(https)로 돌리세요." >&2; exit 1;;
+esac
 MGR_USER="${WMS_MANAGER_USER:-manager}"
 MGR_PASSWORD="${WMS_MANAGER_PASSWORD:-manager}"
 
