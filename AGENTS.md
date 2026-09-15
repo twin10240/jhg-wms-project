@@ -38,6 +38,7 @@ Claude Code·Codex 공용(`CLAUDE.md`는 이 파일을 불러온다). 사람용 
 
 - 커밋 제목: `type(wms): 한국어 현재형 서술` — feat / fix / docs / test / ci. 왜 바꿨는지는 본문에.
 - 병합은 머지 커밋(`gh pr merge --merge`). master에 직접 push하지 않는다.
+- PR 본문에 [`.github/pull_request_template.md`](.github/pull_request_template.md)의 "교차 저장소 확인" 절을 채운다. `gh pr create --body`는 템플릿을 불러오지 않는다.
 - 데이터 시드는 SQL이 아니라 앱 경로(API·폼)를 탄다 — `docs/seed-*.sh`. 멱등이 아니다.
 - 평가셋 라벨의 최종 권위는 사람이다. 에이전트가 지어낸 문구로 만든 데이터를 평가셋으로 쓰지 않는다.
 - "X가 로그에 안 남는다"를 로그 캡처로 단언하는 테스트는 만들지 않는다 — 로깅 구현에 묶여 깨지기 쉽다. 코드 리뷰로 지킨다.
