@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# 커밋 전 업스트림보다 뒤처졌는지 본다 — 2026-09-16
+#
+# 왜: 뒤처진 체크아웃 위에 커밋하면 diff가 남의 병합을 되돌리는 모양이 된다.
+#     2026-09-14 옆 저장소 상태를 뒤처진 로컬로 오판했고,
+#     2026-09-16 WMS 로컬 master가 4커밋 뒤처진 채 미커밋 3건이 얹혀
+#     그대로 커밋했으면 PR #66·#67을 날릴 뻔했다. 둘 다 원인이 같다.
+#
+# 설치: git config core.hooksPath .githooks   (저장소마다 한 번)
+# 우회: git commit --no-verify                (뒤처진 걸 알고도 커밋할 때)
+
+set -uo pipefail
+
+# 업스트림이 없는 브랜치(첫 push 전)는 볼 게 없다.
+up="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)" || exit 0
+
+# 네트워크가 없으면 막지 않는다 — 검사기가 작업을 세우면 안 된다.
+git fetch -q "${up%%/*}" 2>/dev/null || exit 0
+
+behind="$(git rev-list --count "HEAD..$up" 2>/dev/null)" || exit 0
+[ "${behind:-0}" -eq 0 ] && exit 0
+
+cat >&2 <<EOF
+
+커밋을 멈춥니다 — 현재 브랜치가 $up 보다 ${behind}커밋 뒤처져 있습니다.
+
+  이대로 커밋하면 diff가 남의 병합을 되돌리는 모양이 됩니다.
+  git stash && git pull --ff-only && git stash pop
+  뒤 'git diff'로 의도한 줄만 남았는지 보고 다시 커밋하십시오.
+
+  알고도 커밋하려면: git commit --no-verify
+
+EOF
+exit 1
+
+# ponytail: 업스트림만 본다. 기능 브랜치가 master에 뒤처진 건 안 잡는다
+# (그건 정상이라 막으면 못 쓴다). 실제로 밟은 두 건은 모두 추적 브랜치 위였다.
