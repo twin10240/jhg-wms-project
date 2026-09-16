@@ -8,6 +8,7 @@ Claude Code·Codex 공용(`CLAUDE.md`는 이 파일을 불러온다). 사람용 
 
 - 재고 정본을 가진 WMS. 주문(OMS)은 `../jhg-commerce-project`, 시스템 테스트는 `../jhg-system-tests` — 별도 저장소·별도 DB.
 - WMS는 Claude Code, OMS·realtime·system-tests는 Codex 담당이다. 옆 저장소는 커밋하지 않고 README "통신 채널"의 계약으로만 맞춘다.
+- 담당 에이전트가 아닌 저장소의 코드 변경·PR 승인·병합·종료·브랜치 삭제는 사용자가 명시하지 않으면 진행하지 않고 확인을 요청한다.
   필요한 변경은 요청 문서로 넘긴다 — 공개하면 안 되는 요청은 git 밖 `~/study/docs/codex-requests/`.
 - **이 저장소를 바꾸는 작업은 이 디렉터리에서 연다.** 상위 폴더(`~/study`, git 아님)에서 연 세션은 이 파일을 WMS 파일을 읽을 때에야 불러오고,
   워크트리 격리가 안 되며, 메모리·세션 기록도 따로 쌓여 다음 세션이 앞 작업을 못 찾는다(2026-09-13 실제로 겪음).
