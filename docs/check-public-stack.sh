@@ -38,6 +38,10 @@ epoch() {
 
 echo "== 컨테이너 ($REPO)"
 git -C "$REPO" fetch -q origin 2>/dev/null || true
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker API에 접근할 수 없습니다 — Docker Desktop/Colima와 권한을 확인하십시오" >&2
+  exit 2
+fi
 # 런타임에 들어가는 경로만 본다 — 문서 커밋으로 재빌드를 요구하지 않는다.
 src_at="$(git -C "$REPO" log -1 --format=%ct origin/master -- src build.gradle settings.gradle gradle Dockerfile)"
 src_sha="$(git -C "$REPO" log -1 --format=%h origin/master -- src build.gradle settings.gradle gradle Dockerfile)"
