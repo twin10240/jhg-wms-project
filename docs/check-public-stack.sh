@@ -38,14 +38,20 @@ epoch() {
 
 echo "== 컨테이너 ($REPO)"
 git -C "$REPO" fetch -q origin 2>/dev/null || true
-if ! docker info >/dev/null 2>&1; then
+containers="wms1 wms2 wms3"
+if [ "${SKIP_CONTAINERS:-}" = 1 ]; then
+  # 원격(CI)에서 공개 주소만 볼 때. Docker가 없는 게 아니라 여기서 볼 게 아니다.
+  skip "컨테이너·AI 키·이미지 최신성 — SKIP_CONTAINERS=1, 로컬 Docker가 있는 곳에서 본다"
+  containers=""
+elif ! docker info >/dev/null 2>&1; then
   echo "Docker API에 접근할 수 없습니다 — Docker Desktop/Colima와 권한을 확인하십시오" >&2
+  echo "공개 주소만 보려면 SKIP_CONTAINERS=1" >&2
   exit 2
 fi
 # 런타임에 들어가는 경로만 본다 — 문서 커밋으로 재빌드를 요구하지 않는다.
 src_at="$(git -C "$REPO" log -1 --format=%ct origin/master -- src build.gradle settings.gradle gradle Dockerfile)"
 src_sha="$(git -C "$REPO" log -1 --format=%h origin/master -- src build.gradle settings.gradle gradle Dockerfile)"
-for s in wms1 wms2 wms3; do
+for s in $containers; do
   if [ "$(docker inspect -f '{{.State.Running}}' "$s" 2>/dev/null)" != true ]; then
     fail "$s 실행 중이 아님"; continue
   fi
