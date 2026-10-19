@@ -28,6 +28,10 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        # id 블록 캐시를 끈다(insert마다 nextval). 스위트 중간에 새 컨텍스트가 뜨면 create-drop이
+        # 시퀀스를 1로 되돌리는데, 캐시된 컨텍스트는 옛 블록을 마저 쓴 뒤 작은 값을 받아 id가 역전된다 —
+        # id 순서로 자르는 원장 분석 테스트가 클래스 실행 순서에 따라 깨졌다(2026-10-19, 컨텍스트 하나 추가로 재현).
+        id.optimizer.pooled.preferred: none
     # main과 동일. 테스트만 OSIV가 켜져 있으면 뷰 렌더 중 지연로딩이 조용히 성공해
     # 운영에서만 LazyInitializationException으로 터지는 차이가 생긴다.
     open-in-view: false
