@@ -366,7 +366,8 @@ class InventoryServiceTest {
         Reservation r = reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow();
         assertThat(r.getDeliveredAt()).isNotNull();
         assertThat(r.getStatus()).isEqualTo(ReservationStatus.SHIPPED);   // 상태는 그대로 — 세 군데 SHIPPED 분기를 안 건드린다
-        verify(deliveryNotifier).notifyAfterCommit(keyOf(99L), 99L, r.getDeliveredAt());
+        verify(deliveryNotifier).notifyAfterCommit(new OmsDeliveryNotifier.DeliveryStatusEvent(
+                keyOf(99L), 99L, com.jhg.wms.domain.DeliveryStatus.DELIVERED, 2, r.getDeliveredAt(), null));
 
         Inventory after = repo.findByProductIdIn(List.of(1L)).get(0);
         assertThat(after.getOnHandQty()).isEqualTo(4);                    // 출고 때 깎인 그대로
@@ -385,7 +386,9 @@ class InventoryServiceTest {
         assertThat(service.markDelivered(keyOf(99L))).isFalse();   // 통지만 재발송
 
         assertThat(reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow().getDeliveredAt()).isEqualTo(first);
-        verify(deliveryNotifier, times(2)).notifyAfterCommit(keyOf(99L), 99L, first);  // 통지 유실 시 재클릭이 복구 경로
+        // 통지 유실 시 재클릭이 복구 경로 — 두 번 다 같은 버전·시각이다(재통지가 now()를 새로 만들지 않는다).
+        verify(deliveryNotifier, times(2)).notifyAfterCommit(new OmsDeliveryNotifier.DeliveryStatusEvent(
+                keyOf(99L), 99L, com.jhg.wms.domain.DeliveryStatus.DELIVERED, 2, first, null));
     }
 
     @Test
@@ -755,6 +758,12 @@ class InventoryServiceTest {
 
         assertThat(res.trackingNumber()).matches("MOCK-99-\\d{14}-[0-9a-f]{8}");
         assertThat(repo.findByProductId(1L).orElseThrow().getOnHandQty()).isEqualTo(4);   // 재고 불변
+        // 배송 v1은 송장 최초 발급과 함께 정해진다 — 이 보완 경로도 예외가 아니다.
+        Reservation r = reservationRepo.findByRequestKey(keyOf(99L)).orElseThrow();
+        assertThat(r.getDeliveryStatus()).isEqualTo(com.jhg.wms.domain.DeliveryStatus.SHIPPED);
+        assertThat(r.getDeliveryVersion()).isEqualTo(1);
+        assertThat(r.getDeliveryStatusAt()).isEqualTo(r.getIssuedAt());
+        assertThat(adjustmentRepo.findAll()).filteredOn(t -> t.getType() == InventoryTransactionType.SHIP).hasSize(1);
     }
 
     // ── 드릴다운 조회 ────────────────────────────────────────────

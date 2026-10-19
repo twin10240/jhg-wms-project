@@ -276,6 +276,161 @@ class WmsAdminControllerTest {
                 .andExpect(flash().attribute("errorMessage", "송장이 없어 배송 완료할 수 없습니다. orderId=20"));
     }
 
+    // ── 배송 실패·재배송 ───────────────────────────────────────
+
+    private static final String KEY20 = "00000000-0000-0000-0000-000000000014";
+
+    private static Reservation issued(long orderId) {
+        Reservation r = Reservation.reserve(keyOf(orderId), orderId, Map.of(1L, 1));
+        r.ship();
+        r.issueShipment(java.time.Instant.parse("2026-10-19T02:00:00Z"));
+        return r;
+    }
+
+    @Test
+    void 배송실패_기록은_사유를_넘기고_예약화면으로_돌아간다() throws Exception {
+        when(inventoryService.recordDeliveryFailure(keyOf(20L), DeliveryFailureCode.RECIPIENT_UNAVAILABLE)).thenReturn(true);
+
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/delivery-failure").param("failureCode", "RECIPIENT_UNAVAILABLE")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/reservations"))
+                .andExpect(flash().attribute("successMessage", "배송 실패를 기록했습니다."));
+    }
+
+    @Test
+    void 같은_실패_재요청은_재통지_문구로_안내한다() throws Exception {
+        when(inventoryService.recordDeliveryFailure(keyOf(20L), DeliveryFailureCode.ADDRESS_ISSUE)).thenReturn(false);
+
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/delivery-failure").param("failureCode", "ADDRESS_ISSUE")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(flash().attribute("successMessage", "OMS에 배송 실패를 다시 통지했습니다."));
+    }
+
+    @Test
+    void 재배송은_MANAGER도_할_수_있고_재요청은_재통지로_안내한다() throws Exception {
+        when(inventoryService.startRedelivery(keyOf(20L))).thenReturn(true, false);
+
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/redeliver").with(user("mgr").roles("MANAGER")).with(csrf()))
+                .andExpect(redirectedUrl("/admin/reservations"))
+                .andExpect(flash().attribute("successMessage", "재배송을 시작했습니다."));
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/redeliver").with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(flash().attribute("successMessage", "OMS에 재배송을 다시 통지했습니다."));
+    }
+
+    @Test
+    void 두_역할_모두_실패_완료를_기록할_수_있다() throws Exception {
+        for (String role : new String[]{"OPERATOR", "MANAGER"}) {
+            mockMvc.perform(post("/admin/reservations/" + KEY20 + "/delivery-failure").param("failureCode", "ADDRESS_ISSUE")
+                            .with(user("u").roles(role)).with(csrf()))
+                    .andExpect(redirectedUrl("/admin/reservations"));
+            mockMvc.perform(post("/admin/reservations/" + KEY20 + "/deliver").with(user("u").roles(role)).with(csrf()))
+                    .andExpect(redirectedUrl("/admin/reservations"));
+        }
+        verify(inventoryService, times(2)).recordDeliveryFailure(keyOf(20L), DeliveryFailureCode.ADDRESS_ISSUE);
+        verify(inventoryService, times(2)).markDelivered(keyOf(20L));
+    }
+
+    @Test
+    void 업무_충돌은_HTTP_오류가_아니라_에러_플래시다() throws Exception {
+        when(inventoryService.startRedelivery(keyOf(20L)))
+                .thenThrow(new IllegalStateException("최초 출고 중인 주문은 재배송할 수 없습니다. 배송 실패를 먼저 기록하세요."));
+
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/redeliver").with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("errorMessage", "최초 출고 중인 주문은 재배송할 수 없습니다. 배송 실패를 먼저 기록하세요."));
+    }
+
+    @Test
+    void 사유가_없거나_지원하지_않으면_서비스를_부르지_않고_에러_플래시다() throws Exception {
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/delivery-failure")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(flash().attribute("errorMessage", "배송 실패 사유를 선택하세요."));
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/delivery-failure").param("failureCode", "LOST")
+                        .with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(flash().attribute("errorMessage", "지원하지 않는 배송 실패 사유입니다: LOST"));
+
+        verify(inventoryService, never()).recordDeliveryFailure(any(), any());
+    }
+
+    @Test
+    void 잘못된_UUID는_거부하고_서비스를_부르지_않는다() throws Exception {
+        mockMvc.perform(post("/admin/reservations/not-a-uuid/redeliver").with(user("op").roles("OPERATOR")).with(csrf()))
+                .andExpect(status().is4xxClientError());
+
+        verify(inventoryService, never()).startRedelivery(any());
+    }
+
+    @Test
+    void CSRF가_없으면_403이고_미인증은_로그인으로_보낸다() throws Exception {
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/delivery-failure").param("failureCode", "ADDRESS_ISSUE")
+                        .with(user("op").roles("OPERATOR")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/redeliver").with(user("op").roles("OPERATOR")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/admin/reservations/" + KEY20 + "/redeliver").with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+
+        verifyNoInteractions(inventoryService);
+    }
+
+    @Test
+    void 최초_출고_행은_실패와_완료만_보여준다() throws Exception {
+        when(inventoryService.findAllReservations()).thenReturn(List.of(issued(20L)));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
+                .andExpect(content().string(containsString("/admin/reservations/" + KEY20 + "/deliver\"")))  // delivery-failure와 구분
+                .andExpect(content().string(containsString("/admin/reservations/" + KEY20 + "/delivery-failure")))
+                .andExpect(content().string(containsString("수취인 부재")))
+                .andExpect(content().string(not(containsString("/admin/reservations/" + KEY20 + "/redeliver"))));
+    }
+
+    @Test
+    void 실패_행은_사유_시각과_재배송_재통지를_보여주고_완료_버튼은_없다() throws Exception {
+        Reservation failed = issued(20L);
+        failed.recordDeliveryFailure(DeliveryFailureCode.ADDRESS_ISSUE, java.time.Instant.parse("2026-10-19T03:00:00Z"));
+        when(inventoryService.findAllReservations()).thenReturn(List.of(failed));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
+                .andExpect(content().string(containsString("배송 실패 · 주소 문제 2026-10-19")))
+                .andExpect(content().string(containsString("/admin/reservations/" + KEY20 + "/redeliver")))
+                .andExpect(content().string(containsString("name=\"failureCode\" value=\"ADDRESS_ISSUE\"")))
+                // deliveredAt이 null이라도 실패 중에는 완료 버튼을 그리지 않는다.
+                .andExpect(content().string(not(containsString("/admin/reservations/" + KEY20 + "/deliver\""))));
+    }
+
+    @Test
+    void 재배송_중_행은_실패_완료_재배송_재통지를_보여준다() throws Exception {
+        Reservation redelivering = issued(20L);
+        redelivering.recordDeliveryFailure(DeliveryFailureCode.ADDRESS_ISSUE, java.time.Instant.parse("2026-10-19T03:00:00Z"));
+        redelivering.startRedelivery(java.time.Instant.parse("2026-10-19T04:00:00Z"));
+        when(inventoryService.findAllReservations()).thenReturn(List.of(redelivering));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")))
+                .andExpect(content().string(containsString("재배송 중 2026-10-19")))
+                .andExpect(content().string(containsString("/admin/reservations/" + KEY20 + "/deliver\"")))  // delivery-failure와 구분
+                .andExpect(content().string(containsString("/admin/reservations/" + KEY20 + "/delivery-failure")))
+                .andExpect(content().string(containsString("/admin/reservations/" + KEY20 + "/redeliver")));
+    }
+
+    @Test
+    void 배송대기_탭과_건수는_실패_재배송_중인_주문을_포함한다() throws Exception {
+        Reservation failed = issued(20L);
+        failed.recordDeliveryFailure(DeliveryFailureCode.RECIPIENT_UNAVAILABLE, java.time.Instant.parse("2026-10-19T03:00:00Z"));
+        Reservation redelivering = issued(21L);
+        redelivering.recordDeliveryFailure(DeliveryFailureCode.RECIPIENT_UNAVAILABLE, java.time.Instant.parse("2026-10-19T03:00:00Z"));
+        redelivering.startRedelivery(java.time.Instant.parse("2026-10-19T04:00:00Z"));
+        Reservation delivered = issued(22L);
+        delivered.deliver(java.time.Instant.parse("2026-10-19T05:00:00Z"));
+        when(inventoryService.findAllReservations()).thenReturn(List.of(failed, redelivering, delivered));
+
+        mockMvc.perform(get("/admin/reservations").with(user("op").roles("OPERATOR")).param("pendingDelivery", "true"))
+                .andExpect(model().attribute("reservations", List.of(failed, redelivering)));
+        mockMvc.perform(get("/").with(user("op").roles("OPERATOR")))
+                .andExpect(model().attribute("deliveryPendingCount", 2L));
+    }
+
     @Test
     void 발주화면_상태_필터가_동작한다() throws Exception {
         PurchaseOrder ordered = PurchaseOrder.create("대기", PurchaseOrderItem.create(1L, 10));

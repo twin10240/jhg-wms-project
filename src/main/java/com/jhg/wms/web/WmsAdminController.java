@@ -80,7 +80,7 @@ public class WmsAdminController {
         return "admin/dashboard";
     }
 
-    /** 배송 대기 = 출고됐고 아직 배송 완료를 기록하지 않은 예약. 창고가 손댈 행이 이것뿐이다. */
+    /** 배송 대기 = 출고됐고 아직 배송 완료를 기록하지 않은 예약(배송 실패·재배송 중 포함). 창고가 손댈 행이 이것뿐이다. */
     private static final java.util.function.Predicate<Reservation> PENDING_DELIVERY =
             r -> r.getStatus() == ReservationStatus.SHIPPED && r.getDeliveredAt() == null;
 
@@ -97,6 +97,7 @@ public class WmsAdminController {
         model.addAttribute("reservations", reservations);
         model.addAttribute("activeStatus", status);
         model.addAttribute("pendingDelivery", pendingDelivery);
+        model.addAttribute("failureCodes", DeliveryFailureCode.values());
         model.addAttribute("productNames", inventoryService.findAllRows().stream()
                 .collect(Collectors.toMap(InventoryRowResponse::productId, InventoryRowResponse::productName)));
         return "admin/reservations";
@@ -108,11 +109,30 @@ public class WmsAdminController {
      */
     @PostMapping("/admin/reservations/{requestKey}/deliver")
     public String deliver(@PathVariable java.util.UUID requestKey, RedirectAttributes ra) {
+        return changeDelivery(ra, () -> inventoryService.markDelivered(requestKey),
+                "배송 완료 처리했습니다.", "OMS에 배송 완료를 다시 통지했습니다.");
+    }
+
+    /** 배송 실패 기록. 배송 완료와 같은 이유로 OPERATOR도 남길 수 있다(현장 관측 사실). */
+    @PostMapping("/admin/reservations/{requestKey}/delivery-failure")
+    public String deliveryFailure(@PathVariable java.util.UUID requestKey,
+                                  @RequestParam(required = false) String failureCode, RedirectAttributes ra) {
+        return changeDelivery(ra,
+                () -> inventoryService.recordDeliveryFailure(requestKey, DeliveryFailureCode.parse(failureCode)),
+                "배송 실패를 기록했습니다.", "OMS에 배송 실패를 다시 통지했습니다.");
+    }
+
+    @PostMapping("/admin/reservations/{requestKey}/redeliver")
+    public String redeliver(@PathVariable java.util.UUID requestKey, RedirectAttributes ra) {
+        return changeDelivery(ra, () -> inventoryService.startRedelivery(requestKey),
+                "재배송을 시작했습니다.", "OMS에 재배송을 다시 통지했습니다.");
+    }
+
+    /** 업무 충돌은 HTTP 오류가 아니라 flash 오류다 — 폼 화면 관례(JSON 콜백의 409와 다르다). */
+    private String changeDelivery(RedirectAttributes ra, java.util.function.BooleanSupplier action,
+                                  String changedMessage, String renotifiedMessage) {
         try {
-            boolean firstTime = inventoryService.markDelivered(requestKey);
-            ra.addFlashAttribute("successMessage", firstTime
-                    ? "배송 완료 처리했습니다."
-                    : "OMS에 배송 완료를 다시 통지했습니다.");
+            ra.addFlashAttribute("successMessage", action.getAsBoolean() ? changedMessage : renotifiedMessage);
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
         }

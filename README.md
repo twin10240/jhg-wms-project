@@ -85,7 +85,7 @@
 | S3 | WMS → OMS | 재고 증가(입고·조정) 통지 → OMS 백오더 FIFO 승격 |
 | S4 | 양방향 | 회복탄력성 — 타임아웃 · best-effort · 보상 스윕 |
 | S5 | 양방향 | 반품(RMA) — OMS가 접수 `POST /api/returns`, WMS가 입고·검수 결과 통지 `POST /api/return-status-events` |
-| S6 | WMS → OMS | 배송 완료 통지 `POST /api/delivery-events` — 창고가 기록하면 OMS 주문이 `DELIVERED`로 전이 |
+| S6 | WMS → OMS | 배송 상태 통지 `POST /api/delivery-status-events` — 창고가 기록한 배송 실패·재배송·완료를 버전과 함께 전달 |
 | S7 | OMS → WMS | 송장 조회 `GET /api/shipments/{requestKey}` — OMS가 자기 송장·배송 상태의 불일치를 확인·복구 |
 
 보충 흐름: OMS가 백오더로 부족을 감지 → WMS에 **보충 요청** → WMS 관리자가 **승인 → 발주 생성 → 입고** → 재고 증가 → S3로 OMS에 통지 → OMS가 백오더 승격. (상세: 아래 [보충 요청과 발주](#보충-요청과-발주) · [OMS 재고보충 통지](#oms-재고보충-통지-s3-채널3) 절)
@@ -325,11 +325,18 @@ GET /api/shipments/{requestKey}
   "carrierName": "테스트택배",
   "trackingNumber": "MOCK-202-20260827063000-3f2a9c14",
   "issuedAt": "2026-08-27T06:30:00.123456Z",
-  "deliveredAt": "2026-08-28T01:00:00.123456Z"
+  "deliveredAt": "2026-08-28T01:00:00.123456Z",
+  "status": "DELIVERED",
+  "deliveryVersion": 2,
+  "occurredAt": "2026-08-28T01:00:00.123456Z",
+  "failureCode": null
 }
 ```
 
 - **`deliveredAt`은 배송 중이면 `null`** 입니다(JSON에서 생략되지 않고 `null`로 나갑니다).
+- **뒤 네 필드는 현재 배송 상태**입니다(2026-10 추가, 앞 7필드는 그대로). 값은 [배송 상태 통지(S6)](#oms-배송-상태-통지-s6)와 같아서,
+  콜백이 유실됐을 때 OMS가 이 조회로 최신 상태를 따라잡습니다. 최초 출고는 `SHIPPED v1`·`occurredAt = issuedAt`,
+  `DELIVERED`면 `occurredAt = deliveredAt`(마이크로초까지), `failureCode`는 실패일 때만 값이 있고 그 밖에는 `null`입니다.
 - **`404`**: 예약이 없거나 아직 송장이 발급되지 않은 주문. 둘을 구분하지 않습니다.
 - **인증**: 다른 `/api/**`와 같은 서비스 계정 Basic. 미인증은 `401`.
 - **아무것도 바꾸지 않습니다**: 조회는 재고·예약·송장·배송 상태를 건드리지 않고, 송장 재발급이나 출고 처리도 하지 않습니다. 몇 번을 호출해도 같은 값입니다.
@@ -586,16 +593,39 @@ Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — **이 분�
 - 통지·전 REST 응답에 타임아웃(connect 1s / read 2s, `spring.http.client.*`) — OMS hang이어도 최대 수 초 내 복귀 (S4)
 - `shipAll`은 RELEASED 예약 출고를, `releaseAll`은 SHIPPED 예약 해제를 거부(S4) — 타임아웃 반쪽 상태에서의 재고 오염(reservedQty 음수) 방지
 
-### OMS 배송 완료 통지 (S6)
+### OMS 배송 상태 통지 (S6)
 
-창고가 `/admin/reservations`에서 **배송 완료**를 누르면 `Reservation.deliveredAt`을 남기고, `OmsDeliveryNotifier`가 커밋 후 OMS `POST /api/delivery-events` 에 `{"requestKey":"3f2a9c14-...","orderId":202,"deliveredAt":"2026-08-28T01:00:00.123456Z"}` 를 보냅니다 — OMS가 `Delivery`를 `DELIVERED`로 올립니다. OMS는 이 상태에서만 고객 반품 신청을 허용하므로, 반품 흐름이 열리는 시점이기도 합니다.
+창고가 `/admin/reservations`에서 **배송 실패·재배송·배송 완료**를 기록하면 `OmsDeliveryNotifier`가 커밋 후 OMS
+`POST /api/delivery-status-events`에 현재 배송 상태를 버전과 함께 보냅니다(2026-10, 이전의 `/api/delivery-events` 완료 통지를 대체).
 
-- **대상**: `SHIPPED`이고 송장이 발급된 예약만. 출고 전이거나 송장이 없으면 거부합니다.
-- **작업 큐**: 대시보드의 `배송 대기`(출고 완료 & 배송 완료 미기록) 수치가 예약 화면의 같은 탭으로 연결됩니다.
-- **재고 무변동**: 배송 완료는 원장 사건이 아닙니다 — `InventoryTransaction`을 만들지 않고 `onHand`·`reserved`를 건드리지 않습니다. 실물 차감은 출고에서 이미 끝났습니다.
-- **상태를 추가하지 않았습니다**: `ReservationStatus`에 `DELIVERED`를 넣으면 `SHIPPED` 비교 세 곳(출고 재차감 방지, 해제 거부, 반품 게이트)의 의미가 뒤집힙니다. 배송 완료는 출고의 후속 사실이라 타임스탬프 한 칸으로 기록합니다.
-- **멱등**: 재클릭해도 최초 시각을 덮어쓰지 않고 통지만 재발송합니다. OMS 쪽도 이미 `DELIVERED`면 no-op(200)입니다.
-- **best-effort**: 통지 실패는 warn 로그만 남기고 배송 완료 기록은 유지됩니다. 보상 스윕은 두지 않았습니다 — 대신 **배송 완료된 행에도 `OMS 재통지` 버튼이 남습니다**(완료 시각은 그대로, 통지만 재발송). WMS 자체가 다운이라 통지가 아예 나가지 못한 경우의 최후 복구는 OMS 관리자 화면의 `배송 완료(수동)` 버튼입니다 — 그쪽은 정상 경로가 아니라 복구용으로 표기돼 있습니다.
+```json
+{"requestKey":"3f2a9c14-...","orderId":202,"status":"DELIVERY_FAILED","deliveryVersion":2,
+ "occurredAt":"2026-10-19T03:00:00.123456Z","failureCode":"RECIPIENT_UNAVAILABLE"}
+```
+
+```text
+출고(송장 발급) SHIPPED v1 → 실패 DELIVERY_FAILED v2 → 재배송 SHIPPED v3 → 완료 DELIVERED v4
+실패 없이:      SHIPPED v1 → DELIVERED v2
+```
+
+- **버전**: 유효한 전이마다 정확히 1 오릅니다. v1은 송장을 처음 발급할 때 정해지며 **첫 출고는 통지하지 않습니다**(OMS는 출고 응답으로 압니다).
+  OMS는 낮은 버전을 무시하고 같은 버전의 다른 내용은 409로 거부하므로, 전달 순서·중복에 기대지 않습니다.
+- **전이표**: SHIPPED → 실패·완료, 실패 → 재배송, 완료 이후는 없음. 최초 출고(v1)에서 재배송, 실패 중 바로 완료,
+  실패 중 사유 변경, 완료 후 실패·재배송은 거부하며 아무것도 바꾸지 않습니다. 화면에서 버튼을 숨기는 것과 별개로 서버가 다시 검증합니다.
+- **실패 사유**: `RECIPIENT_UNAVAILABLE`(수취인 부재)·`ADDRESS_ISSUE`(주소 문제) 둘만, 자유 서술은 받지 않습니다.
+  WMS는 **현재 실패 코드만** 저장합니다 — 재배송·완료 때 지우고 이력은 두지 않습니다.
+- **같은 액션 재요청 = 재통지**: 현재 상태와 같은 액션(같은 사유의 실패, 재배송 중 재배송, 완료 후 완료)은 버전·시각을 그대로 두고 같은 본문을 다시 보냅니다.
+  통지가 유실됐을 때 창고가 같은 버튼으로 복구하는 경로입니다. 별도 명령 ID가 없으므로, 재배송 **뒤에** 도착한 옛 실패 버튼 요청은 새 시도의 실패로 기록될 수 있습니다(알려진 한계).
+- **동시성**: 예약 행 잠금(`findByRequestKeyWithLock`) 안에서 읽고 판정하고 바꿉니다. 같은 요청이 겹치면 버전은 한 번만 오르고, 다른 액션이 겹치면 먼저 잠근 쪽 결과 위에서 뒤쪽을 다시 판정합니다.
+- **커밋 후 전송**: 본문은 잠금 안에서 굳힌 스냅샷이고, 롤백되면 보내지 않습니다. 네트워크 호출 중에는 잠금을 쥐지 않습니다.
+- **재고 무변동**: 실패·재배송·완료는 원장 사건이 아닙니다 — 송장·`issuedAt`·`onHand`·`reserved`를 건드리지 않고, 예약 상태는 끝까지 `SHIPPED`입니다
+  (`ReservationStatus`에 값을 넣으면 `SHIPPED` 비교 세 곳 — 출고 재차감 방지, 해제 거부, 반품 게이트 — 의 의미가 뒤집힙니다).
+- **best-effort**: 통지 실패는 상태를 되돌리지 않습니다. 401/403은 자격증명 문제로, 400/409는 계약 거부로 error 로그를 남기고, 5xx·타임아웃은 warn입니다.
+  재전송 큐는 두지 않았습니다 — 복구는 WMS의 같은 버튼 재통지 또는 OMS 관리자 송장 조회 동기화(`POST /admin/orders/{orderId}/shipment/sync`)입니다.
+  OMS가 아직 출고를 모르는데(READY) 실패가 먼저 도착하면 409이며, 같은 동기화로 송장과 최신 상태를 함께 맞춥니다.
+- **장애 주입**: `OMS_CALLBACK_FAIL_FIRST=true`면 프로세스에서 **첫 배송 콜백 하나만** 유실시킵니다(통합 테스트용, 기본 false).
+- **기존 DB 이전**: 컬럼·백필·제약은 [`docs/wms-delivery-failure-migration.md`](docs/wms-delivery-failure-migration.md)의 수동 SQL로 **새 앱 기동 전에** 넣습니다.
+  기존 완료 행은 `DELIVERED v2`가 되며, 그 행의 완료 재통지는 기존 `deliveredAt`과 v2를 그대로 보냅니다.
 
 ### 관리자 UI (Thymeleaf)
 
@@ -606,8 +636,8 @@ Claude Code가 그 서버에 붙어 반품 보고서를 씁니다 — **이 분�
 | `/admin/inventory` | 재고 조회(보유·예약·가용)·수동 조정(**사유 필수**, 실사 중인 상품은 거부) | 인증 |
 | `/admin/inventory/transactions` | 재고 트랜잭션 이력 — 유형 필터(기초/입고/출고/조정/반품), 상품명·변경 전→후·참조(`발주 #N`/`주문 #N`/`RMA #N`)·사유 표시, 20건씩 페이징 | 인증 |
 | `/admin/inventory/ledger` | 수불대장 — 기간별 상품당 기초·기초설정·입고·반품·출고·조정·실사·기말 집계(원장에서 유도) | 인증 |
-| `/admin/reservations` | 예약 현황 — 상태 필터와 **배송 대기** 탭, 주문별 상품·수량, 송장번호, 배송 완료 여부 표시 | 인증 |
-| `/admin/reservations/{requestKey}/deliver` (POST) | 배송 완료 기록 + OMS 통지 (출고·송장 발급된 주문만) | 인증 |
+| `/admin/reservations` | 예약 현황 — 상태 필터와 **배송 대기** 탭(실패·재배송 중 포함), 주문별 상품·수량, 송장번호, 배송 상태(실패 사유·시각) 표시 | 인증 |
+| `/admin/reservations/{requestKey}/deliver`·`/delivery-failure`·`/redeliver` (POST) | 배송 완료 · 배송 실패(사유 `failureCode`) · 재배송 기록 + OMS 통지. 같은 액션 재요청은 재통지 (출고·송장 발급된 주문만) | 인증 |
 | `/admin/purchase-orders` | 발주 목록(`ORDERED`/`PARTIALLY_RECEIVED`/`RECEIVED`/`CANCELLED` 필터) — 미완료를 발주일시 오래된 순으로, 종료된 건은 뒤로 | 인증 |
 | `/admin/purchase-orders` (POST) | 발주 생성(다품목) | **MANAGER** |
 | `/admin/purchase-orders/{poId}` | 발주 상세 — 품목별 발주량·입고량·잔량, 입고 처리(여러 번 나눠 입고) | 인증 |
@@ -738,20 +768,21 @@ DB 계층 예외는 흰 500 페이지로 새지 않습니다 — 변경(POST)은
 
 - **도메인 단위** — `InventoryTest` / `ReservationTest` / `PurchaseOrderTest` / `ReplenishmentRequestTest` / `WmsUserTest`
   - 발주 상태 전이(부분 입고·취소), 취소된 발주의 입고 거부 포함
-- **서비스 통합**(`@DataJpaTest`) — `InventoryServiceTest` / `PurchaseOrderServiceTest` / `ReplenishmentRequestServiceTest` / `RmaServiceTest`
+- **서비스 통합**(`@DataJpaTest`) — `InventoryServiceTest` / `DeliveryStatusServiceTest` / `PurchaseOrderServiceTest` / `ReplenishmentRequestServiceTest` / `RmaServiceTest`
   - 원장 재구성 불변식(Σ delta == onHand), 발주 취소 시 연결 요청 종결·재고 불변, 목록 정렬 검증
   - 수불대장 기말 항등식, 반품 접수 검증·멱등·누적 반품량·처분별 재고 반영(RESTOCKED만 증가)
 - **MockMvc 슬라이스** — `InventoryControllerTest` / `ShipmentControllerTest` / `ReplenishmentRequestControllerTest` / `WmsAdminControllerTest` / `RmaControllerTest` / `RmaAdminControllerTest` / `ReturnAnalyticsControllerTest`
   - 롤 경계(OPERATOR가 MANAGER 액션 호출 시 403), 화면 렌더링(한글 상태·상품명·참조) 포함
   - 반품 API 상태 코드 계약(201/200/409/400/404/401), 검수 폼 기본값 부재, DB 장애 시 503(리다이렉트 루프 아님)
-  - 송장 조회 계약(200/404/401, `deliveredAt`이 생략이 아니라 `null`로 직렬화), 배송 완료·재통지 액션과 배송 대기 탭
+  - 송장 조회 계약(200/404/401, `deliveredAt`이 생략이 아니라 `null`로 직렬화, 배송 상태 네 필드), 배송 실패·재배송·완료·재통지 액션과 상태별 버튼, 배송 대기 탭
   - 분석 REST 넷의 직렬화·401·빈 결과 200·잘못된 인자 400(본문 내용까지) 계약
 - **보안 통합**(`@SpringBootTest(RANDOM_PORT)`) — `SecurityChainIntegrationTest`
   - `/api/**` 미인증 **401 유지**(302 아님), Basic 200, 폼 로그인 왕복. MockMvc가 재현 못 하는 실서블릿 `/error` 재디스패치를 검증
 - **OMS 통지 클라이언트**(`@RestClientTest`) — `OmsReplenishmentNotifierTest` / `OmsDeliveryNotifierTest`
-  - Basic 자격증명 헤더, 페이로드 계약, 5xx·401을 삼켜 커밋 경로를 지키는지(afterCommit 예외 전파 차단)
+  - Basic 자격증명 헤더, 페이로드 계약, 4xx·5xx·타임아웃을 삼켜 커밋 경로를 지키는지(afterCommit 예외 전파 차단)
+  - 배송 콜백의 커밋 경계(`DeliveryCallbackCommitTest`) — 롤백 시 미전송, 커밋 뒤 전송 실패에도 상태 유지, 스냅샷 불변
 - **설정·기동** — `WmsUserSeederTest`(멱등·BCrypt·공백 자격증명 기동 실패) / `DbUserDetailsServiceTest`(롤→`ROLE_` 권한)
-- **실제 동시 요청**(`@SpringBootTest`) — 오버셀 방지, 실사 세션 겹침, 이중 승인·조정 차단, 원장 불변식 검증
+- **실제 동시 요청**(`@SpringBootTest`) — 오버셀 방지, 실사 세션 겹침, 이중 승인·조정 차단, 배송 상태 중복·경합 전이, 원장 불변식 검증
 
 ### 수동 검증
 
