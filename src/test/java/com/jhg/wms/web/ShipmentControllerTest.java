@@ -2,6 +2,8 @@ package com.jhg.wms.web;
 
 import com.jhg.wms.config.DbUserDetailsService;
 import com.jhg.wms.config.SecurityConfig;
+import com.jhg.wms.domain.DeliveryFailureCode;
+import com.jhg.wms.domain.DeliveryStatus;
 import com.jhg.wms.service.InventoryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +37,8 @@ class ShipmentControllerTest {
     @Test
     void 송장이_발급된_주문은_모든_필드를_반환한다() throws Exception {
         when(inventoryService.findShipment(keyOf(202L))).thenReturn(Optional.of(new ShipmentResponse(
-                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, DELIVERED_AT)));
+                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, DELIVERED_AT,
+                DeliveryStatus.DELIVERED, 2L, DELIVERED_AT, null)));
 
         mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-0000000000ca").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())
@@ -46,13 +49,35 @@ class ShipmentControllerTest {
                 .andExpect(jsonPath("$.trackingNumber").value("MOCK-202-20260827063000"))
                 // 초 미만까지 그대로 나간다 — 초 단위 고정 패턴 파서를 쓰면 깨진다.
                 .andExpect(jsonPath("$.issuedAt").value("2026-08-27T06:30:00.123456Z"))
-                .andExpect(jsonPath("$.deliveredAt").value("2026-08-28T01:00:00.123456Z"));
+                .andExpect(jsonPath("$.deliveredAt").value("2026-08-28T01:00:00.123456Z"))
+                // 배송 상태 버전 — 완료면 occurredAt이 deliveredAt과 같다.
+                .andExpect(jsonPath("$.status").value("DELIVERED"))
+                .andExpect(jsonPath("$.deliveryVersion").value(2))
+                .andExpect(jsonPath("$.occurredAt").value("2026-08-28T01:00:00.123456Z"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"failureCode\":null")));
+    }
+
+    @Test
+    void 배송_실패면_상태_버전_시각_사유를_함께_준다() throws Exception {
+        Instant failedAt = Instant.parse("2026-08-27T09:00:00.123456Z");
+        when(inventoryService.findShipment(keyOf(202L))).thenReturn(Optional.of(new ShipmentResponse(
+                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, null,
+                DeliveryStatus.DELIVERY_FAILED, 2L, failedAt, DeliveryFailureCode.RECIPIENT_UNAVAILABLE)));
+
+        mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-0000000000ca").with(httpBasic("wms", "wms")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"deliveredAt\":null")))
+                .andExpect(jsonPath("$.status").value("DELIVERY_FAILED"))
+                .andExpect(jsonPath("$.deliveryVersion").value(2))
+                .andExpect(jsonPath("$.occurredAt").value("2026-08-27T09:00:00.123456Z"))
+                .andExpect(jsonPath("$.failureCode").value("RECIPIENT_UNAVAILABLE"));
     }
 
     @Test
     void 배송_중이면_deliveredAt은_null이다() throws Exception {
         when(inventoryService.findShipment(keyOf(202L))).thenReturn(Optional.of(new ShipmentResponse(
-                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, null)));
+                keyOf(202L), 202L, "MOCK", "테스트택배", "MOCK-202-20260827063000", ISSUED_AT, null,
+                DeliveryStatus.SHIPPED, 1L, ISSUED_AT, null)));
 
         mockMvc.perform(get("/api/shipments/00000000-0000-0000-0000-0000000000ca").with(httpBasic("wms", "wms")))
                 .andExpect(status().isOk())

@@ -1,6 +1,7 @@
 package com.jhg.wms.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
@@ -88,6 +89,33 @@ public class Reservation {
     private Instant deliveredAt;
 
     /**
+     * 배송 시도의 현재 상태. 송장 발급 전은 null이다. 위 deliveredAt과 같은 이유로 ReservationStatus와 분리한다.
+     * <p>기존 DB에는 이 컬럼들을 ddl-auto가 아니라 {@code docs/wms-delivery-failure-migration.sql}로 먼저 넣는다.
+     */
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Enumerated(EnumType.STRING)
+    @Column
+    private DeliveryStatus deliveryStatus;
+
+    /**
+     * 유효한 전이마다 정확히 1 증가한다(송장 발급 v1). OMS는 이 값으로 늦게 도착한 콜백을 버린다.
+     * DEFAULT 0은 ddl-auto가 기존 행에 NOT NULL 컬럼을 붙일 때의 방어일 뿐, 백필을 대신하지 않는다.
+     */
+    @ColumnDefault("0")
+    @Column(nullable = false)
+    private long deliveryVersion;
+
+    /** 현재 배송 상태가 확정된 시각 — 콜백의 occurredAt. 재통지는 이 값을 그대로 보낸다. */
+    @Column
+    private Instant deliveryStatusAt;
+
+    /** 현재 실패 사유. DELIVERY_FAILED에서만 값이 있다 — 재배송·완료 때 지운다(이력은 두지 않는다). */
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Enumerated(EnumType.STRING)
+    @Column
+    private DeliveryFailureCode deliveryFailureCode;
+
+    /**
      * 예약 생성 시각. 이 필드가 생기기 전 행은 null이다 — 알 수 없는 정보라 백필하지 않는다
      * ({@code InventoryTransaction.actor}와 같은 규칙).
      *
@@ -147,14 +175,78 @@ public class Reservation {
         // 신규 주문의 출고가 통째로 실패한다. 예약마다 유일한 값은 requestKey뿐이다.
         this.trackingNumber = CARRIER_CODE + "-" + orderId + "-" + TRACKING_TS.format(now)
                 + "-" + requestKey.toString().substring(0, 8);
+        // 배송 v1은 ship()이 아니라 여기서 정한다 — 송장 없이 SHIPPED인 기존 행을 shipAll이 보완할 때도 이 경로를 탄다.
+        this.deliveryStatus = DeliveryStatus.SHIPPED;
+        this.deliveryVersion = 1;
+        this.deliveryStatusAt = this.issuedAt;
+    }
+
+    // ── 배송 상태 전이 ─────────────────────────────────────────
+    // 세 메서드 모두 새 전이면 true, 현재 상태와 같은 액션의 재요청이면 false(버전·시각 불변 — 재통지만 한다).
+    // 전이표에 없는 요청은 아무것도 바꾸지 않고 IllegalStateException. 잠금은 호출 측 서비스의 책임이다.
+    // 절삭 이유는 issueShipment와 같다(timestamp(6)).
+
+    /** 배송 실패 기록. 같은 사유의 재요청은 재통지, 다른 사유로 바꾸기는 거부한다. */
+    public boolean recordDeliveryFailure(DeliveryFailureCode code, Instant now) {
+        if (code == null) throw new IllegalArgumentException("배송 실패 사유를 선택하세요.");
+        switch (requireDeliveryStatus()) {
+            case SHIPPED -> {
+                advance(DeliveryStatus.DELIVERY_FAILED, now);
+                this.deliveryFailureCode = code;
+                return true;
+            }
+            case DELIVERY_FAILED -> {
+                if (code == deliveryFailureCode) return false;
+                throw new IllegalStateException("이미 '" + deliveryFailureCode.getLabel()
+                        + "'(으)로 실패 기록된 배송입니다. 사유를 바꾸려면 재배송 후 다시 기록하세요.");
+            }
+            default -> throw new IllegalStateException("배송 완료된 주문은 실패로 기록할 수 없습니다.");
+        }
+    }
+
+    /** 재배송 시작. 같은 송장·물건으로 다시 보낸다 — 송장·재고는 건드리지 않는다. */
+    public boolean startRedelivery(Instant now) {
+        switch (requireDeliveryStatus()) {
+            case DELIVERY_FAILED -> {
+                advance(DeliveryStatus.SHIPPED, now);
+                return true;
+            }
+            case SHIPPED -> {
+                // v1은 최초 출고다. 실패 기록 없이 재배송을 받으면 버전이 업무 사실 없이 늘어난다.
+                if (deliveryVersion == 1)
+                    throw new IllegalStateException("최초 출고 중인 주문은 재배송할 수 없습니다. 배송 실패를 먼저 기록하세요.");
+                return false;
+            }
+            default -> throw new IllegalStateException("배송 완료된 주문은 재배송할 수 없습니다.");
+        }
     }
 
     /**
      * 배송 완료 기록. 재고는 출고에서 이미 차감됐으므로 원장을 만들지 않는다 — 사실만 남긴다.
-     * 절삭 이유는 issueShipment와 같다(issued_at/delivered_at 모두 timestamp(6)).
-     * 재호출 방지는 호출 측(락을 쥔 서비스)의 책임 — issueShipment와 같은 규칙이다.
+     * deliveredAt은 완료 상태 시각과 같은 값이다(조회 계약: DELIVERED면 둘이 마이크로초까지 같다).
      */
-    public void deliver(Instant now) {
-        this.deliveredAt = now.truncatedTo(ChronoUnit.MICROS);
+    public boolean deliver(Instant now) {
+        switch (requireDeliveryStatus()) {
+            case SHIPPED -> {
+                advance(DeliveryStatus.DELIVERED, now);
+                this.deliveredAt = this.deliveryStatusAt;
+                return true;
+            }
+            case DELIVERED -> { return false; }
+            default -> throw new IllegalStateException("배송 실패 상태에서는 바로 완료할 수 없습니다. 재배송을 먼저 시작하세요.");
+        }
+    }
+
+    private DeliveryStatus requireDeliveryStatus() {
+        if (deliveryStatus == null)
+            throw new IllegalStateException("송장이 발급된 출고 주문만 배송 상태를 바꿀 수 있습니다.");
+        return deliveryStatus;
+    }
+
+    private void advance(DeliveryStatus next, Instant now) {
+        this.deliveryStatus = next;
+        this.deliveryVersion++;
+        this.deliveryStatusAt = now.truncatedTo(ChronoUnit.MICROS);
+        this.deliveryFailureCode = null;   // 현재 실패 코드만 둔다 — 실패 전이는 advance 뒤에 다시 채운다
     }
 }

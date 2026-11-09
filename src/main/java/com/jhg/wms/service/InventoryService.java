@@ -3,6 +3,7 @@ package com.jhg.wms.service;
 import com.jhg.wms.client.OmsDeliveryNotifier;
 import com.jhg.wms.client.OmsReplenishmentNotifier;
 import com.jhg.wms.config.ActorProvider;
+import com.jhg.wms.domain.DeliveryFailureCode;
 import com.jhg.wms.domain.Inventory;
 import com.jhg.wms.domain.InventoryTransaction;
 import com.jhg.wms.domain.InventoryTransactionType;
@@ -174,25 +175,43 @@ public class InventoryService {
      * 배송 완료 기록 + OMS 통지. 출고되고 송장이 있는 주문만 대상이다.
      * <p>재고는 건드리지 않는다 — 출고에서 이미 차감됐고 배송 완료는 원장 사건이 아니다.
      * <p>재호출은 시각을 덮어쓰지 않고 통지만 재발송한다. 통지가 유실됐을 때(best-effort)
-     * 관리자가 화면의 재통지 버튼으로 복구하는 경로이며, OMS 쪽이 멱등이라 안전하다.
+     * 관리자가 화면의 재통지 버튼으로 복구하는 경로이며, OMS가 같은 버전을 no-op으로 받아 안전하다.
      *
      * @return 이번 호출이 배송 완료를 처음 기록했으면 true, 이미 기록돼 있어 통지만 재발송했으면 false
      */
     @Transactional
     public boolean markDelivered(UUID requestKey) {
-        Reservation reservation = reservationRepository.findByRequestKeyWithLock(requestKey)
-                .orElseThrow(() -> new IllegalStateException("예약이 없어 배송 완료할 수 없습니다. requestKey=" + requestKey));
-        if (reservation.getStatus() != ReservationStatus.SHIPPED)
-            throw new IllegalStateException("출고된 주문만 배송 완료할 수 있습니다. requestKey=" + requestKey);
-        if (reservation.getTrackingNumber() == null)
-            throw new IllegalStateException("송장이 없어 배송 완료할 수 없습니다. requestKey=" + requestKey);
+        return changeDelivery(requestKey, "배송 완료", r -> r.deliver(Instant.now()));
+    }
 
-        boolean firstTime = reservation.getDeliveredAt() == null;
-        if (firstTime)
-            reservation.deliver(Instant.now());
-        // 콜백에 두 값을 다 싣는다 — OMS는 requestKey로 주문을 특정하고, orderId는 사람이 읽는 참조다.
-        omsDeliveryNotifier.notifyAfterCommit(requestKey, reservation.getOrderId(), reservation.getDeliveredAt());
-        return firstTime;
+    /** 배송 실패 기록 + OMS 통지. 같은 사유의 재요청은 통지만 재발송한다. 반환값은 markDelivered와 같다. */
+    @Transactional
+    public boolean recordDeliveryFailure(UUID requestKey, DeliveryFailureCode code) {
+        return changeDelivery(requestKey, "배송 실패 기록", r -> r.recordDeliveryFailure(code, Instant.now()));
+    }
+
+    /** 재배송 시작 + OMS 통지. 같은 송장으로 다시 보낸다 — 재고·송장 불변. 반환값은 markDelivered와 같다. */
+    @Transactional
+    public boolean startRedelivery(UUID requestKey) {
+        return changeDelivery(requestKey, "재배송", r -> r.startRedelivery(Instant.now()));
+    }
+
+    /**
+     * 배송 상태 변경의 공통 경로: 행 잠금 → 출고·송장 확인 → 도메인 전이 → 커밋 후 통지.
+     * 잠금 덕에 같은 요청이 동시에 와도 버전은 한 번만 오르고, 뒤 요청은 앞 요청이 커밋한 상태를 보고 재통지가 된다.
+     * 통지 본문은 여기서(락 안에서) 굳힌다. 전이가 거부되면 예외로 롤백되고 통지도 등록되지 않는다.
+     */
+    private boolean changeDelivery(UUID requestKey, String action, java.util.function.Predicate<Reservation> transition) {
+        Reservation reservation = reservationRepository.findByRequestKeyWithLock(requestKey)
+                .orElseThrow(() -> new IllegalStateException("예약이 없어 " + action + "할 수 없습니다. requestKey=" + requestKey));
+        if (reservation.getStatus() != ReservationStatus.SHIPPED)
+            throw new IllegalStateException("출고된 주문만 " + action + "할 수 있습니다. requestKey=" + requestKey);
+        if (reservation.getTrackingNumber() == null)
+            throw new IllegalStateException("송장이 없어 " + action + "할 수 없습니다. requestKey=" + requestKey);
+
+        boolean changed = transition.test(reservation);
+        omsDeliveryNotifier.notifyAfterCommit(OmsDeliveryNotifier.DeliveryStatusEvent.snapshotOf(reservation));
+        return changed;
     }
 
     /** 예약 해제. 예약이 없거나 이미 해제됐으면 no-op. 출고된 예약은 해제 거부(반쪽 상태 오염 방지). */
