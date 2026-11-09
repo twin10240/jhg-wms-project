@@ -12,6 +12,7 @@ SQL: [`wms-delivery-failure-migration.sql`](wms-delivery-failure-migration.sql) 
 새 앱이 먼저 떠도 기동은 성공한다(`delivery_version`의 DB 기본값 0 덕분). 그러나 그건 **백필도 제약도 없는 상태**다 —
 기존 배송 중·완료 행이 모두 "미출고 v0"으로 보여 화면에서 버튼이 사라지고 조회가 틀린 상태를 준다.
 그 경우에도 아래 SQL을 실행하면 복구된다(검사 (c)), 하지만 그사이 쓰인 값은 보장하지 않는다.
+그사이 OMS가 그런 행을 송장 동기화하면 `status:null, deliveryVersion:0` 응답을 받아 실패한다 — SQL을 돌리기 전까지 그 주문의 동기화는 깨져 있다.
 
 | DB | 앱 | 실행 담당 | 상태 |
 |---|---|---|---|

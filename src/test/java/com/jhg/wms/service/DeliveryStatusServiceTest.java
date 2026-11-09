@@ -16,7 +16,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -37,13 +41,18 @@ class DeliveryStatusServiceTest {
     @Autowired ReservationRepository reservationRepo;
     @Autowired InventoryTransactionRepository txnRepo;
     @Autowired jakarta.persistence.EntityManager em;
+    @Autowired JdbcTemplate jdbc;
     InventoryService service;
     OmsDeliveryNotifier deliveryNotifier;
 
     private static final UUID KEY = keyOf(99L);
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        // create-drop 스키마엔 이전 SQL의 CHECK 5개가 없다 — 앱이 쓰는 값이 실제 제약을 지키는지 여기서 본다.
+        // DDL은 이전 SQL의 ④ 블록을 그대로 쓴다(복사본이 갈라지지 않게). 테스트 트랜잭션과 함께 롤백된다.
+        String sql = Files.readString(Path.of("docs/wms-delivery-failure-migration.sql"));
+        jdbc.execute(sql.substring(sql.indexOf("-- ④"), sql.indexOf("-- ⑤")));
         deliveryNotifier = mock(OmsDeliveryNotifier.class);
         service = new InventoryService(repo, reservationRepo, txnRepo, mock(OmsReplenishmentNotifier.class),
                 deliveryNotifier, () -> "operator");
@@ -282,5 +291,14 @@ class DeliveryStatusServiceTest {
         assertThat(v2.failureCode()).isEqualTo(RECIPIENT_UNAVAILABLE);
         assertThat(v2.deliveredAt()).isNull();
         assertThat(service.findShipment(KEY).orElseThrow()).isEqualTo(v2);   // 조회는 아무것도 바꾸지 않는다
+    }
+
+    @Test
+    void 이전_SQL_제약이_테스트_스키마에_걸려_있다() {
+        shipped(KEY, 99L);
+        em.flush();
+        // SHIPPED는 홀수 버전만 — 제약이 빠졌다면 이 쓰기가 통과해 위 전이 테스트들이 제약 없이 돈 것이다.
+        assertThatThrownBy(() -> jdbc.update("update reservation set delivery_version = 2 where request_key = ?", KEY))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }
