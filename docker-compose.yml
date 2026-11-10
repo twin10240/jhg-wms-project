@@ -27,6 +27,9 @@ x-wms-base: &wms-base
     WMS_OPERATOR_PASSWORD: ${WMS_OPERATOR_PASSWORD:-operator}
     WMS_MANAGER_USER: ${WMS_MANAGER_USER:-manager}
     WMS_MANAGER_PASSWORD: ${WMS_MANAGER_PASSWORD:-manager}
+    # WMS→OMS 콜백 대상. 기본값은 컨테이너 자신이라 콜백이 어디에도 닿지 않는다(공개 스택 단독 운영).
+    # 공개 OMS에 잇는 경우만 .env에 OMS_BASE_URL=http://host.docker.internal:8080 — 소비자 배포가 먼저다.
+    OMS_BASE_URL: ${OMS_BASE_URL:-http://localhost:8080}
     OMS_CALLBACK_USER: ${OMS_CALLBACK_USER:-wms}
     OMS_CALLBACK_PASSWORD: ${OMS_CALLBACK_PASSWORD:-wms}
   depends_on:
